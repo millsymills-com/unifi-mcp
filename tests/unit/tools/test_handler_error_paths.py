@@ -272,7 +272,6 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
     (register_protect_device_tools, "unifi_protect_list_sensors", "list_sensors", "protect", {}),
     (register_protect_device_tools, "unifi_protect_list_viewers", "list_viewers", "protect", {}),
     (register_nvr_tools, "unifi_protect_get_nvr", "get_nvr", "protect", {}),
-    (register_nvr_tools, "unifi_protect_update_nvr", "update_nvr", "protect", {"data": {"name": "nvr"}}),
     (register_media_tools, "unifi_protect_get_snapshot", "get_snapshot", "protect", {"camera_id": "c"}),
     (
         register_media_tools,

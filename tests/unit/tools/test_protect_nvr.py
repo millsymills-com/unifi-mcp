@@ -1,4 +1,4 @@
-"""Tests for Protect NVR MCP tools (1 read + 1 write)."""
+"""Tests for Protect NVR MCP tools (1 read)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ BASE_URL = "https://10.0.0.1:443"
 PROTECT_PREFIX = f"{BASE_URL}/proxy/protect/integration/v1"
 
 READ_TOOL_NAMES = {"unifi_protect_get_nvr"}
-WRITE_TOOL_NAMES = {"unifi_protect_update_nvr"}
 
 
 @pytest.fixture
@@ -44,14 +43,11 @@ def _full_config(mode: UniFiMode) -> UniFiConfig:
 class TestNvrRegistration:
     async def test_all_tools_registered(self, mcp_with_nvr):
         tools = await mcp_with_nvr.list_tools()
-        assert {t.name for t in tools} == READ_TOOL_NAMES | WRITE_TOOL_NAMES
+        assert {t.name for t in tools} == READ_TOOL_NAMES
 
-
-class TestNvrModeGating:
-    async def test_readonly_hides_update_nvr(self):
+    async def test_readonly_exposes_get_nvr(self):
         server = create_server(_full_config(UniFiMode.READONLY))
         names = {t.name for t in await server.list_tools()}
-        assert "unifi_protect_update_nvr" not in names
         assert "unifi_protect_get_nvr" in names
 
 
@@ -60,9 +56,3 @@ class TestNvrClientEndpoints:
     async def test_get_nvr(self, protect_client_local):
         respx.get(f"{PROTECT_PREFIX}/nvrs").mock(return_value=httpx.Response(200, json={"name": "nvr-1"}))
         assert await protect_client_local.get_nvr() == {"name": "nvr-1"}
-
-    @respx.mock
-    async def test_update_nvr_puts_body(self, protect_client_local):
-        route = respx.put(f"{PROTECT_PREFIX}/nvrs").mock(return_value=httpx.Response(200, json={}))
-        await protect_client_local.update_nvr({"name": "renamed"})
-        assert b"renamed" in route.calls[0].request.content

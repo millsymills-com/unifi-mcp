@@ -128,12 +128,6 @@ class ProtectClient(BaseUniFiClient):
         )
         return result
 
-    async def update_nvr(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Update NVR settings."""
-        # TODO(#43): live-verify PUT /nvrs (vs /nvrs/{id}) against a real Protect NVR.
-        result: dict[str, Any] = await self.put("nvrs", json=data)
-        return result
-
     # -- Media methods ------------------------------------------------------
 
     async def get_snapshot(

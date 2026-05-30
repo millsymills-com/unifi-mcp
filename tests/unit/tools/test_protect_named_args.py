@@ -1,4 +1,4 @@
-"""Named-scalar-arg variants for Protect update_camera + update_nvr (#202).
+"""Named-scalar-arg variants for Protect update_camera (#202).
 
 Exercises the option-1 allowlist API:
 - supplying named args builds the correct nested body server-side,
@@ -25,7 +25,6 @@ from fastmcp.exceptions import ToolError
 from unifi_mcp.clients.protect import ProtectClient
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.tools.protect.cameras import register_camera_tools
-from unifi_mcp.tools.protect.nvr import register_nvr_tools
 
 BASE_URL = "https://10.0.0.1:443"
 PROTECT_PREFIX = f"{BASE_URL}/proxy/protect/integration/v1"
@@ -72,7 +71,7 @@ class TestUpdateCameraNamedArgs:
         server = FastMCP(name="t")
         register_camera_tools(server)
         ctx, _ = _ctx_with_protect_client()
-        route = respx.put(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={"ok": True}))
+        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={"ok": True}))
 
         result = await _call(
             server,
@@ -92,7 +91,7 @@ class TestUpdateCameraNamedArgs:
         server = FastMCP(name="t")
         register_camera_tools(server)
         ctx, _ = _ctx_with_protect_client()
-        route = respx.put(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
 
         await _call(
             server,
@@ -145,7 +144,7 @@ class TestUpdateCameraNamedArgs:
         server = FastMCP(name="t")
         register_camera_tools(server)
         ctx, _ = _ctx_with_protect_client()
-        route = respx.put(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
 
         await _call(
             server,
@@ -173,76 +172,3 @@ class TestUpdateCameraNamedArgs:
             )
         assert "radius_secret" in str(exc.value)
 
-
-# ── update_nvr ─────────────────────────────────────────────────────────────
-
-
-class TestUpdateNvrNamedArgs:
-    @respx.mock
-    async def test_named_args_build_body(self):
-        server = FastMCP(name="t")
-        register_nvr_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-        route = respx.put(f"{PROTECT_PREFIX}/nvrs").mock(return_value=httpx.Response(200, json={"ok": True}))
-
-        result = await _call(
-            server,
-            "unifi_protect_update_nvr",
-            ctx,
-            name="Studio NVR",
-            timezone="America/Los_Angeles",
-        )
-
-        assert result == {"ok": True}
-        sent = json.loads(route.calls[0].request.content)
-        assert sent == {"name": "Studio NVR", "timezone": "America/Los_Angeles"}
-
-    async def test_no_args_raises_bad_request(self):
-        server = FastMCP(name="t")
-        register_nvr_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(server, "unifi_protect_update_nvr", ctx)
-        assert "at least one field" in str(exc.value).lower()
-
-    async def test_mixing_named_and_data_raises_bad_request(self):
-        server = FastMCP(name="t")
-        register_nvr_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(
-                server,
-                "unifi_protect_update_nvr",
-                ctx,
-                name="x",
-                data={"foo": 1},
-            )
-        assert "cannot mix" in str(exc.value).lower()
-
-    @respx.mock
-    async def test_legacy_data_dict_still_passes_through(self):
-        server = FastMCP(name="t")
-        register_nvr_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-        route = respx.put(f"{PROTECT_PREFIX}/nvrs").mock(return_value=httpx.Response(200, json={}))
-
-        await _call(server, "unifi_protect_update_nvr", ctx, data={"name": "renamed"})
-
-        sent = json.loads(route.calls[0].request.content)
-        assert sent == {"name": "renamed"}
-
-    async def test_legacy_data_dict_still_hits_denylist(self):
-        server = FastMCP(name="t")
-        register_nvr_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(
-                server,
-                "unifi_protect_update_nvr",
-                ctx,
-                data={"radius_secret": "x"},
-            )
-        assert "radius_secret" in str(exc.value)

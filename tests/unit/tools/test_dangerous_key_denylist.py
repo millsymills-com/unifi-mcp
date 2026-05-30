@@ -26,7 +26,6 @@ from unifi_mcp.tools.network.routing import register_routing_tools
 from unifi_mcp.tools.network.system import register_system_tools
 from unifi_mcp.tools.network.wlan import register_wlan_tools
 from unifi_mcp.tools.protect.cameras import register_camera_tools
-from unifi_mcp.tools.protect.nvr import register_nvr_tools
 
 # ── Helper: direct denylist tests ──────────────────────────────────────────
 
@@ -194,7 +193,6 @@ GUARDED_WRITE_TOOLS = [
     ),
     ("unifi_network_update_route", register_routing_tools, {"route_id": "r-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_camera", register_camera_tools, {"camera_id": "c-1", "data": DENIED_PAYLOAD}),
-    ("unifi_protect_update_nvr", register_nvr_tools, {"data": DENIED_PAYLOAD}),
 ]
 
 
@@ -221,7 +219,7 @@ async def test_each_write_tool_blocks_radius_secret(tool_name, register_fn, kwar
         getattr(network_client, name).side_effect = AssertionError(
             f"client {name}() must NOT be called when payload contains a denied key"
         )
-    for name in ("update_camera", "update_nvr"):
+    for name in ("update_camera",):
         getattr(protect_client, name).side_effect = AssertionError(
             f"client {name}() must NOT be called when payload contains a denied key"
         )
