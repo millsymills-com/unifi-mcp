@@ -149,6 +149,20 @@ class TestGetNvr:
         assert result == FIXTURES["nvr"]
 
 
+class TestUpdateLight:
+    @respx.mock
+    async def test_update_light_sends_patch(self, client):
+        payload = {"lightModeSettings": {"mode": "motion"}}
+        route = respx.patch(f"{API_PREFIX}lights/l1").mock(
+            return_value=httpx.Response(200, json={"id": "l1", **payload})
+        )
+        result = await client.update_light("l1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "l1"
+
+
 class TestValidateConnection:
     @respx.mock
     async def test_validate_returns_true_on_success(self, client):
