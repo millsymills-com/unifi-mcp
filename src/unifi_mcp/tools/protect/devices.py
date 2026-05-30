@@ -1,4 +1,4 @@
-"""Protect accessory device tools — chimes, lights, sensors, viewers (4 read + writes)."""
+"""Protect accessory device tools - chimes, lights, sensors, viewers (4 read + 5 write)."""
 
 from __future__ import annotations
 
@@ -268,5 +268,30 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             )
             reject_dangerous_keys(body, tool_name="unifi_protect_update_sensor")
             return await context.clients["protect"].update_sensor(sensor_id, body)
+        except Exception as e:
+            handle_client_error(e)
+
+    @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    async def unifi_protect_set_viewer_liveview(
+        ctx: Context,
+        viewer_id: str,
+        liveview_id: str,
+    ) -> dict[str, Any]:
+        """Set the active liveview displayed on a Protect viewport.
+
+        Args:
+            viewer_id: The viewer device ID.
+            liveview_id: The liveview ID to display on this viewer.
+
+        Returns:
+            The upstream API response.
+        """
+        try:
+            validate_id(viewer_id, field="viewer_id")
+            validate_id(liveview_id, field="liveview_id")
+            context = get_server_context(ctx)
+            if not context.config.writes_enabled:
+                raise UniFiReadOnlyError("Cannot set viewer liveview in read-only mode")
+            return await context.clients["protect"].update_viewer(viewer_id, {"liveview": liveview_id})
         except Exception as e:
             handle_client_error(e)

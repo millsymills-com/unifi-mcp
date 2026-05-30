@@ -171,4 +171,3 @@ class TestUpdateCameraNamedArgs:
                 data={"radius_secret": "x"},
             )
         assert "radius_secret" in str(exc.value)
-

@@ -1,4 +1,4 @@
-"""Tests for Protect accessory-device MCP tools (4 read + write)."""
+"""Tests for Protect accessory-device MCP tools (4 read + 5 write)."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ WRITE_TOOL_NAMES = {
     "unifi_protect_update_light",
     "unifi_protect_set_light_mode",
     "unifi_protect_update_sensor",
+    "unifi_protect_set_viewer_liveview",
 }
 
 
@@ -255,3 +256,51 @@ class TestUpdateSensorTool:
             await _call(server, "unifi_protect_update_sensor", ctx, sensor_id="s1")
         assert "at least one field" in str(exc.value).lower()
         mock_client.update_sensor.assert_not_awaited()
+
+
+def _ctx_with_mock_viewer_client(config: UniFiConfig) -> tuple[AsyncMock, AsyncMock]:
+    """Build a ctx whose protect client has a mock update_viewer method."""
+    mock_client = AsyncMock()
+    mock_client.update_viewer = AsyncMock(return_value={"id": "v1"})
+    ctx = AsyncMock()
+    ctx.lifespan_context = type("FakeLifespan", (), {"config": config, "clients": {"protect": mock_client}})()
+    return ctx, mock_client
+
+
+class TestSetViewerLiveviewTool:
+    async def test_calls_update_viewer_with_liveview_body(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_viewer_client(_readwrite_config())
+
+        await _call(server, "unifi_protect_set_viewer_liveview", ctx, viewer_id="v1", liveview_id="lv1")
+
+        mock_client.update_viewer.assert_awaited_once_with("v1", {"liveview": "lv1"})
+
+    async def test_readonly_raises_read_only_error(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_viewer_client(_readonly_config())
+
+        with pytest.raises(ToolError) as exc:
+            await _call(server, "unifi_protect_set_viewer_liveview", ctx, viewer_id="v1", liveview_id="lv1")
+        assert "read-only" in str(exc.value).lower()
+        mock_client.update_viewer.assert_not_awaited()
+
+    async def test_bad_liveview_id_raises_tool_error(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_viewer_client(_readwrite_config())
+
+        with pytest.raises(ToolError):
+            await _call(server, "unifi_protect_set_viewer_liveview", ctx, viewer_id="v1", liveview_id="../x")
+        mock_client.update_viewer.assert_not_awaited()
+
+    async def test_bad_viewer_id_raises_tool_error(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_viewer_client(_readwrite_config())
+
+        with pytest.raises(ToolError):
+            await _call(server, "unifi_protect_set_viewer_liveview", ctx, viewer_id="../x", liveview_id="lv1")
+        mock_client.update_viewer.assert_not_awaited()

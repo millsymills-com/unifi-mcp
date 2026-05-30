@@ -191,6 +191,20 @@ class TestUpdateSensor:
         assert result["id"] == "s1"
 
 
+class TestUpdateViewer:
+    @respx.mock
+    async def test_update_viewer_sends_patch(self, client):
+        payload = {"liveview": "lv1"}
+        route = respx.patch(f"{API_PREFIX}viewers/v1").mock(
+            return_value=httpx.Response(200, json={"id": "v1", **payload})
+        )
+        result = await client.update_viewer("v1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "v1"
+
+
 class TestValidateConnection:
     @respx.mock
     async def test_validate_returns_true_on_success(self, client):
