@@ -149,6 +149,20 @@ class TestGetNvr:
         assert result == FIXTURES["nvr"]
 
 
+class TestUpdateChime:
+    @respx.mock
+    async def test_update_chime_sends_patch(self, client):
+        payload = {"volume": 75}
+        route = respx.patch(f"{API_PREFIX}chimes/ch1").mock(
+            return_value=httpx.Response(200, json={"id": "ch1", **payload})
+        )
+        result = await client.update_chime("ch1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "ch1"
+
+
 class TestUpdateLight:
     @respx.mock
     async def test_update_light_sends_patch(self, client):

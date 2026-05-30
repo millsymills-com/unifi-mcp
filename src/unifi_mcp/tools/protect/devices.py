@@ -16,6 +16,11 @@ from unifi_mcp.tools._common import (
     validate_id,
 )
 
+_CHIME_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    "volume": ("volume",),
+    "repeat_times": ("repeatTimes",),
+}
+
 _LIGHT_FIELD_PATHS: dict[str, tuple[str, ...]] = {
     "led_level": ("lightDeviceSettings", "ledLevel"),
     "pir_duration": ("lightDeviceSettings", "pirDuration"),
@@ -92,6 +97,49 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             handle_client_error(e)
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    async def unifi_protect_update_chime(
+        ctx: Context,
+        chime_id: str,
+        *,
+        volume: int | None = None,
+        repeat_times: int | None = None,
+        data: JsonObject | None = None,
+    ) -> dict[str, Any]:
+        """Update chime settings using named scalar args.
+
+        Pass only the fields to change. At least one named arg or ``data``
+        must be supplied.
+
+        Args:
+            chime_id: The chime device ID.
+            volume: Chime volume, 0-100 (``volume``).
+            repeat_times: Number of ring repeats (``repeatTimes``).
+            data: Raw settings dict for fields outside the named args above; cannot be
+                combined with any named arg. Still passes the dangerous-key denylist.
+
+        Returns:
+            The upstream API response.
+        """
+        try:
+            validate_id(chime_id, field="chime_id")
+            context = get_server_context(ctx)
+            if not context.config.writes_enabled:
+                raise UniFiReadOnlyError("Cannot update chime in read-only mode")
+            body = build_named_arg_body(
+                tool_name="unifi_protect_update_chime",
+                field_paths=_CHIME_FIELD_PATHS,
+                named_values={
+                    "volume": volume,
+                    "repeat_times": repeat_times,
+                },
+                data=data,
+            )
+            reject_dangerous_keys(body, tool_name="unifi_protect_update_chime")
+            return await context.clients["protect"].update_chime(chime_id, body)
+        except Exception as e:
+            handle_client_error(e)
+
+    @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     async def unifi_protect_update_light(
         ctx: Context,
         light_id: str,
@@ -117,10 +165,8 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
                 (``lightDeviceSettings.pirSensitivity``).
             mode: Light activation mode (``lightModeSettings.mode``) —
                 "off", "motion", or "always".
-            data: DEPRECATED — raw light settings dict. Kept for
-                back-compat with existing agents; prefer the named scalar
-                args above. Still passes through the dangerous-key
-                denylist. Cannot be combined with any named arg.
+            data: Raw settings dict for fields outside the named args above; cannot be
+                combined with any named arg. Still passes the dangerous-key denylist.
 
         Returns:
             The upstream API response.

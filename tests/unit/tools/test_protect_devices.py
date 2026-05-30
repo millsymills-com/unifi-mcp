@@ -25,6 +25,7 @@ READ_TOOL_NAMES = {
     "unifi_protect_list_viewers",
 }
 WRITE_TOOL_NAMES = {
+    "unifi_protect_update_chime",
     "unifi_protect_update_light",
     "unifi_protect_set_light_mode",
 }
@@ -60,6 +61,15 @@ def _readonly_config() -> UniFiConfig:
         unifi_protect_api="k",
         unifi_site_manager_api=None,
     )
+
+
+def _ctx_with_mock_chime_client(config: UniFiConfig) -> tuple[AsyncMock, AsyncMock]:
+    """Build a ctx whose protect client has a mock update_chime method."""
+    mock_client = AsyncMock()
+    mock_client.update_chime = AsyncMock(return_value={"id": "ch1"})
+    ctx = AsyncMock()
+    ctx.lifespan_context = type("FakeLifespan", (), {"config": config, "clients": {"protect": mock_client}})()
+    return ctx, mock_client
 
 
 def _ctx_with_mock_light_client(config: UniFiConfig) -> tuple[AsyncMock, AsyncMock]:
@@ -110,6 +120,40 @@ class TestProtectDeviceClientEndpoints:
         respx.get(f"{PROTECT_PREFIX}/{endpoint}").mock(return_value=httpx.Response(200, json=payload))
         result = await getattr(protect_client_local, method_name)()
         assert result == payload
+
+
+class TestUpdateChimeTool:
+    async def test_named_args_build_flat_body(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_chime_client(_readwrite_config())
+
+        await _call(server, "unifi_protect_update_chime", ctx, chime_id="ch1", volume=75, repeat_times=2)
+
+        mock_client.update_chime.assert_awaited_once_with(
+            "ch1",
+            {"volume": 75, "repeatTimes": 2},
+        )
+
+    async def test_readonly_raises_read_only_error(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_chime_client(_readonly_config())
+
+        with pytest.raises(ToolError) as exc:
+            await _call(server, "unifi_protect_update_chime", ctx, chime_id="ch1", volume=50)
+        assert "read-only" in str(exc.value).lower()
+        mock_client.update_chime.assert_not_awaited()
+
+    async def test_no_args_raises(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_chime_client(_readwrite_config())
+
+        with pytest.raises(ToolError) as exc:
+            await _call(server, "unifi_protect_update_chime", ctx, chime_id="ch1")
+        assert "at least one field" in str(exc.value).lower()
+        mock_client.update_chime.assert_not_awaited()
 
 
 class TestUpdateLightTool:
