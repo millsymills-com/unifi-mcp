@@ -94,9 +94,9 @@ class TestGetSnapshot:
 
 class TestUpdateCamera:
     @respx.mock
-    async def test_update_camera_sends_put(self, client):
+    async def test_update_camera_sends_patch(self, client):
         payload = {"name": "Back Yard"}
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(
             return_value=httpx.Response(200, json={"id": "cam-1", "name": "Back Yard"})
         )
         result = await client.update_camera("cam-1", payload)
@@ -109,7 +109,7 @@ class TestUpdateCamera:
 class TestSetRecordingMode:
     @respx.mock
     async def test_set_recording_mode_sends_correct_payload(self, client):
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
         await client.set_recording_mode("cam-1", "motion", pre_padding=5, post_padding=10)
         assert route.called
         request_body = json.loads(route.calls[0].request.content)
@@ -120,6 +120,24 @@ class TestSetRecordingMode:
                 "postPaddingSecs": 10,
             }
         }
+
+    @respx.mock
+    async def test_set_recording_mode_always_sends_correct_payload(self, client):
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
+        await client.set_recording_mode("cam-1", "always")
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == {"recordingSettings": {"mode": "always"}}
+
+
+class TestSetSmartDetection:
+    @respx.mock
+    async def test_set_smart_detection_sends_correct_payload(self, client):
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
+        await client.set_smart_detection("cam-1", ["person"])
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == {"smartDetectSettings": {"objectTypes": ["person"]}}
 
 
 class TestGetNvr:

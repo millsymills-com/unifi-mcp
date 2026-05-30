@@ -85,7 +85,7 @@ class ProtectClient(BaseUniFiClient):
 
     async def update_camera(self, camera_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """Update camera settings."""
-        result: dict[str, Any] = await self.put(f"cameras/{self._segment(camera_id)}", json=data)
+        result: dict[str, Any] = await self.patch(f"cameras/{self._segment(camera_id)}", json=data)
         return result
 
     async def set_recording_mode(
@@ -109,7 +109,7 @@ class ProtectClient(BaseUniFiClient):
         if post_padding is not None:
             recording_settings["postPaddingSecs"] = post_padding
 
-        result: dict[str, Any] = await self.put(
+        result: dict[str, Any] = await self.patch(
             f"cameras/{self._segment(camera_id)}",
             json={"recordingSettings": recording_settings},
         )
@@ -122,7 +122,7 @@ class ProtectClient(BaseUniFiClient):
             camera_id: The camera ID.
             object_types: List of smart detection object types to enable.
         """
-        result: dict[str, Any] = await self.put(
+        result: dict[str, Any] = await self.patch(
             f"cameras/{self._segment(camera_id)}",
             json={"smartDetectSettings": {"objectTypes": object_types}},
         )
