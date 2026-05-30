@@ -28,6 +28,12 @@ _LIGHT_FIELD_PATHS: dict[str, tuple[str, ...]] = {
     "mode": ("lightModeSettings", "mode"),
 }
 
+_SENSOR_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    "mount_type": ("mountType",),
+    "motion_is_enabled": ("motionSettings", "isEnabled"),
+    "light_is_enabled": ("lightSettings", "isEnabled"),
+}
+
 
 def register_protect_device_tools(mcp: FastMCP) -> None:
     """Register Protect accessory device tools."""
@@ -213,5 +219,54 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             if not context.config.writes_enabled:
                 raise UniFiReadOnlyError("Cannot set light mode in read-only mode")
             return await context.clients["protect"].update_light(light_id, {"lightModeSettings": {"mode": mode}})
+        except Exception as e:
+            handle_client_error(e)
+
+    @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    async def unifi_protect_update_sensor(
+        ctx: Context,
+        sensor_id: str,
+        *,
+        mount_type: str | None = None,
+        motion_is_enabled: bool | None = None,
+        light_is_enabled: bool | None = None,
+        data: JsonObject | None = None,
+    ) -> dict[str, Any]:
+        """Update sensor settings using named scalar args.
+
+        Pass only the fields to change. At least one named arg or ``data``
+        must be supplied.
+
+        Args:
+            sensor_id: The sensor device ID.
+            mount_type: Physical mount type, e.g. "door", "window", or "garage"
+                (``mountType``).
+            motion_is_enabled: Enable or disable motion detection
+                (``motionSettings.isEnabled``).
+            light_is_enabled: Enable or disable ambient-light (lux) sensor reporting
+                (``lightSettings.isEnabled``).
+            data: Raw settings dict for fields outside the named args above; cannot be
+                combined with any named arg. Still passes the dangerous-key denylist.
+
+        Returns:
+            The upstream API response.
+        """
+        try:
+            validate_id(sensor_id, field="sensor_id")
+            context = get_server_context(ctx)
+            if not context.config.writes_enabled:
+                raise UniFiReadOnlyError("Cannot update sensor in read-only mode")
+            body = build_named_arg_body(
+                tool_name="unifi_protect_update_sensor",
+                field_paths=_SENSOR_FIELD_PATHS,
+                named_values={
+                    "mount_type": mount_type,
+                    "motion_is_enabled": motion_is_enabled,
+                    "light_is_enabled": light_is_enabled,
+                },
+                data=data,
+            )
+            reject_dangerous_keys(body, tool_name="unifi_protect_update_sensor")
+            return await context.clients["protect"].update_sensor(sensor_id, body)
         except Exception as e:
             handle_client_error(e)

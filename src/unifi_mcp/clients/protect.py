@@ -98,6 +98,11 @@ class ProtectClient(BaseUniFiClient):
         result: dict[str, Any] = await self.patch(f"lights/{self._segment(light_id)}", json=data)
         return result
 
+    async def update_sensor(self, sensor_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update sensor settings."""
+        result: dict[str, Any] = await self.patch(f"sensors/{self._segment(sensor_id)}", json=data)
+        return result
+
     async def set_recording_mode(
         self,
         camera_id: str,

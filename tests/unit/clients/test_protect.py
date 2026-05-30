@@ -177,6 +177,20 @@ class TestUpdateLight:
         assert result["id"] == "l1"
 
 
+class TestUpdateSensor:
+    @respx.mock
+    async def test_update_sensor_sends_patch(self, client):
+        payload = {"mountType": "door"}
+        route = respx.patch(f"{API_PREFIX}sensors/s1").mock(
+            return_value=httpx.Response(200, json={"id": "s1", **payload})
+        )
+        result = await client.update_sensor("s1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "s1"
+
+
 class TestValidateConnection:
     @respx.mock
     async def test_validate_returns_true_on_success(self, client):

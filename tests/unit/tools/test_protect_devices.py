@@ -28,6 +28,7 @@ WRITE_TOOL_NAMES = {
     "unifi_protect_update_chime",
     "unifi_protect_update_light",
     "unifi_protect_set_light_mode",
+    "unifi_protect_update_sensor",
 }
 
 
@@ -76,6 +77,15 @@ def _ctx_with_mock_light_client(config: UniFiConfig) -> tuple[AsyncMock, AsyncMo
     """Build a ctx whose protect client has a mock update_light method."""
     mock_client = AsyncMock()
     mock_client.update_light = AsyncMock(return_value={"id": "l1"})
+    ctx = AsyncMock()
+    ctx.lifespan_context = type("FakeLifespan", (), {"config": config, "clients": {"protect": mock_client}})()
+    return ctx, mock_client
+
+
+def _ctx_with_mock_sensor_client(config: UniFiConfig) -> tuple[AsyncMock, AsyncMock]:
+    """Build a ctx whose protect client has a mock update_sensor method."""
+    mock_client = AsyncMock()
+    mock_client.update_sensor = AsyncMock(return_value={"id": "s1"})
     ctx = AsyncMock()
     ctx.lifespan_context = type("FakeLifespan", (), {"config": config, "clients": {"protect": mock_client}})()
     return ctx, mock_client
@@ -209,3 +219,39 @@ class TestSetLightModeTool:
             await _call(server, "unifi_protect_set_light_mode", ctx, light_id="l1", mode="motion")
         assert "read-only" in str(exc.value).lower()
         mock_client.update_light.assert_not_awaited()
+
+
+class TestUpdateSensorTool:
+    async def test_named_args_build_nested_body(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_sensor_client(_readwrite_config())
+
+        await _call(
+            server, "unifi_protect_update_sensor", ctx, sensor_id="s1", mount_type="door", motion_is_enabled=True
+        )
+
+        mock_client.update_sensor.assert_awaited_once_with(
+            "s1",
+            {"mountType": "door", "motionSettings": {"isEnabled": True}},
+        )
+
+    async def test_readonly_raises_read_only_error(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_sensor_client(_readonly_config())
+
+        with pytest.raises(ToolError) as exc:
+            await _call(server, "unifi_protect_update_sensor", ctx, sensor_id="s1", mount_type="window")
+        assert "read-only" in str(exc.value).lower()
+        mock_client.update_sensor.assert_not_awaited()
+
+    async def test_no_args_raises(self):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+        ctx, mock_client = _ctx_with_mock_sensor_client(_readwrite_config())
+
+        with pytest.raises(ToolError) as exc:
+            await _call(server, "unifi_protect_update_sensor", ctx, sensor_id="s1")
+        assert "at least one field" in str(exc.value).lower()
+        mock_client.update_sensor.assert_not_awaited()
