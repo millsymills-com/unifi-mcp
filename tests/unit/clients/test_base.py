@@ -89,6 +89,35 @@ class TestPutRequest:
         assert result == {}
 
 
+class TestPatchRequest:
+    @respx.mock
+    async def test_patch_returns_parsed_json(self, client):
+        respx.patch(f"{BASE_URL}/test/123").mock(
+            return_value=httpx.Response(200, json={"_id": "123", "name": "updated"})
+        )
+        result = await client.patch("test/123", json={"name": "updated"})
+        assert result == {"_id": "123", "name": "updated"}
+
+    @respx.mock
+    async def test_patch_empty_body_returns_empty_dict(self, client):
+        respx.patch(f"{BASE_URL}/test/123").mock(return_value=httpx.Response(204))
+        result = await client.patch("test/123", json={"name": "updated"})
+        assert result == {}
+
+    @respx.mock
+    async def test_patch_200_empty_body_returns_empty_dict(self, client):
+        respx.patch(f"{BASE_URL}/test/123").mock(return_value=httpx.Response(200, content=b""))
+        result = await client.patch("test/123", json={})
+        assert result == {}
+
+    @respx.mock
+    async def test_patch_timeout_not_retried(self, client):
+        route = respx.patch(f"{BASE_URL}/test/123").mock(side_effect=httpx.ReadTimeout("slow"))
+        with pytest.raises(UniFiTimeoutError):
+            await client.patch("test/123", json={"name": "updated"})
+        assert route.call_count == 1
+
+
 class TestDeleteRequest:
     @respx.mock
     async def test_delete_204_returns_empty_dict(self, client):
