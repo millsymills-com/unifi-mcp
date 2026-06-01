@@ -6,13 +6,13 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
 from unifi_mcp.tools._common import (
     JsonObject,
     build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
+    tool_handler,
 )
 
 # ── Option-1 allowlist for unifi_protect_update_nvr (#202) ─────────────────
@@ -26,6 +26,7 @@ def register_nvr_tools(mcp: FastMCP) -> None:
     """Register NVR tools."""
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_get_nvr(ctx: Context) -> dict[str, Any]:
         """Get NVR (Network Video Recorder) status and configuration.
 
@@ -38,13 +39,10 @@ def register_nvr_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].get_nvr())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].get_nvr())
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_update_nvr(
         ctx: Context,
         *,
@@ -74,17 +72,11 @@ def register_nvr_tools(mcp: FastMCP) -> None:
             registered so it works automatically once Ubiquiti exposes the
             endpoint on a future firmware.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update NVR in read-only mode")
-            body = build_named_arg_body(
-                tool_name="unifi_protect_update_nvr",
-                field_paths=_NVR_FIELD_PATHS,
-                named_values={"name": name, "timezone": timezone},
-                data=data,
-            )
-            reject_dangerous_keys(body, tool_name="unifi_protect_update_nvr")
-            return await context.clients["protect"].update_nvr(body)
-        except Exception as e:
-            handle_client_error(e)
+        body = build_named_arg_body(
+            tool_name="unifi_protect_update_nvr",
+            field_paths=_NVR_FIELD_PATHS,
+            named_values={"name": name, "timezone": timezone},
+            data=data,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_protect_update_nvr")
+        return await get_server_context(ctx).clients["protect"].update_nvr(body)

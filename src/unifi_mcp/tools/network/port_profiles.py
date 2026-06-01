@@ -6,12 +6,13 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiBadRequestError, UniFiReadOnlyError, handle_client_error
+from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
+    tool_handler,
     validate_id,
     validate_mac,
 )
@@ -28,6 +29,7 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
     # ── Read tools ──────────────────────────────────────────────────────
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_list_port_profiles(ctx: Context) -> dict[str, Any]:
         """List all switch port profiles (VLAN, PoE, storm-control configs).
 
@@ -37,13 +39,10 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].list_port_profiles())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].list_port_profiles())
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_port_profile(ctx: Context, profile_id: str) -> dict[str, Any]:
         """Get a specific switch port profile by id.
 
@@ -53,16 +52,13 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(profile_id, field="profile_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_port_profile(profile_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(profile_id, field="profile_id")
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_port_profile(profile_id))
 
     # ── Write tools ─────────────────────────────────────────────────────
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_port_profile(ctx: Context, data: JsonObject) -> dict[str, Any]:
         """Create a switch port profile.
 
@@ -76,16 +72,11 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create port profile in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_create_port_profile")
-            return await context.clients["network"].create_port_profile(data)
-        except Exception as e:
-            handle_client_error(e)
+        reject_dangerous_keys(data, tool_name="unifi_network_create_port_profile")
+        return await get_server_context(ctx).clients["network"].create_port_profile(data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_port_profile(ctx: Context, profile_id: str, data: JsonObject) -> dict[str, Any]:
         """Update a switch port profile. Pass only fields to change.
 
@@ -96,17 +87,12 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(profile_id, field="profile_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update port profile in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_update_port_profile")
-            return await context.clients["network"].update_port_profile(profile_id, data)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(profile_id, field="profile_id")
+        reject_dangerous_keys(data, tool_name="unifi_network_update_port_profile")
+        return await get_server_context(ctx).clients["network"].update_port_profile(profile_id, data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_delete_port_profile(ctx: Context, profile_id: str) -> dict[str, Any]:
         """Delete a switch port profile.
 
@@ -120,16 +106,11 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(profile_id, field="profile_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot delete port profile in read-only mode")
-            return await context.clients["network"].delete_port_profile(profile_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(profile_id, field="profile_id")
+        return await get_server_context(ctx).clients["network"].delete_port_profile(profile_id)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_assign_port_profile(
         ctx: Context, mac: str, port_idx: int, profile_id: str
     ) -> dict[str, Any]:
@@ -150,16 +131,10 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
             Destructive — can drop clients on that port if the new profile
             changes their link config.
         """
-        try:
-            validate_mac(mac, field="mac")
-            validate_id(profile_id, field="profile_id")
-            if not isinstance(port_idx, int) or not (_PORT_IDX_MIN <= port_idx <= _PORT_IDX_MAX):
-                raise UniFiBadRequestError(
-                    f"port_idx must be between {_PORT_IDX_MIN} and {_PORT_IDX_MAX} (got {port_idx!r})"
-                )
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot assign port profile in read-only mode")
-            return await context.clients["network"].assign_port_profile(mac, port_idx, profile_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        validate_id(profile_id, field="profile_id")
+        if not isinstance(port_idx, int) or not (_PORT_IDX_MIN <= port_idx <= _PORT_IDX_MAX):
+            raise UniFiBadRequestError(
+                f"port_idx must be between {_PORT_IDX_MIN} and {_PORT_IDX_MAX} (got {port_idx!r})"
+            )
+        return await get_server_context(ctx).clients["network"].assign_port_profile(mac, port_idx, profile_id)

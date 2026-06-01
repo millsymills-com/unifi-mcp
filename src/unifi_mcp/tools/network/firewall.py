@@ -6,8 +6,14 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
-from unifi_mcp.tools._common import JsonObject, get_server_context, redact_secrets, reject_dangerous_keys, validate_id
+from unifi_mcp.tools._common import (
+    JsonObject,
+    get_server_context,
+    redact_secrets,
+    reject_dangerous_keys,
+    tool_handler,
+    validate_id,
+)
 
 
 def register_firewall_tools(mcp: FastMCP) -> None:
@@ -16,6 +22,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
     # ── Read tools ──────────────────────────────────────────────────────
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_list_firewall_rules(ctx: Context) -> dict[str, Any]:
         """List all firewall rules.
 
@@ -25,13 +32,10 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].list_firewall_rules())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].list_firewall_rules())
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_firewall_rule(ctx: Context, rule_id: str) -> dict[str, Any]:
         """Get a specific firewall rule by ID.
 
@@ -41,14 +45,11 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(rule_id, field="rule_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_firewall_rule(rule_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(rule_id, field="rule_id")
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_firewall_rule(rule_id))
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_list_firewall_groups(ctx: Context) -> dict[str, Any]:
         """List all firewall groups (address groups, port groups).
 
@@ -58,13 +59,10 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].list_firewall_groups())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].list_firewall_groups())
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_firewall_group(ctx: Context, group_id: str) -> dict[str, Any]:
         """Get a specific firewall group by ID.
 
@@ -74,16 +72,13 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(group_id, field="group_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_firewall_group(group_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(group_id, field="group_id")
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_firewall_group(group_id))
 
     # ── Write tools ─────────────────────────────────────────────────────
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_firewall_rule(
         ctx: Context,
         name: str,
@@ -121,29 +116,24 @@ def register_firewall_tools(mcp: FastMCP) -> None:
             ``ipsec``, ``src_firewallgroup_ids``, and
             ``dst_firewallgroup_ids``; pass them via ``data``.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create firewall rule in read-only mode")
-            if data is None:
-                data = {
-                    "name": name,
-                    "ruleset": ruleset,
-                    "action": action,
-                    "enabled": enabled,
-                    "protocol": protocol,
-                }
-                if src_address is not None:
-                    data["src_address"] = src_address
-                if dst_address is not None:
-                    data["dst_address"] = dst_address
-            else:
-                reject_dangerous_keys(data, tool_name="unifi_network_create_firewall_rule")
-            return await context.clients["network"].create_firewall_rule(data)
-        except Exception as e:
-            handle_client_error(e)
+        if data is None:
+            data = {
+                "name": name,
+                "ruleset": ruleset,
+                "action": action,
+                "enabled": enabled,
+                "protocol": protocol,
+            }
+            if src_address is not None:
+                data["src_address"] = src_address
+            if dst_address is not None:
+                data["dst_address"] = dst_address
+        else:
+            reject_dangerous_keys(data, tool_name="unifi_network_create_firewall_rule")
+        return await get_server_context(ctx).clients["network"].create_firewall_rule(data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_firewall_rule(ctx: Context, rule_id: str, data: JsonObject) -> dict[str, Any]:
         """Update an existing firewall rule. Pass only fields to change.
 
@@ -154,17 +144,12 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(rule_id, field="rule_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update firewall rule in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_rule")
-            return await context.clients["network"].update_firewall_rule(rule_id, data)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(rule_id, field="rule_id")
+        reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_rule")
+        return await get_server_context(ctx).clients["network"].update_firewall_rule(rule_id, data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_delete_firewall_rule(ctx: Context, rule_id: str) -> dict[str, Any]:
         """Delete a firewall rule.
 
@@ -174,16 +159,11 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(rule_id, field="rule_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot delete firewall rule in read-only mode")
-            return await context.clients["network"].delete_firewall_rule(rule_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(rule_id, field="rule_id")
+        return await get_server_context(ctx).clients["network"].delete_firewall_rule(rule_id)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_firewall_group(
         ctx: Context,
         name: str,
@@ -200,20 +180,15 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create firewall group in read-only mode")
-            data: JsonObject = {
-                "name": name,
-                "group_type": group_type,
-                "group_members": group_members,
-            }
-            return await context.clients["network"].create_firewall_group(data)
-        except Exception as e:
-            handle_client_error(e)
+        data: JsonObject = {
+            "name": name,
+            "group_type": group_type,
+            "group_members": group_members,
+        }
+        return await get_server_context(ctx).clients["network"].create_firewall_group(data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_firewall_group(ctx: Context, group_id: str, data: JsonObject) -> dict[str, Any]:
         """Update an existing firewall group. Pass only fields to change.
 
@@ -224,17 +199,12 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(group_id, field="group_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update firewall group in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_group")
-            return await context.clients["network"].update_firewall_group(group_id, data)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(group_id, field="group_id")
+        reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_group")
+        return await get_server_context(ctx).clients["network"].update_firewall_group(group_id, data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_delete_firewall_group(ctx: Context, group_id: str) -> dict[str, Any]:
         """Delete a firewall group.
 
@@ -244,11 +214,5 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(group_id, field="group_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot delete firewall group in read-only mode")
-            return await context.clients["network"].delete_firewall_group(group_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(group_id, field="group_id")
+        return await get_server_context(ctx).clients["network"].delete_firewall_group(group_id)

@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Every MCP tool handler now shares a single `tool_handler` decorator
+  (`unifi_mcp.tools._common`) that owns the `try`/`handle_client_error`
+  error funnel and the defense-in-depth write-mode gate, replacing the
+  identical envelope previously hand-coded in all 81 handlers. The served
+  tool surface (names, schemas, descriptions, tags, annotations) is
+  unchanged. Net −275 lines.
+- Collapsed `register_read_tools` / `register_write_tools` back into
+  `register_all_tools`, which now disables write-tagged tools with a single
+  conditional instead of a disable-then-re-enable pass. The two split
+  helpers are removed.
+- The lifespan shutdown loop now reuses `_safe_close` instead of an inline
+  duplicate of its swallow-and-log close handling.
+- Promoted the duplicated key-normalization helper to a shared
+  `unifi_mcp._redaction.normalize_key`, reused by the tool-layer
+  dangerous-key denylist; the two denylists themselves stay independent.
+
 ## [0.3.0] - 2026-05-07
 
 ### Changed

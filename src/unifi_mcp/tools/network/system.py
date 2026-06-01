@@ -6,13 +6,14 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiBadRequestError, UniFiReadOnlyError, handle_client_error
+from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
     build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
+    tool_handler,
     validate_mac,
 )
 
@@ -56,6 +57,7 @@ def register_system_tools(mcp: FastMCP) -> None:
     """Register system and command tools."""
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_settings(ctx: Context) -> dict[str, Any]:
         """Get controller settings.
 
@@ -70,13 +72,10 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_settings())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_settings())
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_settings(
         ctx: Context,
         *,
@@ -124,26 +123,21 @@ def register_system_tools(mcp: FastMCP) -> None:
             order matters, the caller should re-read state after a failure
             or pass a single section per call. See #225.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update settings in read-only mode")
-            body = build_named_arg_body(
-                tool_name="unifi_network_update_settings",
-                field_paths=_SETTINGS_FIELD_PATHS,
-                named_values={
-                    "ntp_server_1": ntp_server_1,
-                    "ntp_server_2": ntp_server_2,
-                    "mgmt_led_enabled": mgmt_led_enabled,
-                },
-                data=data,
-            )
-            reject_dangerous_keys(body, tool_name="unifi_network_update_settings")
-            return await context.clients["network"].update_settings(body)
-        except Exception as e:
-            handle_client_error(e)
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_settings",
+            field_paths=_SETTINGS_FIELD_PATHS,
+            named_values={
+                "ntp_server_1": ntp_server_1,
+                "ntp_server_2": ntp_server_2,
+                "mgmt_led_enabled": mgmt_led_enabled,
+            },
+            data=data,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_settings")
+        return await get_server_context(ctx).clients["network"].update_settings(body)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_run_speedtest(ctx: Context) -> dict[str, Any]:
         """Run a speed test on the controller's WAN connection.
 
@@ -153,15 +147,10 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot run speed test in read-only mode")
-            return await context.clients["network"].run_speedtest()
-        except Exception as e:
-            handle_client_error(e)
+        return await get_server_context(ctx).clients["network"].run_speedtest()
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_backup(ctx: Context) -> dict[str, Any]:
         """Create a backup of the controller configuration.
 
@@ -173,15 +162,10 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create backup in read-only mode")
-            return await context.clients["network"].create_backup()
-        except Exception as e:
-            handle_client_error(e)
+        return await get_server_context(ctx).clients["network"].create_backup()
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_upgrade_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Upgrade a device to the latest firmware.
 
@@ -191,16 +175,11 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot upgrade device in read-only mode")
-            return await context.clients["network"].upgrade_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].upgrade_device(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_power_cycle_port(ctx: Context, mac: str, port_idx: int) -> dict[str, Any]:
         """Power cycle a PoE port on a switch.
 
@@ -212,17 +191,12 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            _validate_port_idx(port_idx)
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot power cycle port in read-only mode")
-            return await context.clients["network"].power_cycle_port(mac, port_idx)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        _validate_port_idx(port_idx)
+        return await get_server_context(ctx).clients["network"].power_cycle_port(mac, port_idx)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_unauthorize_guest(ctx: Context, mac: str) -> dict[str, Any]:
         """Revoke guest authorization for a client.
 
@@ -236,16 +210,11 @@ def register_system_tools(mcp: FastMCP) -> None:
         the pre-check and the ``cmd/stamgr`` POST run as separate requests
         with no compare-and-set primitive (#151).
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot unauthorize guest in read-only mode")
-            return await context.clients["network"].unauthorize_guest(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].unauthorize_guest(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_reset_dpi(ctx: Context) -> dict[str, Any]:
         """Reset all DPI (Deep Packet Inspection) counters.
 
@@ -255,10 +224,4 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot reset DPI in read-only mode")
-            return await context.clients["network"].reset_dpi()
-        except Exception as e:
-            handle_client_error(e)
+        return await get_server_context(ctx).clients["network"].reset_dpi()

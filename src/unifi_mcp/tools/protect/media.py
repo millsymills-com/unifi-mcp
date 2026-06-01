@@ -7,14 +7,14 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import handle_client_error
-from unifi_mcp.tools._common import get_server_context, validate_id
+from unifi_mcp.tools._common import get_server_context, tool_handler, validate_id
 
 
 def register_media_tools(mcp: FastMCP) -> None:
     """Register Protect media tools."""
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_get_snapshot(ctx: Context, camera_id: str, timestamp: int | None = None) -> dict[str, Any]:
         """Get a JPEG snapshot from a camera.
 
@@ -30,21 +30,19 @@ def register_media_tools(mcp: FastMCP) -> None:
             ``{"format": "jpeg", "data_base64": str, "size_bytes": int}``. ``data_base64``
             is the JPEG bytes encoded with standard base64; decode before writing to disk.
         """
-        try:
-            validate_id(camera_id, field="camera_id")
-            context = get_server_context(ctx)
-            data: bytes = await context.clients["protect"].get_snapshot(
-                camera_id, timestamp=timestamp, max_bytes=context.config.unifi_max_snapshot_bytes
-            )
-            return {
-                "format": "jpeg",
-                "data_base64": base64.b64encode(data).decode("ascii"),
-                "size_bytes": len(data),
-            }
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(camera_id, field="camera_id")
+        context = get_server_context(ctx)
+        data: bytes = await context.clients["protect"].get_snapshot(
+            camera_id, timestamp=timestamp, max_bytes=context.config.unifi_max_snapshot_bytes
+        )
+        return {
+            "format": "jpeg",
+            "data_base64": base64.b64encode(data).decode("ascii"),
+            "size_bytes": len(data),
+        }
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_export_video(ctx: Context, camera_id: str, start: int, end: int) -> dict[str, Any]:
         """Export a video clip from a camera for a time range.
 
@@ -68,16 +66,13 @@ def register_media_tools(mcp: FastMCP) -> None:
             registered so it works automatically once Ubiquiti exposes the
             endpoint on a future firmware.
         """
-        try:
-            validate_id(camera_id, field="camera_id")
-            context = get_server_context(ctx)
-            data: bytes = await context.clients["protect"].export_video(
-                camera_id, start, end, max_bytes=context.config.unifi_max_export_bytes
-            )
-            return {
-                "format": "mp4",
-                "data_base64": base64.b64encode(data).decode("ascii"),
-                "size_bytes": len(data),
-            }
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(camera_id, field="camera_id")
+        context = get_server_context(ctx)
+        data: bytes = await context.clients["protect"].export_video(
+            camera_id, start, end, max_bytes=context.config.unifi_max_export_bytes
+        )
+        return {
+            "format": "mp4",
+            "data_base64": base64.b64encode(data).decode("ascii"),
+            "size_bytes": len(data),
+        }
