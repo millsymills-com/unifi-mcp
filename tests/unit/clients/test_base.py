@@ -381,6 +381,30 @@ class TestErrorBodyExtraction:
         assert "Service Unavailable" not in msg
 
     @respx.mock
+    @pytest.mark.parametrize(
+        "json_body",
+        [
+            pytest.param(["err.one", "err.two"], id="json-list"),
+            pytest.param("bare string error", id="json-string"),
+        ],
+    )
+    async def test_non_dict_json_body_yields_opaque_hint(self, client, json_body):
+        """A body that parses as JSON but is not a dict (a list or a bare
+        string) falls through the envelope-matching ``isinstance(..., dict)``
+        gate to the opaque ``<unparseable body, see DEBUG log>`` hint, rather
+        than leaking the raw structure into the surfaced message.
+        """
+        respx.get(f"{BASE_URL}/test").mock(return_value=httpx.Response(500, json=json_body))
+        with pytest.raises(UniFiServerError) as exc_info:
+            await client.get("test")
+        msg = str(exc_info.value)
+        assert "HTTP 500" in msg
+        assert "<unparseable body, see DEBUG log>" in msg
+        # No element of the non-dict body leaks into the surfaced message.
+        assert "err.one" not in msg
+        assert "bare string error" not in msg
+
+    @respx.mock
     async def test_raw_body_debug_log_suppressed_by_default(self, client, caplog, monkeypatch):
         """Without ``UNIFI_LOG_RAW_BODIES=1`` the full body never reaches the
         DEBUG log — the redacted/summary form goes out instead.
@@ -407,6 +431,31 @@ class TestErrorBodyExtraction:
             await client.get("test")
         assert any(huge_body in r.getMessage() for r in caplog.records), (
             f"expected raw body in DEBUG log; got {[r.getMessage() for r in caplog.records]!r}"
+        )
+
+    @respx.mock
+    async def test_raw_body_debug_log_emitted_with_opt_in_for_json_body(self, client, caplog, monkeypatch):
+        """``UNIFI_LOG_RAW_BODIES=1`` logs the untouched body on the JSON path too.
+
+        The default DEBUG branch logs the redacted form; the opt-in branch
+        inside the ``parsed is not None`` block must emit ``response.text``
+        verbatim so an operator diagnosing a structured error sees exactly what
+        the controller sent.
+        """
+        import logging
+
+        monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "1")
+        respx.get(f"{BASE_URL}/test").mock(
+            return_value=httpx.Response(500, json={"meta": {"rc": "error", "msg": "api.err.Internal"}}),
+        )
+        with caplog.at_level(logging.DEBUG, logger="unifi_mcp.clients.base"), pytest.raises(UniFiServerError):
+            await client.get("test")
+        debug_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any('"rc": "error"' in m or '"rc":"error"' in m for m in debug_messages), (
+            f"expected untouched JSON body in DEBUG log; got {debug_messages!r}"
+        )
+        assert not any("redacted" in m.lower() for m in debug_messages), (
+            f"raw opt-in must not take the redacted branch; got {debug_messages!r}"
         )
 
     @respx.mock
