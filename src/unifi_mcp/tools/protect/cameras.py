@@ -107,7 +107,9 @@ def register_camera_tools(mcp: FastMCP) -> None:
                 denylist. Cannot be combined with any named arg.
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_get_camera`` to confirm the change applied.
         """
         validate_id(camera_id, field="camera_id")
         body = build_named_arg_body(
@@ -144,7 +146,9 @@ def register_camera_tools(mcp: FastMCP) -> None:
             post_padding: Post-event recording padding in seconds (optional).
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_get_camera`` to confirm the change applied.
         """
         validate_id(camera_id, field="camera_id")
         return redact_secrets(
@@ -165,7 +169,9 @@ def register_camera_tools(mcp: FastMCP) -> None:
             object_types: List of object types to detect — e.g., ["person", "vehicle", "animal"].
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_get_camera`` to confirm the change applied.
         """
         validate_id(camera_id, field="camera_id")
         return redact_secrets(

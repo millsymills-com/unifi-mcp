@@ -17,6 +17,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Protect PATCH write tools now document that integration v1 returns an empty
+  ack (`{}`) on success and that callers should re-read to confirm the change;
+  the accessory tools (light/chime/sensor/viewer) carry an explicit "field
+  paths unverified against hardware" caveat (#333, #330). `set_light_mode`
+  notes it is a deliberate convenience shortcut over `update_light` (#326).
 - Every MCP tool handler now shares a single `tool_handler` decorator
   (`unifi_mcp.tools._common`) that owns the `try`/`handle_client_error`
   error funnel and the defense-in-depth write-mode gate, replacing the
