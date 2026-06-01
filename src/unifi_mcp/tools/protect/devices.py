@@ -6,13 +6,13 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
 from unifi_mcp.tools._common import (
     JsonObject,
     build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
+    tool_handler,
     validate_id,
 )
 
@@ -39,6 +39,7 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
     """Register Protect accessory device tools."""
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_chimes(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect chime devices.
 
@@ -48,13 +49,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_chimes())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_chimes())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_lights(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect smart light devices.
 
@@ -64,13 +62,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_lights())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_lights())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_sensors(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect sensor devices.
 
@@ -80,13 +75,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_sensors())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_sensors())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_viewers(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect viewport devices.
 
@@ -96,13 +88,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_viewers())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_viewers())
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_update_chime(
         ctx: Context,
         chime_id: str,
@@ -126,26 +115,21 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(chime_id, field="chime_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update chime in read-only mode")
-            body = build_named_arg_body(
-                tool_name="unifi_protect_update_chime",
-                field_paths=_CHIME_FIELD_PATHS,
-                named_values={
-                    "volume": volume,
-                    "repeat_times": repeat_times,
-                },
-                data=data,
-            )
-            reject_dangerous_keys(body, tool_name="unifi_protect_update_chime")
-            return await context.clients["protect"].update_chime(chime_id, body)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(chime_id, field="chime_id")
+        body = build_named_arg_body(
+            tool_name="unifi_protect_update_chime",
+            field_paths=_CHIME_FIELD_PATHS,
+            named_values={
+                "volume": volume,
+                "repeat_times": repeat_times,
+            },
+            data=data,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_protect_update_chime")
+        return await get_server_context(ctx).clients["protect"].update_chime(chime_id, body)
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_update_light(
         ctx: Context,
         light_id: str,
@@ -177,28 +161,23 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(light_id, field="light_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update light in read-only mode")
-            body = build_named_arg_body(
-                tool_name="unifi_protect_update_light",
-                field_paths=_LIGHT_FIELD_PATHS,
-                named_values={
-                    "led_level": led_level,
-                    "pir_duration": pir_duration,
-                    "pir_sensitivity": pir_sensitivity,
-                    "mode": mode,
-                },
-                data=data,
-            )
-            reject_dangerous_keys(body, tool_name="unifi_protect_update_light")
-            return await context.clients["protect"].update_light(light_id, body)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(light_id, field="light_id")
+        body = build_named_arg_body(
+            tool_name="unifi_protect_update_light",
+            field_paths=_LIGHT_FIELD_PATHS,
+            named_values={
+                "led_level": led_level,
+                "pir_duration": pir_duration,
+                "pir_sensitivity": pir_sensitivity,
+                "mode": mode,
+            },
+            data=data,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_protect_update_light")
+        return await get_server_context(ctx).clients["protect"].update_light(light_id, body)
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_set_light_mode(
         ctx: Context,
         light_id: str,
@@ -213,16 +192,15 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(light_id, field="light_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot set light mode in read-only mode")
-            return await context.clients["protect"].update_light(light_id, {"lightModeSettings": {"mode": mode}})
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(light_id, field="light_id")
+        return (
+            await get_server_context(ctx)
+            .clients["protect"]
+            .update_light(light_id, {"lightModeSettings": {"mode": mode}})
+        )
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_update_sensor(
         ctx: Context,
         sensor_id: str,
@@ -251,27 +229,22 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(sensor_id, field="sensor_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update sensor in read-only mode")
-            body = build_named_arg_body(
-                tool_name="unifi_protect_update_sensor",
-                field_paths=_SENSOR_FIELD_PATHS,
-                named_values={
-                    "mount_type": mount_type,
-                    "motion_is_enabled": motion_is_enabled,
-                    "light_is_enabled": light_is_enabled,
-                },
-                data=data,
-            )
-            reject_dangerous_keys(body, tool_name="unifi_protect_update_sensor")
-            return await context.clients["protect"].update_sensor(sensor_id, body)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(sensor_id, field="sensor_id")
+        body = build_named_arg_body(
+            tool_name="unifi_protect_update_sensor",
+            field_paths=_SENSOR_FIELD_PATHS,
+            named_values={
+                "mount_type": mount_type,
+                "motion_is_enabled": motion_is_enabled,
+                "light_is_enabled": light_is_enabled,
+            },
+            data=data,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_protect_update_sensor")
+        return await get_server_context(ctx).clients["protect"].update_sensor(sensor_id, body)
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_set_viewer_liveview(
         ctx: Context,
         viewer_id: str,
@@ -286,12 +259,6 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(viewer_id, field="viewer_id")
-            validate_id(liveview_id, field="liveview_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot set viewer liveview in read-only mode")
-            return await context.clients["protect"].update_viewer(viewer_id, {"liveview": liveview_id})
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(viewer_id, field="viewer_id")
+        validate_id(liveview_id, field="liveview_id")
+        return await get_server_context(ctx).clients["protect"].update_viewer(viewer_id, {"liveview": liveview_id})

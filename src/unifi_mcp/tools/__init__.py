@@ -1,9 +1,9 @@
 """MCP tool definitions for UniFi APIs.
 
-Tools are split into a read surface and a write surface. ``register_read_tools``
-registers everything and disables write-tagged tools; ``register_write_tools``
-re-enables them when ``UNIFI_MODE=readwrite``. ``register_all_tools`` is the
-single entry point used by ``server.create_server``.
+``register_all_tools`` is the single entry point used by
+``server.create_server``: it registers every configured API's tools, then
+hides the write-tagged ones unless ``UNIFI_MODE=readwrite`` (PROTO-005 /
+PROTO-006).
 """
 
 from __future__ import annotations
@@ -39,29 +39,13 @@ def _register_for_each_api(mcp: FastMCP, config: UniFiConfig) -> None:
         logger.info("Registered Site Manager tools")
 
 
-def register_read_tools(mcp: FastMCP, config: UniFiConfig) -> None:
-    """Register every tool, then hide write-tagged tools.
+def register_all_tools(mcp: FastMCP, config: UniFiConfig) -> None:
+    """Register every configured API's tools, hiding writes in readonly mode.
 
-    Call once at startup. Callers that need writes back should follow up
-    with :func:`register_write_tools`. Implements the read half of
-    PROTO-005.
+    Write-tagged tools are disabled unless ``config.writes_enabled`` (the
+    explicit ``UNIFI_MODE=readwrite`` opt-in of PROTO-005 / PROTO-006), so the
+    served tool list is mutation-free by default.
     """
     _register_for_each_api(mcp, config)
-    mcp.disable(tags={"write"})
-
-
-def register_write_tools(mcp: FastMCP, config: UniFiConfig) -> None:
-    """Re-enable write-tagged tools when ``UNIFI_MODE=readwrite``.
-
-    Implements the write half of PROTO-005 and the explicit env-flag opt-in
-    of PROTO-006: writes only come back on after an explicit
-    ``config.writes_enabled`` check.
-    """
-    if config.writes_enabled:
-        mcp.enable(tags={"write"})
-
-
-def register_all_tools(mcp: FastMCP, config: UniFiConfig) -> None:
-    """Register the read and write surfaces in mode-appropriate order."""
-    register_read_tools(mcp, config)
-    register_write_tools(mcp, config)
+    if not config.writes_enabled:
+        mcp.disable(tags={"write"})

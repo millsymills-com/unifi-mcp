@@ -6,14 +6,21 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
-from unifi_mcp.tools._common import JsonObject, get_server_context, redact_secrets, reject_dangerous_keys, validate_id
+from unifi_mcp.tools._common import (
+    JsonObject,
+    get_server_context,
+    redact_secrets,
+    reject_dangerous_keys,
+    tool_handler,
+    validate_id,
+)
 
 
 def register_network_config_tools(mcp: FastMCP) -> None:
     """Register network config tools."""
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_list_networks(ctx: Context) -> dict[str, Any]:
         """List all network (VLAN/subnet) configurations.
 
@@ -23,13 +30,10 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].list_networks())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].list_networks())
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_network(ctx: Context, network_id: str) -> dict[str, Any]:
         """Get a specific network configuration by ID.
 
@@ -42,14 +46,11 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(network_id, field="network_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_network(network_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(network_id, field="network_id")
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_network(network_id))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_network(
         ctx: Context,
         name: str,
@@ -70,20 +71,15 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create network in read-only mode")
-            data: JsonObject = {"name": name, "purpose": purpose, "dhcpd_enabled": dhcpd_enabled}
-            if subnet is not None:
-                data["subnet"] = subnet
-            if vlan is not None:
-                data["vlan"] = vlan
-            return await context.clients["network"].create_network(data)
-        except Exception as e:
-            handle_client_error(e)
+        data: JsonObject = {"name": name, "purpose": purpose, "dhcpd_enabled": dhcpd_enabled}
+        if subnet is not None:
+            data["subnet"] = subnet
+        if vlan is not None:
+            data["vlan"] = vlan
+        return await get_server_context(ctx).clients["network"].create_network(data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_network(ctx: Context, network_id: str, data: JsonObject) -> dict[str, Any]:
         """Update an existing network configuration. Pass only fields to change.
 
@@ -94,17 +90,12 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(network_id, field="network_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update network in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_update_network")
-            return await context.clients["network"].update_network(network_id, data)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(network_id, field="network_id")
+        reject_dangerous_keys(data, tool_name="unifi_network_update_network")
+        return await get_server_context(ctx).clients["network"].update_network(network_id, data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_delete_network(ctx: Context, network_id: str) -> dict[str, Any]:
         """Delete a network configuration.
 
@@ -114,11 +105,5 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(network_id, field="network_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot delete network in read-only mode")
-            return await context.clients["network"].delete_network(network_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(network_id, field="network_id")
+        return await get_server_context(ctx).clients["network"].delete_network(network_id)

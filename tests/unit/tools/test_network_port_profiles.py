@@ -228,3 +228,84 @@ class TestAssignHandlerPlumbing:
         result = await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff", port_idx=7, profile_id="p-7")
         assert result == {"ok": True}
         client.assign_port_profile.assert_awaited_once_with("aa:bb:cc:dd:ee:ff", 7, "p-7")
+
+
+class TestListPortProfilesHandler:
+    """Drive the read tool through the handler so the redact-and-return path runs."""
+
+    async def test_list_redacts_and_returns(self, mcp_with_profiles):
+        client = AsyncMock()
+        client.list_port_profiles.return_value = {"data": [{"_id": "p-1", "name": "guest", "x_passphrase": "hunter2"}]}
+        ctx = _ctx(_config(UniFiMode.READONLY), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_list_port_profiles")
+        result = await tool.fn(ctx)
+        assert result == {"data": [{"_id": "p-1", "name": "guest", "x_passphrase": "***REDACTED***"}]}
+        client.list_port_profiles.assert_awaited_once_with()
+
+    async def test_list_client_error_maps_to_tool_error(self, mcp_with_profiles):
+        from unifi_mcp.errors import UniFiServerError
+
+        client = AsyncMock()
+        client.list_port_profiles.side_effect = UniFiServerError("controller down")
+        ctx = _ctx(_config(UniFiMode.READONLY), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_list_port_profiles")
+        with pytest.raises(ToolError, match="controller down"):
+            await tool.fn(ctx)
+
+
+class TestCreatePortProfileHandler:
+    async def test_readonly_blocks_create(self, mcp_with_profiles):
+        client = AsyncMock()
+        ctx = _ctx(_config(UniFiMode.READONLY), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_create_port_profile")
+        with pytest.raises(ToolError, match="read-only mode"):
+            await tool.fn(ctx, data={"name": "guest", "poe_mode": "off", "forward": "all"})
+        client.create_port_profile.assert_not_awaited()
+
+    async def test_readwrite_forwards_payload(self, mcp_with_profiles):
+        client = AsyncMock()
+        client.create_port_profile.return_value = {"ok": True}
+        ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_create_port_profile")
+        payload = {"name": "guest", "poe_mode": "off", "forward": "all"}
+        result = await tool.fn(ctx, data=payload)
+        assert result == {"ok": True}
+        client.create_port_profile.assert_awaited_once_with(payload)
+
+
+class TestUpdatePortProfileHandler:
+    async def test_readonly_blocks_update(self, mcp_with_profiles):
+        client = AsyncMock()
+        ctx = _ctx(_config(UniFiMode.READONLY), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_update_port_profile")
+        with pytest.raises(ToolError, match="read-only mode"):
+            await tool.fn(ctx, profile_id="p-1", data={"poe_mode": "off"})
+        client.update_port_profile.assert_not_awaited()
+
+    async def test_readwrite_forwards_payload(self, mcp_with_profiles):
+        client = AsyncMock()
+        client.update_port_profile.return_value = {"ok": True}
+        ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_update_port_profile")
+        result = await tool.fn(ctx, profile_id="p-1", data={"poe_mode": "off"})
+        assert result == {"ok": True}
+        client.update_port_profile.assert_awaited_once_with("p-1", {"poe_mode": "off"})
+
+
+class TestDeletePortProfileHandler:
+    async def test_readonly_blocks_delete(self, mcp_with_profiles):
+        client = AsyncMock()
+        ctx = _ctx(_config(UniFiMode.READONLY), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_delete_port_profile")
+        with pytest.raises(ToolError, match="read-only mode"):
+            await tool.fn(ctx, profile_id="p-1")
+        client.delete_port_profile.assert_not_awaited()
+
+    async def test_readwrite_forwards_id(self, mcp_with_profiles):
+        client = AsyncMock()
+        client.delete_port_profile.return_value = {"ok": True}
+        ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
+        tool = await mcp_with_profiles.get_tool("unifi_network_delete_port_profile")
+        result = await tool.fn(ctx, profile_id="p-1")
+        assert result == {"ok": True}
+        client.delete_port_profile.assert_awaited_once_with("p-1")

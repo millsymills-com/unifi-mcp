@@ -42,15 +42,19 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
 REDACTED = "***REDACTED***"
 
 
-def _normalize(key: str) -> str:
+def normalize_key(key: str) -> str:
     """Lowercase + strip underscores so snake_case and camelCase forms of the
     same key (`client_secret` and `clientSecret`) collapse to one identity.
+
+    Shared by this module's secret-key matching and the tool-layer
+    dangerous-key denylist (``tools/_common``) so both classify keys the
+    same way; the two denylists themselves stay independent.
     """
     return key.lower().replace("_", "")
 
 
 # Normalized denylist — matched against the normalized key.
-_NORMALIZED_KEYS: frozenset[str] = frozenset(_normalize(k) for k in SENSITIVE_KEYS)
+_NORMALIZED_KEYS: frozenset[str] = frozenset(normalize_key(k) for k in SENSITIVE_KEYS)
 
 # Suffix patterns — match the **normalized** end of a key, so the same rule
 # catches `x_ssh_password`, `xSshPassword`, and `sshPassword`.
@@ -58,7 +62,7 @@ _NORMALIZED_SUFFIXES: tuple[str, ...] = ("password", "secret", "authkey", "token
 
 
 def _is_sensitive_key(key: str) -> bool:
-    normalized = _normalize(key)
+    normalized = normalize_key(key)
     if normalized in _NORMALIZED_KEYS:
         return True
     if normalized.startswith("super") and (normalized.endswith("password") or normalized.endswith("url")):

@@ -2,15 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from unifi_mcp.clients.network import NetworkClient
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
 from unifi_mcp.tools.network.devices import register_device_tools
+
+
+@dataclass
+class _FakeLifespan:
+    config: UniFiConfig
+    clients: dict[str, Any] = field(default_factory=dict)
+
+
+def _ctx(config: UniFiConfig, **clients: Any) -> AsyncMock:
+    ctx = AsyncMock()
+    ctx.lifespan_context = _FakeLifespan(config=config, clients=clients)
+    return ctx
+
 
 BASE_URL = "https://10.0.0.1:443"
 SITE_PREFIX = f"{BASE_URL}/proxy/network/api/s/default"
@@ -163,3 +181,24 @@ class TestForgetDevice:
         with pytest.raises(UniFiNotFoundError, match="aa:bb"):
             await network_client.forget_device("aa:bb:cc:dd:ee:ff")
         assert post_route.call_count == 0
+
+
+class TestForgetDeviceHandler:
+    """Drive the forget tool through the handler to cover its read-only gate."""
+
+    async def test_readonly_blocks_forget(self, mcp_with_devices):
+        client = AsyncMock()
+        ctx = _ctx(_full_config(UniFiMode.READONLY), network=client)
+        tool = await mcp_with_devices.get_tool("unifi_network_forget_device")
+        with pytest.raises(ToolError, match="read-only mode"):
+            await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff")
+        client.forget_device.assert_not_awaited()
+
+    async def test_readwrite_forwards_mac(self, mcp_with_devices):
+        client = AsyncMock()
+        client.forget_device.return_value = {"ok": True}
+        ctx = _ctx(_full_config(UniFiMode.READWRITE), network=client)
+        tool = await mcp_with_devices.get_tool("unifi_network_forget_device")
+        result = await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff")
+        assert result == {"ok": True}
+        client.forget_device.assert_awaited_once_with("aa:bb:cc:dd:ee:ff")

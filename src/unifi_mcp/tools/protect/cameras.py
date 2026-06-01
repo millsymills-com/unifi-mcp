@@ -6,13 +6,13 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
 from unifi_mcp.tools._common import (
     JsonObject,
     build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
+    tool_handler,
     validate_id,
 )
 
@@ -38,6 +38,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
     """Register Protect camera tools."""
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_cameras(ctx: Context) -> list[dict[str, Any]]:
         """List all cameras managed by UniFi Protect.
 
@@ -47,13 +48,10 @@ def register_camera_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_cameras())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_cameras())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_get_camera(ctx: Context, camera_id: str) -> dict[str, Any]:
         """Get detailed info for a specific camera.
 
@@ -66,14 +64,11 @@ def register_camera_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(camera_id, field="camera_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].get_camera(camera_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(camera_id, field="camera_id")
+        return redact_secrets(await get_server_context(ctx).clients["protect"].get_camera(camera_id))
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_update_camera(
         ctx: Context,
         camera_id: str,
@@ -114,30 +109,25 @@ def register_camera_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(camera_id, field="camera_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update camera in read-only mode")
-            body = build_named_arg_body(
-                tool_name="unifi_protect_update_camera",
-                field_paths=_CAMERA_FIELD_PATHS,
-                named_values={
-                    "name": name,
-                    "led_settings_is_enabled": led_settings_is_enabled,
-                    "osd_settings_is_name_enabled": osd_settings_is_name_enabled,
-                    "osd_settings_is_date_enabled": osd_settings_is_date_enabled,
-                    "osd_settings_is_logo_enabled": osd_settings_is_logo_enabled,
-                    "osd_settings_is_debug_enabled": osd_settings_is_debug_enabled,
-                },
-                data=data,
-            )
-            reject_dangerous_keys(body, tool_name="unifi_protect_update_camera")
-            return await context.clients["protect"].update_camera(camera_id, body)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(camera_id, field="camera_id")
+        body = build_named_arg_body(
+            tool_name="unifi_protect_update_camera",
+            field_paths=_CAMERA_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "led_settings_is_enabled": led_settings_is_enabled,
+                "osd_settings_is_name_enabled": osd_settings_is_name_enabled,
+                "osd_settings_is_date_enabled": osd_settings_is_date_enabled,
+                "osd_settings_is_logo_enabled": osd_settings_is_logo_enabled,
+                "osd_settings_is_debug_enabled": osd_settings_is_debug_enabled,
+            },
+            data=data,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_protect_update_camera")
+        return await get_server_context(ctx).clients["protect"].update_camera(camera_id, body)
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_set_recording_mode(
         ctx: Context,
         camera_id: str,
@@ -156,18 +146,15 @@ def register_camera_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(camera_id, field="camera_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot set recording mode in read-only mode")
-            return await context.clients["protect"].set_recording_mode(
-                camera_id, mode, pre_padding=pre_padding, post_padding=post_padding
-            )
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(camera_id, field="camera_id")
+        return (
+            await get_server_context(ctx)
+            .clients["protect"]
+            .set_recording_mode(camera_id, mode, pre_padding=pre_padding, post_padding=post_padding)
+        )
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_protect_set_smart_detection(
         ctx: Context, camera_id: str, object_types: list[str]
     ) -> dict[str, Any]:
@@ -180,11 +167,5 @@ def register_camera_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(camera_id, field="camera_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot set smart detection in read-only mode")
-            return await context.clients["protect"].set_smart_detection(camera_id, object_types)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(camera_id, field="camera_id")
+        return await get_server_context(ctx).clients["protect"].set_smart_detection(camera_id, object_types)

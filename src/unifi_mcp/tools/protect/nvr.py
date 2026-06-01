@@ -6,14 +6,14 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import handle_client_error
-from unifi_mcp.tools._common import get_server_context, redact_secrets
+from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler
 
 
 def register_nvr_tools(mcp: FastMCP) -> None:
     """Register NVR tools."""
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_get_nvr(ctx: Context) -> dict[str, Any]:
         """Get NVR (Network Video Recorder) status and configuration.
 
@@ -26,8 +26,4 @@ def register_nvr_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].get_nvr())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].get_nvr())
