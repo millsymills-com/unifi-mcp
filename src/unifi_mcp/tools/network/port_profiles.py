@@ -73,7 +73,7 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         reject_dangerous_keys(data, tool_name="unifi_network_create_port_profile")
-        return await get_server_context(ctx).clients["network"].create_port_profile(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_port_profile(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -89,7 +89,7 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
         """
         validate_id(profile_id, field="profile_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_port_profile")
-        return await get_server_context(ctx).clients["network"].update_port_profile(profile_id, data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_port_profile(profile_id, data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -107,7 +107,7 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(profile_id, field="profile_id")
-        return await get_server_context(ctx).clients["network"].delete_port_profile(profile_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_port_profile(profile_id))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -137,4 +137,6 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
             raise UniFiBadRequestError(
                 f"port_idx must be between {_PORT_IDX_MIN} and {_PORT_IDX_MAX} (got {port_idx!r})"
             )
-        return await get_server_context(ctx).clients["network"].assign_port_profile(mac, port_idx, profile_id)
+        return redact_secrets(
+            await get_server_context(ctx).clients["network"].assign_port_profile(mac, port_idx, profile_id)
+        )

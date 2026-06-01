@@ -40,9 +40,25 @@ def _readonly_config() -> UniFiConfig:
     )
 
 
+def _readwrite_config() -> UniFiConfig:
+    return UniFiConfig(
+        _env_file=None,
+        unifi_mode=UniFiMode.READWRITE,
+        unifi_network_api="k",
+        unifi_protect_api="k",
+        unifi_site_manager_api=None,
+    )
+
+
 def _fake_ctx(**clients: Any) -> AsyncMock:
     ctx = AsyncMock()
     ctx.lifespan_context = FakeLifespan(config=_readonly_config(), clients=clients)
+    return ctx
+
+
+def _fake_rw_ctx(**clients: Any) -> AsyncMock:
+    ctx = AsyncMock()
+    ctx.lifespan_context = FakeLifespan(config=_readwrite_config(), clients=clients)
     return ctx
 
 
@@ -371,6 +387,39 @@ class TestProtectDevicesRedaction:
         ctx = _fake_ctx(protect=protect_client)
         result = await _call(server, "unifi_protect_list_viewers", ctx)
         assert result[0]["ssoToken"] == REDACTED
+
+
+class TestWriteResponseRedaction:
+    """#325 — write tools echo the upstream object and must redact secrets too."""
+
+    @pytest.fixture
+    def server(self) -> FastMCP:
+        s = FastMCP(name="t")
+        register_wlan_tools(s)
+        register_nvr_tools(s)
+        return s
+
+    async def test_update_wlan_redacts_passphrase_in_echoed_object(self, server):
+        network_client = AsyncMock()
+        network_client.update_wlan = AsyncMock(
+            return_value={"_id": "w-1", "name": "Home", "x_passphrase": "super-secret", "radius_secret": "r-sec"},
+        )
+        ctx = _fake_rw_ctx(network=network_client)
+        result = await _call(server, "unifi_network_update_wlan", ctx, wlan_id="w-1", data={"name": "Home"})
+        assert result["x_passphrase"] == REDACTED
+        assert result["radius_secret"] == REDACTED
+        assert result["name"] == "Home"
+        assert "super-secret" not in str(result)
+
+    async def test_create_wlan_redacts_passphrase_in_echoed_object(self, server):
+        network_client = AsyncMock()
+        network_client.create_wlan = AsyncMock(
+            return_value={"data": [{"_id": "w-2", "name": "Guest", "x_passphrase": "leak-me"}]},
+        )
+        ctx = _fake_rw_ctx(network=network_client)
+        result = await _call(server, "unifi_network_create_wlan", ctx, name="Guest", x_passphrase="pw")
+        assert result["data"][0]["x_passphrase"] == REDACTED
+        assert "leak-me" not in str(result)
 
 
 class TestSiteManagerDiscoveryRedaction:

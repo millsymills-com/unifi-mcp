@@ -126,7 +126,7 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             data=data,
         )
         reject_dangerous_keys(body, tool_name="unifi_protect_update_chime")
-        return await get_server_context(ctx).clients["protect"].update_chime(chime_id, body)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].update_chime(chime_id, body))
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -174,7 +174,7 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             data=data,
         )
         reject_dangerous_keys(body, tool_name="unifi_protect_update_light")
-        return await get_server_context(ctx).clients["protect"].update_light(light_id, body)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].update_light(light_id, body))
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -193,7 +193,7 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(light_id, field="light_id")
-        return (
+        return redact_secrets(
             await get_server_context(ctx)
             .clients["protect"]
             .update_light(light_id, {"lightModeSettings": {"mode": mode}})
@@ -241,7 +241,7 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             data=data,
         )
         reject_dangerous_keys(body, tool_name="unifi_protect_update_sensor")
-        return await get_server_context(ctx).clients["protect"].update_sensor(sensor_id, body)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].update_sensor(sensor_id, body))
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -261,4 +261,6 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         """
         validate_id(viewer_id, field="viewer_id")
         validate_id(liveview_id, field="liveview_id")
-        return await get_server_context(ctx).clients["protect"].update_viewer(viewer_id, {"liveview": liveview_id})
+        return redact_secrets(
+            await get_server_context(ctx).clients["protect"].update_viewer(viewer_id, {"liveview": liveview_id})
+        )

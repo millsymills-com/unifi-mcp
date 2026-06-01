@@ -134,7 +134,7 @@ def register_system_tools(mcp: FastMCP) -> None:
             data=data,
         )
         reject_dangerous_keys(body, tool_name="unifi_network_update_settings")
-        return await get_server_context(ctx).clients["network"].update_settings(body)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_settings(body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -147,7 +147,7 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        return await get_server_context(ctx).clients["network"].run_speedtest()
+        return redact_secrets(await get_server_context(ctx).clients["network"].run_speedtest())
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -162,7 +162,7 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        return await get_server_context(ctx).clients["network"].create_backup()
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_backup())
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -176,7 +176,7 @@ def register_system_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].upgrade_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].upgrade_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -193,7 +193,7 @@ def register_system_tools(mcp: FastMCP) -> None:
         """
         validate_mac(mac, field="mac")
         _validate_port_idx(port_idx)
-        return await get_server_context(ctx).clients["network"].power_cycle_port(mac, port_idx)
+        return redact_secrets(await get_server_context(ctx).clients["network"].power_cycle_port(mac, port_idx))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -211,7 +211,7 @@ def register_system_tools(mcp: FastMCP) -> None:
         with no compare-and-set primitive (#151).
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].unauthorize_guest(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].unauthorize_guest(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -224,4 +224,4 @@ def register_system_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        return await get_server_context(ctx).clients["network"].reset_dpi()
+        return redact_secrets(await get_server_context(ctx).clients["network"].reset_dpi())
