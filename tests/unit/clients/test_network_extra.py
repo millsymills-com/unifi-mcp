@@ -196,6 +196,29 @@ class TestCrudMethods:
         assert ntp_route.call_count == 1, "first section must have been applied before the second failed"
         assert mgmt_route.call_count >= 1
 
+    @respx.mock
+    async def test_update_settings_rejects_non_dict_section(self, client):
+        """A section whose value is not a dict is rejected before any PUT —
+        each section body must be a partial-config mapping. The raised error
+        names the offending section and the type seen.
+        """
+        from unifi_mcp.errors import UniFiError
+
+        put_route = respx.put(f"{API_PREFIX}rest/setting/ntp").mock(return_value=httpx.Response(200, json={}))
+        with pytest.raises(UniFiError, match="section 'ntp' must be a dict body, got str"):
+            await client.update_settings({"ntp": "notadict"})
+        assert put_route.call_count == 0, "validation must short-circuit before issuing the PUT"
+
+    async def test_update_settings_rejects_empty_body(self, client):
+        """An empty mapping carries no sections to dispatch — raise rather than
+        silently no-op so the caller learns the request was meaningless. No HTTP
+        is issued.
+        """
+        from unifi_mcp.errors import UniFiError
+
+        with pytest.raises(UniFiError, match="no sections in body"):
+            await client.update_settings({})
+
 
 class TestCommandMethods:
     @pytest.mark.parametrize(
