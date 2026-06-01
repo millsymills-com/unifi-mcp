@@ -337,6 +337,15 @@ class TestCertFingerprintValidation:
         with pytest.raises(ValidationError, match="64 hex chars"):
             UniFiConfig(_env_file=None, unifi_network_cert_fingerprint="aa:bb:cc")
 
+    def test_rejects_non_string_non_none_value(self):
+        """A non-string, non-None value (e.g. an int) is rejected outright.
+
+        The validator runs in ``mode="before"`` so a raw int reaches it without
+        coercion; it must not be treated as an unset/blank value or normalized.
+        """
+        with pytest.raises(ValidationError, match="fingerprint must be a string"):
+            UniFiConfig(_env_file=None, unifi_network_cert_fingerprint=12345)
+
 
 class TestVerifySSLAudit:
     """Items 1+2 of #149: warn on verify_ssl=False with an API key set."""

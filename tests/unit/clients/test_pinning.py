@@ -193,6 +193,72 @@ class TestTeardownOnMismatch:
         matching.aclose.assert_awaited_once()
         non_matching.aclose.assert_not_awaited()
 
+    async def test_mismatch_without_pool_still_raises(self, monkeypatch):
+        """When the transport exposes no connection pool, teardown closes only
+        the response and lets the original error through unchanged."""
+        transport = CertPinningTransport(expected_fingerprint="c" * 64)
+        transport._pool = None  # ty: ignore[invalid-assignment]
+        response = _make_response(_FakeSSLObject(_FAKE_DER))
+        response.aclose = AsyncMock()  # ty: ignore[invalid-assignment]
+
+        async def fake_super(self_: Any, request: httpx.Request) -> httpx.Response:
+            return response
+
+        monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", fake_super)
+        request = httpx.Request("GET", "https://example.invalid/")
+        with pytest.raises(UniFiAuthError, match="pin mismatch"):
+            await transport.handle_async_request(request)
+        response.aclose.assert_awaited_once()
+
+    async def test_mismatch_when_pool_connections_raise(self, monkeypatch):
+        """If enumerating the pool's connections raises, teardown swallows it
+        and the original ``UniFiAuthError`` reaches the caller."""
+        transport = CertPinningTransport(expected_fingerprint="c" * 64)
+        response = _make_response(_FakeSSLObject(_FAKE_DER))
+
+        class _ExplodingPool:
+            @property
+            def connections(self) -> list[object]:
+                raise RuntimeError("pool snapshot unavailable")
+
+        transport._pool = _ExplodingPool()  # ty: ignore[invalid-assignment]
+
+        async def fake_super(self_: Any, request: httpx.Request) -> httpx.Response:
+            return response
+
+        monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", fake_super)
+        request = httpx.Request("GET", "https://example.invalid/")
+        with pytest.raises(UniFiAuthError, match="pin mismatch"):
+            await transport.handle_async_request(request)
+
+    async def test_mismatch_skips_connection_without_origin(self, monkeypatch):
+        """A pooled connection with no ``_origin`` is skipped, not closed —
+        we can't confirm it serves the suspect origin, so leave it alone."""
+        transport = CertPinningTransport(expected_fingerprint="c" * 64)
+        response = _make_response(_FakeSSLObject(_FAKE_DER))
+
+        class _OriginlessConn:
+            def __init__(self) -> None:
+                self._origin = None
+                self.aclose = AsyncMock()
+
+        originless = _OriginlessConn()
+
+        class _FakePool:
+            def __init__(self, conns: list[object]) -> None:
+                self.connections = conns
+
+        transport._pool = _FakePool([originless])  # ty: ignore[invalid-assignment]
+
+        async def fake_super(self_: Any, request: httpx.Request) -> httpx.Response:
+            return response
+
+        monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", fake_super)
+        request = httpx.Request("GET", "https://example.invalid/")
+        with pytest.raises(UniFiAuthError, match="pin mismatch"):
+            await transport.handle_async_request(request)
+        originless.aclose.assert_not_awaited()
+
     async def test_success_path_does_not_teardown(self, monkeypatch):
         transport = CertPinningTransport(expected_fingerprint=_FAKE_FP)
         response = _make_response(_FakeSSLObject(_FAKE_DER))
