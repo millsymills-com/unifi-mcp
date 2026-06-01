@@ -434,6 +434,21 @@ class TestErrorBodyExtraction:
         assert "bare string error" not in msg
 
     @respx.mock
+    async def test_json_null_body_yields_opaque_hint(self, client):
+        """A literal JSON ``null`` parses to ``None``, so ``parsed is None``
+        diverts to the non-JSON branch (a different path than the list/string
+        non-dict cases, which fall through the in-block ``isinstance`` gate).
+        The non-empty ``null`` text still yields the opaque hint.
+        """
+        respx.get(f"{BASE_URL}/test").mock(return_value=httpx.Response(500, content=b"null"))
+        with pytest.raises(UniFiServerError) as exc_info:
+            await client.get("test")
+        msg = str(exc_info.value)
+        assert "HTTP 500" in msg
+        assert "<unparseable body, see DEBUG log>" in msg
+        assert "null" not in msg
+
+    @respx.mock
     async def test_raw_body_debug_log_suppressed_by_default(self, client, caplog, monkeypatch):
         """Without ``UNIFI_LOG_RAW_BODIES=1`` the full body never reaches the
         DEBUG log — the redacted/summary form goes out instead.
