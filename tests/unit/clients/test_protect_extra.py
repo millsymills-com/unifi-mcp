@@ -41,8 +41,8 @@ class TestReadMethods:
 
 class TestWriteMethods:
     @respx.mock
-    async def test_set_smart_detection_puts_smart_settings(self, client):
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+    async def test_set_smart_detection_patches_smart_settings(self, client):
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
         await client.set_smart_detection("cam-1", ["person", "vehicle"])
         body = route.calls[0].request.content
         assert b"smartDetectSettings" in body
@@ -50,15 +50,9 @@ class TestWriteMethods:
         assert b"vehicle" in body
 
     @respx.mock
-    async def test_update_nvr_puts_body(self, client):
-        route = respx.put(f"{API_PREFIX}nvrs").mock(return_value=httpx.Response(200, json={}))
-        await client.update_nvr({"name": "renamed"})
-        assert b"renamed" in route.calls[0].request.content
-
-    @respx.mock
     async def test_set_recording_mode_pre_padding_only(self, client):
         # Exercise the pre_padding branch when post_padding is None.
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
         await client.set_recording_mode("cam-1", "motion", pre_padding=7)
         body = route.calls[0].request.content
         assert b"prePaddingSecs" in body
@@ -66,7 +60,7 @@ class TestWriteMethods:
 
     @respx.mock
     async def test_set_recording_mode_post_padding_only(self, client):
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
         await client.set_recording_mode("cam-1", "motion", post_padding=11)
         body = route.calls[0].request.content
         assert b"postPaddingSecs" in body

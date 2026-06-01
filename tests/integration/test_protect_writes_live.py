@@ -1,21 +1,17 @@
 """Live Protect write tests.
 
-Per ``project_protect_integration_api_surface`` memory + #139, only
-``set_recording_mode`` is expected to work end-to-end on integration v1.
-The other three writes (``set_smart_detection``, ``update_camera``,
-``update_nvr``) return HTTP 404 ``Entity 'endpoint' not found`` from the
-controller because integration v1 doesn't wire those PUT bodies through
-to backing handlers.
-
-This test locks in the current upstream behavior so a future controller-
-side fix is detected as a positive signal (the assertion flips).
+Holds the gated live ``set_recording_mode`` round-trip against the test
+camera. Camera writes are issued as PATCH on integration v1 and are
+functional on current firmware.
 
 Run:
     uv run pytest tests/integration/test_protect_writes_live.py -v -m integration
 
-set_recording_mode is gated behind LIVE_TEST_PROTECT_WRITES=1 because a
-silent mode flip on a real surveillance setup would be a problem. For
-dedicated test hardware this gate is just opt-in confirmation.
+The round-trip is gated behind LIVE_TEST_PROTECT_WRITES=1 because a silent
+mode flip on a real surveillance setup would be a problem; for dedicated test
+hardware this gate is just opt-in confirmation. It skips when the camera GET
+response omits ``recordingSettings.mode`` (integration v1 does this on current
+firmware), since the original mode can't be captured for restoration.
 """
 
 from __future__ import annotations
@@ -24,8 +20,6 @@ import logging
 import os
 
 import pytest
-
-from unifi_mcp.errors import UniFiNotFoundError
 
 LOG = logging.getLogger(__name__)
 
@@ -47,39 +41,6 @@ async def _pick_test_camera_id(protect_live_client) -> str:
     cam_id = cam.get("id") or cam.get("_id")
     assert isinstance(cam_id, str), f"camera record missing id: {cam}"
     return cam_id
-
-
-_UPSTREAM_404_REASON = (
-    "Integration v1 returns 404 for this PUT body (see #139, "
-    "project_protect_integration_api_surface memory). xfail-strict so an upstream "
-    "fix flips the test red as a positive signal."
-)
-
-
-@pytest.mark.xfail(strict=True, raises=UniFiNotFoundError, reason=_UPSTREAM_404_REASON)
-class TestSetSmartDetectionMissing:
-    """Lock in upstream 404 for set_smart_detection on integration v1."""
-
-    async def test_set_smart_detection(self, protect_live_client):
-        camera_id = await _pick_test_camera_id(protect_live_client)
-        await protect_live_client.set_smart_detection(camera_id, ["person"])
-
-
-@pytest.mark.xfail(strict=True, raises=UniFiNotFoundError, reason=_UPSTREAM_404_REASON)
-class TestUpdateCameraMissing:
-    """Lock in upstream 404 for update_camera with arbitrary body on integration v1."""
-
-    async def test_update_camera(self, protect_live_client):
-        camera_id = await _pick_test_camera_id(protect_live_client)
-        await protect_live_client.update_camera(camera_id, {"name": "should-404"})
-
-
-@pytest.mark.xfail(strict=True, raises=UniFiNotFoundError, reason=_UPSTREAM_404_REASON)
-class TestUpdateNvrMissing:
-    """Lock in upstream 404 for update_nvr on integration v1 (PUT /nvrs)."""
-
-    async def test_update_nvr(self, protect_live_client):
-        await protect_live_client.update_nvr({"name": "should-404"})
 
 
 @pytest.mark.skipif(not _writes_enabled(), reason=PROTECT_WRITE_GATE_REASON)

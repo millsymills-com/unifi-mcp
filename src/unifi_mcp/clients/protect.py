@@ -85,7 +85,27 @@ class ProtectClient(BaseUniFiClient):
 
     async def update_camera(self, camera_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """Update camera settings."""
-        result: dict[str, Any] = await self.put(f"cameras/{self._segment(camera_id)}", json=data)
+        result: dict[str, Any] = await self.patch(f"cameras/{self._segment(camera_id)}", json=data)
+        return result
+
+    async def update_chime(self, chime_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update chime settings."""
+        result: dict[str, Any] = await self.patch(f"chimes/{self._segment(chime_id)}", json=data)
+        return result
+
+    async def update_light(self, light_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update light settings."""
+        result: dict[str, Any] = await self.patch(f"lights/{self._segment(light_id)}", json=data)
+        return result
+
+    async def update_sensor(self, sensor_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update sensor settings."""
+        result: dict[str, Any] = await self.patch(f"sensors/{self._segment(sensor_id)}", json=data)
+        return result
+
+    async def update_viewer(self, viewer_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update viewer settings."""
+        result: dict[str, Any] = await self.patch(f"viewers/{self._segment(viewer_id)}", json=data)
         return result
 
     async def set_recording_mode(
@@ -109,7 +129,7 @@ class ProtectClient(BaseUniFiClient):
         if post_padding is not None:
             recording_settings["postPaddingSecs"] = post_padding
 
-        result: dict[str, Any] = await self.put(
+        result: dict[str, Any] = await self.patch(
             f"cameras/{self._segment(camera_id)}",
             json={"recordingSettings": recording_settings},
         )
@@ -122,16 +142,10 @@ class ProtectClient(BaseUniFiClient):
             camera_id: The camera ID.
             object_types: List of smart detection object types to enable.
         """
-        result: dict[str, Any] = await self.put(
+        result: dict[str, Any] = await self.patch(
             f"cameras/{self._segment(camera_id)}",
             json={"smartDetectSettings": {"objectTypes": object_types}},
         )
-        return result
-
-    async def update_nvr(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Update NVR settings."""
-        # TODO(#43): live-verify PUT /nvrs (vs /nvrs/{id}) against a real Protect NVR.
-        result: dict[str, Any] = await self.put("nvrs", json=data)
         return result
 
     # -- Media methods ------------------------------------------------------

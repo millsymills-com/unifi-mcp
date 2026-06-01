@@ -288,14 +288,6 @@ class TestProtectHandlers:
         result = await _call(s, "unifi_protect_get_nvr", ctx)
         assert result == {"name": "nvr"}
 
-    async def test_update_nvr_readonly_blocked(self):
-        s = FastMCP(name="t")
-        register_nvr_tools(s)
-        client = AsyncMock()
-        ctx = _fake_ctx(_readonly_config(), protect=client)
-        with pytest.raises(ToolError, match="read-only mode"):
-            await _call(s, "unifi_protect_update_nvr", ctx, data={"name": "x"})
-
     async def test_export_video_plumbs_max_bytes(self):
         s = FastMCP(name="t")
         register_media_tools(s)

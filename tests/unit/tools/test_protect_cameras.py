@@ -92,15 +92,15 @@ class TestCameraClientEndpoints:
         assert result == {"id": "cam-1"}
 
     @respx.mock
-    async def test_update_camera_puts_with_body(self, protect_client_local):
-        route = respx.put(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={"ok": True}))
+    async def test_update_camera_patches_with_body(self, protect_client_local):
+        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={"ok": True}))
         result = await protect_client_local.update_camera("cam-1", {"name": "Front Door"})
         assert result == {"ok": True}
         assert b"Front Door" in route.calls[0].request.content
 
     @respx.mock
-    async def test_set_recording_mode_puts_recording_settings(self, protect_client_local):
-        route = respx.put(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+    async def test_set_recording_mode_patches_recording_settings(self, protect_client_local):
+        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
         await protect_client_local.set_recording_mode("cam-1", "motion", pre_padding=5, post_padding=10)
         body = route.calls[0].request.content
         assert b"recordingSettings" in body
@@ -109,8 +109,8 @@ class TestCameraClientEndpoints:
         assert b"postPaddingSecs" in body
 
     @respx.mock
-    async def test_set_smart_detection_puts_smart_detect_settings(self, protect_client_local):
-        route = respx.put(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+    async def test_set_smart_detection_patches_smart_detect_settings(self, protect_client_local):
+        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
         await protect_client_local.set_smart_detection("cam-1", ["person", "vehicle"])
         body = route.calls[0].request.content
         assert b"smartDetectSettings" in body

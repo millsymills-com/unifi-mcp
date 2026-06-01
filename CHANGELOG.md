@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Protect light, chime, sensor, and viewer write tools
+  (`unifi_protect_update_light`, `unifi_protect_set_light_mode`,
+  `unifi_protect_update_chime`, `unifi_protect_update_sensor`,
+  `unifi_protect_set_viewer_liveview`), issued as PATCH on the integration
+  v1 API.
+- `patch()` verb on the base API client.
+
 ### Changed
 
 - Every MCP tool handler now shares a single `tool_handler` decorator
@@ -23,6 +32,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Promoted the duplicated key-normalization helper to a shared
   `unifi_mcp._redaction.normalize_key`, reused by the tool-layer
   dangerous-key denylist; the two denylists themselves stay independent.
+
+### Fixed
+
+- Protect camera writes (`unifi_protect_update_camera`,
+  `unifi_protect_set_recording_mode`, `unifi_protect_set_smart_detection`)
+  now work: they are issued as PATCH on the integration v1 API instead of
+  an unsupported PUT (#139, #237).
+
+### Removed
+
+- `unifi_protect_update_nvr`: the integration v1 API is GET-only for the
+  NVR, so the tool could never succeed.
 
 ## [0.3.0] - 2026-05-07
 
