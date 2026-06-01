@@ -38,6 +38,7 @@ from _pytest.outcomes import OutcomeException
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
+from tests.integration.conftest import _normalize_mac, live_test_device_macs
 from unifi_mcp.server import create_server, server_lifespan
 
 pytestmark = pytest.mark.integration
@@ -300,9 +301,13 @@ def _unwrap_list(payload: Any) -> list[dict[str, Any]]:
 async def _first_protect_camera_id(client: Client) -> str:
     """Return the id of the first adopted camera, or pytest.skip if none.
 
-    Used by every Protect write test to pick a target. Skips cleanly
+    Used by read-only Protect tests to pick a target. Skips cleanly
     rather than failing when no camera is adopted (e.g., NVR exists but
     operator hasn't added a camera yet).
+
+    Read-only only: write tests must resolve their target through
+    :func:`_allowlisted_camera_id` so they never mutate a device the
+    operator has not approved (#330, footgun behind #271).
     """
     cameras = _unwrap_list(await _invoke(client, "unifi_protect_list_cameras"))
     if not cameras:
@@ -310,6 +315,41 @@ async def _first_protect_camera_id(client: Client) -> str:
     camera_id = cameras[0].get("id")
     assert camera_id, f"First camera entry missing id: {cameras[0]!r}"
     return camera_id
+
+
+async def _allowlisted_camera_id(client: Client) -> str:
+    """Return the id of the first adopted camera whose MAC is allowlisted.
+
+    Write tests must target only devices the operator has explicitly
+    approved via ``LIVE_TEST_DEVICE_MACS``. Blindly writing to ``cameras[0]``
+    is the footgun behind the #271 bench-bricking incident, so this helper
+    filters the live camera list to the allowlist and returns the first
+    match. It ``pytest.skip``s (never fails) when the allowlist is empty or
+    no adopted camera matches, so a contributor without the approved test
+    camera present gets a clean skip rather than a write to the wrong device.
+
+    Args:
+        client: A connected FastMCP client.
+
+    Returns:
+        The ``id`` of the first adopted camera whose MAC is in the allowlist.
+    """
+    allowlist = live_test_device_macs()
+    if not allowlist:
+        pytest.skip("LIVE_TEST_DEVICE_MACS is unset; refusing to pick a Protect write target (#271/#330)")
+    cameras = _unwrap_list(await _invoke(client, "unifi_protect_list_cameras"))
+    if not cameras:
+        pytest.skip("No cameras adopted on the NVR")
+    for cam in cameras:
+        mac = _normalize_mac(str(cam.get("mac", "")))
+        if mac and mac in allowlist:
+            camera_id = cam.get("id")
+            assert camera_id, f"Allowlisted camera entry missing id: {cam!r}"
+            return camera_id
+    pytest.skip(
+        "No adopted camera matches LIVE_TEST_DEVICE_MACS; "
+        "skipping Protect write test rather than targeting a non-approved device (#271/#330)"
+    )
 
 
 # ── Write-tool audit (opt-in via LIVE_TEST_WRITES=1) ───────────────────────
@@ -1070,7 +1110,7 @@ class TestProtectWriteRoundtrips:
         succeeds (returns a dict) rather than requiring the written mode to echo
         back via a re-read, because integration v1 GET omits the field.
         """
-        camera_id = await _first_protect_camera_id(live_client)
+        camera_id = await _allowlisted_camera_id(live_client)
 
         before = await _invoke(live_client, "unifi_protect_get_camera", {"camera_id": camera_id})
         original_mode = before.get("recordingSettings", {}).get("mode") if isinstance(before, dict) else None
@@ -1103,7 +1143,7 @@ class TestProtectWriteRoundtrips:
         """Capture current smartDetectSettings.objectTypes, set ['person'],
         read back, then restore.
         """
-        camera_id = await _first_protect_camera_id(live_client)
+        camera_id = await _allowlisted_camera_id(live_client)
 
         before = await _invoke(live_client, "unifi_protect_get_camera", {"camera_id": camera_id})
         original = (
@@ -1115,6 +1155,16 @@ class TestProtectWriteRoundtrips:
         )
         if original is None:
             pytest.skip(f"Could not read smartDetectSettings from camera (got {before!r})")
+
+        # AI object detection requires a G4/G5-class camera. The G3 Flex
+        # reports featureFlags.smartDetectTypes=[]; setting ['person'] on it
+        # would 4xx. Skip until AI-capable hardware is available (#330).
+        supported = (before.get("featureFlags") or {}).get("smartDetectTypes") or []
+        if "person" not in supported:
+            pytest.skip(
+                "Camera does not support 'person' smart detection "
+                f"(featureFlags.smartDetectTypes={supported!r}); needs an AI-capable G4/G5 (#330)"
+            )
 
         target = ["person"]
 
@@ -1146,7 +1196,7 @@ class TestProtectWriteRoundtrips:
         the simple-key and nested-dict shapes of PUT cameras/{id} on
         integration v1.
         """
-        camera_id = await _first_protect_camera_id(live_client)
+        camera_id = await _allowlisted_camera_id(live_client)
 
         before = await _invoke(live_client, "unifi_protect_get_camera", {"camera_id": camera_id})
         if not isinstance(before, dict):
@@ -1214,7 +1264,7 @@ class TestProtectWriteNegatives:
     """
 
     async def test_set_recording_mode_invalid_mode(self, live_client, artifacts):
-        camera_id = await _first_protect_camera_id(live_client)
+        camera_id = await _allowlisted_camera_id(live_client)
         with pytest.raises(ToolError) as exc_info:
             await _invoke(
                 live_client,
@@ -1227,7 +1277,7 @@ class TestProtectWriteNegatives:
         )
 
     async def test_set_smart_detection_bogus_type(self, live_client, artifacts):
-        camera_id = await _first_protect_camera_id(live_client)
+        camera_id = await _allowlisted_camera_id(live_client)
         with pytest.raises(ToolError) as exc_info:
             await _invoke(
                 live_client,
@@ -1240,7 +1290,7 @@ class TestProtectWriteNegatives:
         )
 
     async def test_update_camera_unknown_field(self, live_client, artifacts):
-        camera_id = await _first_protect_camera_id(live_client)
+        camera_id = await _allowlisted_camera_id(live_client)
         with pytest.raises(ToolError) as exc_info:
             await _invoke(
                 live_client,

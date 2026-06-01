@@ -37,6 +37,40 @@ def _csv_env(name: str) -> list[str]:
     return [item.strip().lower() for item in raw.split(",") if item.strip()]
 
 
+def _normalize_mac(mac: str) -> str:
+    """Fold a MAC to its 12 lowercase hex digits, stripping separators.
+
+    Controllers and operators write the same address as ``E438830FD628``,
+    ``e4:38:83:0f:d6:28`` or ``e4-38-83-0f-d6-28``; folding all three to
+    ``e438830fd628`` lets allowlist membership compare structurally rather
+    than on incidental punctuation or case.
+
+    Args:
+        mac: A MAC address in any common separator/case form.
+
+    Returns:
+        The 12-hex-digit canonical form, or ``""`` if the input does not
+        contain exactly 12 hex digits (caller decides how to treat junk).
+    """
+    digits = "".join(c for c in mac.lower() if c in "0123456789abcdef")
+    return digits if len(digits) == 12 else ""
+
+
+def live_test_device_macs() -> frozenset[str]:
+    """Normalized MACs the operator has explicitly approved for live writes.
+
+    Parsed from the comma-separated ``LIVE_TEST_DEVICE_MACS`` env var. Each
+    entry is folded via :func:`_normalize_mac`; unparseable entries are
+    dropped. Returns an empty set when the var is unset or empty, which the
+    allowlist-target helpers treat as "skip, nothing approved".
+
+    Returns:
+        Frozenset of 12-hex-digit canonical MACs.
+    """
+    macs = (_normalize_mac(item) for item in _csv_env("LIVE_TEST_DEVICE_MACS"))
+    return frozenset(m for m in macs if m)
+
+
 def _network_host() -> str:
     return os.environ.get("UNIFI_NETWORK_HOST", "192.168.1.1")
 
