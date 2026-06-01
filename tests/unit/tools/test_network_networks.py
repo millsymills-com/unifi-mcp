@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from unifi_mcp.clients.network import NetworkClient
+from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.tools.network.networks import register_network_config_tools
 
 BASE_URL = "https://10.0.0.1:443"
@@ -70,3 +76,55 @@ class TestNetworkConfigClientEndpoints:
         route = respx.delete(f"{SITE_PREFIX}/rest/networkconf/n-1").mock(return_value=httpx.Response(204))
         assert await network_client.delete_network("n-1") == {}
         assert route.call_count == 1
+
+
+@dataclass
+class _FakeLifespan:
+    config: UniFiConfig
+    clients: dict[str, Any] = field(default_factory=dict)
+
+
+def _ctx(mode: UniFiMode, **clients: Any) -> AsyncMock:
+    config = UniFiConfig(
+        _env_file=None,
+        unifi_mode=mode,
+        unifi_network_api="k",
+        unifi_protect_api=None,
+        unifi_site_manager_api=None,
+    )
+    ctx = AsyncMock()
+    ctx.lifespan_context = _FakeLifespan(config=config, clients=clients)
+    return ctx
+
+
+class TestCreateNetworkHandler:
+    """Drive create_network through the handler to cover its optional-arg branches."""
+
+    async def test_readonly_blocks_create(self, mcp_with_networks):
+        client = AsyncMock()
+        ctx = _ctx(UniFiMode.READONLY, network=client)
+        tool = await mcp_with_networks.get_tool("unifi_network_create_network")
+        with pytest.raises(ToolError, match="read-only mode"):
+            await tool.fn(ctx, name="guest")
+        client.create_network.assert_not_awaited()
+
+    async def test_subnet_and_vlan_included_when_provided(self, mcp_with_networks):
+        client = AsyncMock()
+        client.create_network.return_value = {"ok": True}
+        ctx = _ctx(UniFiMode.READWRITE, network=client)
+        tool = await mcp_with_networks.get_tool("unifi_network_create_network")
+        result = await tool.fn(ctx, name="guest", subnet="192.168.2.0/24", vlan=100)
+        assert result == {"ok": True}
+        (forwarded,), _ = client.create_network.call_args
+        assert forwarded["subnet"] == "192.168.2.0/24"
+        assert forwarded["vlan"] == 100
+
+    async def test_subnet_and_vlan_absent_when_omitted(self, mcp_with_networks):
+        client = AsyncMock()
+        client.create_network.return_value = {}
+        ctx = _ctx(UniFiMode.READWRITE, network=client)
+        tool = await mcp_with_networks.get_tool("unifi_network_create_network")
+        await tool.fn(ctx, name="guest")
+        (forwarded,), _ = client.create_network.call_args
+        assert "subnet" not in forwarded
+        assert "vlan" not in forwarded

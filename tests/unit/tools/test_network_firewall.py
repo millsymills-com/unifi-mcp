@@ -222,3 +222,44 @@ class TestFirewallCreateDataEscapeHatch:
         assert forwarded["action"] == "drop"  # default
         assert forwarded["enabled"] is True  # default
         assert "dst_address" not in forwarded  # unset → absent
+
+    async def test_dst_address_included_when_provided(self):
+        """The scalar path appends ``dst_address`` only when it's supplied."""
+        from dataclasses import dataclass, field
+        from typing import Any
+        from unittest.mock import AsyncMock
+
+        from fastmcp import FastMCP
+
+        from unifi_mcp.config import UniFiConfig, UniFiMode
+        from unifi_mcp.tools.network.firewall import register_firewall_tools
+
+        @dataclass
+        class _FakeLifespan:
+            config: UniFiConfig
+            clients: dict[str, Any] = field(default_factory=dict)
+
+        server = FastMCP(name="fw-test")
+        register_firewall_tools(server)
+
+        client = AsyncMock()
+        client.create_firewall_rule.return_value = {}
+        config = UniFiConfig(
+            _env_file=None,
+            unifi_mode=UniFiMode.READWRITE,
+            unifi_network_api="k",
+            unifi_protect_api=None,
+            unifi_site_manager_api=None,
+        )
+        ctx = AsyncMock()
+        ctx.lifespan_context = _FakeLifespan(config=config, clients={"network": client})
+
+        tool = await server.get_tool("unifi_network_create_firewall_rule")
+        await tool.fn(
+            ctx,
+            name="from-scalars",
+            ruleset="WAN_OUT",
+            dst_address="8.8.8.8/32",
+        )
+        (forwarded,), _ = client.create_firewall_rule.call_args
+        assert forwarded["dst_address"] == "8.8.8.8/32"
