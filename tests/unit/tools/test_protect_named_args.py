@@ -2,9 +2,7 @@
 
 Exercises the option-1 allowlist API:
 - supplying named args builds the correct nested body server-side,
-- supplying neither named args nor ``data=`` raises BadRequest,
-- mixing named args with ``data=`` raises BadRequest,
-- the legacy ``data=`` path still trips the dangerous-key denylist.
+- supplying no named args raises BadRequest.
 
 All HTTP is mocked with ``respx``; nothing reaches real hardware.
 """
@@ -122,52 +120,3 @@ class TestUpdateCameraNamedArgs:
         with pytest.raises(ToolError) as exc:
             await _call(server, "unifi_protect_update_camera", ctx, camera_id="cam-1")
         assert "at least one field" in str(exc.value).lower()
-
-    async def test_mixing_named_and_data_raises_bad_request(self):
-        server = FastMCP(name="t")
-        register_camera_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(
-                server,
-                "unifi_protect_update_camera",
-                ctx,
-                camera_id="cam-1",
-                name="x",
-                data={"foo": 1},
-            )
-        assert "cannot mix" in str(exc.value).lower()
-
-    @respx.mock
-    async def test_legacy_data_dict_still_passes_through(self):
-        server = FastMCP(name="t")
-        register_camera_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-        route = respx.patch(f"{PROTECT_PREFIX}/cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
-
-        await _call(
-            server,
-            "unifi_protect_update_camera",
-            ctx,
-            camera_id="cam-1",
-            data={"name": "renamed", "ledSettings": {"isEnabled": True}},
-        )
-
-        sent = json.loads(route.calls[0].request.content)
-        assert sent == {"name": "renamed", "ledSettings": {"isEnabled": True}}
-
-    async def test_legacy_data_dict_still_hits_denylist(self):
-        server = FastMCP(name="t")
-        register_camera_tools(server)
-        ctx, _ = _ctx_with_protect_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(
-                server,
-                "unifi_protect_update_camera",
-                ctx,
-                camera_id="cam-1",
-                data={"radius_secret": "x"},
-            )
-        assert "radius_secret" in str(exc.value)

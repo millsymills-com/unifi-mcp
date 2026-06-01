@@ -223,7 +223,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_update_settings",
         "update_settings",
         "network",
-        {"data": {"timezone": "UTC"}},
+        {"ntp_server_1": "time.example.com"},
     ),
     (register_system_tools, "unifi_network_run_speedtest", "run_speedtest", "network", {}),
     (register_system_tools, "unifi_network_create_backup", "create_backup", "network", {}),
@@ -251,7 +251,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_protect_update_camera",
         "update_camera",
         "protect",
-        {"camera_id": "c", "data": {"name": "cam"}},
+        {"camera_id": "c", "name": "cam"},
     ),
     (
         register_camera_tools,

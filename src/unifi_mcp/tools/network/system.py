@@ -8,7 +8,6 @@ from fastmcp import Context, FastMCP
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
-    JsonObject,
     build_named_arg_body,
     get_server_context,
     redact_secrets,
@@ -82,7 +81,6 @@ def register_system_tools(mcp: FastMCP) -> None:
         ntp_server_1: str | None = None,
         ntp_server_2: str | None = None,
         mgmt_led_enabled: bool | None = None,
-        data: JsonObject | None = None,
     ) -> dict[str, Any]:
         """Update controller settings using named scalar args.
 
@@ -107,10 +105,6 @@ def register_system_tools(mcp: FastMCP) -> None:
                 (``ntp.ntp_server_2``).
             mgmt_led_enabled: Whether device status LEDs are illuminated
                 (``mgmt.led_enabled``).
-            data: DEPRECATED — raw settings dict. Kept for back-compat
-                with existing agents; prefer the named scalar args above.
-                Still passes through the dangerous-key denylist. Cannot
-                be combined with any named arg.
 
         Returns:
             The upstream API response from the last section PUT.
@@ -131,7 +125,7 @@ def register_system_tools(mcp: FastMCP) -> None:
                 "ntp_server_2": ntp_server_2,
                 "mgmt_led_enabled": mgmt_led_enabled,
             },
-            data=data,
+            data=None,
         )
         reject_dangerous_keys(body, tool_name="unifi_network_update_settings")
         return redact_secrets(await get_server_context(ctx).clients["network"].update_settings(body))

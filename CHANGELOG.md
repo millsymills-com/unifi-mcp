@@ -49,6 +49,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `unifi_protect_update_nvr`: the integration v1 API is GET-only for the
   NVR, so the tool could never succeed.
+- **Breaking** — the deprecated `data` raw-dict parameter on
+  `unifi_network_update_settings` and `unifi_protect_update_camera`. Use the
+  named scalar args (`ntp_server_1`, `mgmt_led_enabled`, `name`,
+  `led_settings_is_enabled`, the `osd_settings_*` flags), which are the
+  write allowlist. The other write tools' `data` payloads are unaffected.
 
 ### Security
 

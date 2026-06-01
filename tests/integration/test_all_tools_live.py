@@ -1221,7 +1221,8 @@ class TestProtectWriteRoundtrips:
                 "unifi_protect_update_camera",
                 {
                     "camera_id": camera_id,
-                    "data": {"name": target_name, "ledSettings": {"isEnabled": target_led}},
+                    "name": target_name,
+                    "led_settings_is_enabled": target_led,
                 },
             )
             artifacts.dump(
@@ -1244,7 +1245,8 @@ class TestProtectWriteRoundtrips:
                 "unifi_protect_update_camera",
                 {
                     "camera_id": camera_id,
-                    "data": {"name": original_name, "ledSettings": {"isEnabled": original_led}},
+                    "name": original_name,
+                    "led_settings_is_enabled": original_led,
                 },
             )
             artifacts.dump(
@@ -1286,19 +1288,6 @@ class TestProtectWriteNegatives:
             )
         artifacts.dump(
             "set_smart_detection_bogus",
-            {"camera_id": camera_id, "error": str(exc_info.value)},
-        )
-
-    async def test_update_camera_unknown_field(self, live_client, artifacts):
-        camera_id = await _allowlisted_camera_id(live_client)
-        with pytest.raises(ToolError) as exc_info:
-            await _invoke(
-                live_client,
-                "unifi_protect_update_camera",
-                {"camera_id": camera_id, "data": {"thisIsNotAField": "garbage"}},
-            )
-        artifacts.dump(
-            "update_camera_unknown_field",
             {"camera_id": camera_id, "error": str(exc_info.value)},
         )
 

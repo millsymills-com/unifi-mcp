@@ -7,7 +7,6 @@ from typing import Any
 from fastmcp import Context, FastMCP
 
 from unifi_mcp.tools._common import (
-    JsonObject,
     build_named_arg_body,
     get_server_context,
     redact_secrets,
@@ -79,7 +78,6 @@ def register_camera_tools(mcp: FastMCP) -> None:
         osd_settings_is_date_enabled: bool | None = None,
         osd_settings_is_logo_enabled: bool | None = None,
         osd_settings_is_debug_enabled: bool | None = None,
-        data: JsonObject | None = None,
     ) -> dict[str, Any]:
         """Update camera settings using named scalar args.
 
@@ -101,10 +99,6 @@ def register_camera_tools(mcp: FastMCP) -> None:
                 (``osdSettings.isLogoEnabled``).
             osd_settings_is_debug_enabled: Show debug overlay in the OSD
                 (``osdSettings.isDebugEnabled``).
-            data: DEPRECATED — raw camera settings dict. Kept for
-                back-compat with existing agents; prefer the named scalar
-                args above. Still passes through the dangerous-key
-                denylist. Cannot be combined with any named arg.
 
         Returns:
             The controller acknowledgement. Integration v1 returns an empty
@@ -123,7 +117,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
                 "osd_settings_is_logo_enabled": osd_settings_is_logo_enabled,
                 "osd_settings_is_debug_enabled": osd_settings_is_debug_enabled,
             },
-            data=data,
+            data=None,
         )
         reject_dangerous_keys(body, tool_name="unifi_protect_update_camera")
         return redact_secrets(await get_server_context(ctx).clients["protect"].update_camera(camera_id, body))

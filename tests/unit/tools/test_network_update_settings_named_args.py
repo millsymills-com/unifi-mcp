@@ -3,9 +3,7 @@
 Completes the option-1 rollout from #202 for the Network controller-wide
 ``rest/setting`` endpoint. Exercises the allowlist API:
 - supplying named args builds the correct nested body server-side,
-- supplying neither named args nor ``data=`` raises BadRequest,
-- mixing named args with ``data=`` raises BadRequest,
-- the legacy ``data=`` path still trips the dangerous-key denylist,
+- supplying no named args raises BadRequest,
 - the shared ``build_named_arg_body`` helper rejects path collisions
   (locks in the contract for future allowlist additions).
 
@@ -188,53 +186,6 @@ class TestUpdateSettingsNamedArgs:
         with pytest.raises(ToolError) as exc:
             await _call(server, "unifi_network_update_settings", ctx)
         assert "at least one field" in str(exc.value).lower()
-
-    async def test_mixing_named_and_data_raises_bad_request(self):
-        server = FastMCP(name="t")
-        register_system_tools(server)
-        ctx, _ = _ctx_with_network_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(
-                server,
-                "unifi_network_update_settings",
-                ctx,
-                ntp_server_1="0.pool.ntp.org",
-                data={"foo": {"bar": 1}},
-            )
-        assert "cannot mix" in str(exc.value).lower()
-
-    @respx.mock
-    async def test_legacy_data_dict_dispatches_per_section(self):
-        server = FastMCP(name="t")
-        register_system_tools(server)
-        ctx, _ = _ctx_with_network_client()
-        route = respx.put(f"{SITE_PREFIX}/rest/setting/ntp").mock(return_value=httpx.Response(200, json={}))
-
-        await _call(
-            server,
-            "unifi_network_update_settings",
-            ctx,
-            data={"ntp": {"ntp_server_1": "time.example.com"}},
-        )
-
-        assert route.call_count == 1
-        sent = json.loads(route.calls[0].request.content)
-        assert sent == {"ntp_server_1": "time.example.com"}
-
-    async def test_legacy_data_dict_still_hits_denylist(self):
-        server = FastMCP(name="t")
-        register_system_tools(server)
-        ctx, _ = _ctx_with_network_client()
-
-        with pytest.raises(ToolError) as exc:
-            await _call(
-                server,
-                "unifi_network_update_settings",
-                ctx,
-                data={"ntp": {"radius_secret": "x"}},
-            )
-        assert "radius_secret" in str(exc.value)
 
 
 # ── build_named_arg_body contract ──────────────────────────────────────────
