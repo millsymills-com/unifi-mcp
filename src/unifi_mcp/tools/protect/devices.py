@@ -6,14 +6,14 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import handle_client_error
-from unifi_mcp.tools._common import get_server_context, redact_secrets
+from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler
 
 
 def register_protect_device_tools(mcp: FastMCP) -> None:
     """Register Protect accessory device tools."""
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_chimes(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect chime devices.
 
@@ -23,13 +23,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_chimes())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_chimes())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_lights(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect smart light devices.
 
@@ -39,13 +36,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_lights())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_lights())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_sensors(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect sensor devices.
 
@@ -55,13 +49,10 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_sensors())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_sensors())
 
     @mcp.tool(tags={"protect"})
+    @tool_handler()
     async def unifi_protect_list_viewers(ctx: Context) -> list[dict[str, Any]]:
         """List all Protect viewport devices.
 
@@ -71,8 +62,4 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["protect"].list_viewers())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].list_viewers())

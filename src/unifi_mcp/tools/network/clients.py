@@ -6,8 +6,8 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiBadRequestError, UniFiNotFoundError, UniFiReadOnlyError, handle_client_error
-from unifi_mcp.tools._common import get_server_context, redact_secrets, validate_mac
+from unifi_mcp.errors import UniFiBadRequestError, UniFiNotFoundError
+from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler, validate_mac
 
 # UniFi controllers accept guest authorization durations in minutes. Capping
 # at 30 days (43200 min) prevents prompt-injection from stamping an effectively
@@ -25,6 +25,7 @@ def register_client_tools(mcp: FastMCP) -> None:
     # ── Read tools ──────────────────────────────────────────────────────
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_client(ctx: Context, mac: str) -> dict[str, Any]:
         """Get detailed info for a specific client by MAC address.
 
@@ -37,21 +38,18 @@ def register_client_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            result = await context.clients["network"].list_active_clients()
-            clients: list[dict[str, Any]] = result.get("data", [])
-            for client in clients:
-                if client.get("mac", "").lower() == mac.lower():
-                    return redact_secrets(client)
-            raise UniFiNotFoundError(f"Client with MAC {mac} not found among active clients")
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        result = await get_server_context(ctx).clients["network"].list_active_clients()
+        clients: list[dict[str, Any]] = result.get("data", [])
+        for client in clients:
+            if client.get("mac", "").lower() == mac.lower():
+                return redact_secrets(client)
+        raise UniFiNotFoundError(f"Client with MAC {mac} not found among active clients")
 
     # ── Write tools ─────────────────────────────────────────────────────
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_block_client(ctx: Context, mac: str) -> dict[str, Any]:
         """Block a client from connecting to the network.
 
@@ -67,16 +65,11 @@ def register_client_tools(mcp: FastMCP) -> None:
         will still be blocked once it reconnects. The legacy ``cmd/*`` API
         offers no compare-and-set primitive (#151).
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot block client in read-only mode")
-            return await context.clients["network"].block_client(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].block_client(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_unblock_client(ctx: Context, mac: str) -> dict[str, Any]:
         """Unblock a previously blocked client.
 
@@ -90,16 +83,11 @@ def register_client_tools(mcp: FastMCP) -> None:
         the pre-check and the ``cmd/stamgr`` POST run as separate requests
         with no compare-and-set primitive (#151).
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot unblock client in read-only mode")
-            return await context.clients["network"].unblock_client(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].unblock_client(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_kick_client(ctx: Context, mac: str) -> dict[str, Any]:
         """Disconnect a client from the network (they may reconnect).
 
@@ -109,16 +97,11 @@ def register_client_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot kick client in read-only mode")
-            return await context.clients["network"].kick_client(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].kick_client(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_authorize_guest(ctx: Context, mac: str, minutes: int = 60) -> dict[str, Any]:
         """Authorize a guest client for a specified duration.
 
@@ -135,18 +118,12 @@ def register_client_tools(mcp: FastMCP) -> None:
         the pre-check and the ``cmd/stamgr`` POST run as separate requests
         with no compare-and-set primitive (#151).
         """
-        try:
-            validate_mac(mac, field="mac")
-            if not isinstance(minutes, int) or not (
-                _AUTHORIZE_GUEST_MIN_MINUTES <= minutes <= _AUTHORIZE_GUEST_MAX_MINUTES
-            ):
-                raise UniFiBadRequestError(
-                    f"minutes must be between {_AUTHORIZE_GUEST_MIN_MINUTES} and "
-                    f"{_AUTHORIZE_GUEST_MAX_MINUTES} (got {minutes!r})"
-                )
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot authorize guest in read-only mode")
-            return await context.clients["network"].authorize_guest(mac, minutes=minutes)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        if not isinstance(minutes, int) or not (
+            _AUTHORIZE_GUEST_MIN_MINUTES <= minutes <= _AUTHORIZE_GUEST_MAX_MINUTES
+        ):
+            raise UniFiBadRequestError(
+                f"minutes must be between {_AUTHORIZE_GUEST_MIN_MINUTES} and "
+                f"{_AUTHORIZE_GUEST_MAX_MINUTES} (got {minutes!r})"
+            )
+        return await get_server_context(ctx).clients["network"].authorize_guest(mac, minutes=minutes)

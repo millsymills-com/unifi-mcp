@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import functools
 import re
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Concatenate, cast
 
-from unifi_mcp._redaction import redact_secrets
-from unifi_mcp.errors import UniFiBadRequestError
+from unifi_mcp._redaction import normalize_key, redact_secrets
+from unifi_mcp.errors import UniFiBadRequestError, UniFiReadOnlyError, handle_client_error
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from fastmcp import Context
 
     from unifi_mcp.server import ServerContext
@@ -21,6 +24,7 @@ __all__ = [
     "get_server_context",
     "redact_secrets",
     "reject_dangerous_keys",
+    "tool_handler",
     "validate_id",
     "validate_mac",
 ]
@@ -29,6 +33,50 @@ __all__ = [
 def get_server_context(ctx: Context) -> ServerContext:
     """Return the typed lifespan context for a tool call."""
     return cast("ServerContext", ctx.lifespan_context)
+
+
+def tool_handler[**P, R](
+    *, write: bool = False
+) -> Callable[[Callable[Concatenate[Context, P], Awaitable[R]]], Callable[Concatenate[Context, P], Awaitable[R]]]:
+    """Wrap a tool handler with the cross-cutting envelope every tool shares.
+
+    Two concerns, identical across all tools, live here instead of being
+    copied into each handler body:
+
+    - **Error funnel:** the body runs inside a ``try`` whose ``except`` routes
+      every exception through :func:`handle_client_error`, which maps UniFi
+      exceptions to agent-readable ``ToolError`` and re-raises non-``Exception``
+      ``BaseException`` (cancellation, ``KeyboardInterrupt``) untouched.
+    - **Write gate (defense-in-depth):** when ``write=True``, the handler
+      refuses to run unless ``config.writes_enabled``. Write tools are already
+      hidden by the ``{"write"}`` tag in readonly mode; this is the second line
+      that protects a misconfigured server that exposed the tool anyway. The
+      gate fires before the body, so input validation never runs ahead of it.
+
+    The wrapper preserves the wrapped function's signature via
+    ``functools.wraps`` so FastMCP's schema introspection sees the real
+    parameters, defaults, and ``Args`` docstring unchanged.
+
+    Args:
+        write: Whether the handler mutates state and must be gated on
+            ``config.writes_enabled``.
+    """
+
+    def decorator(
+        func: Callable[Concatenate[Context, P], Awaitable[R]],
+    ) -> Callable[Concatenate[Context, P], Awaitable[R]]:
+        @functools.wraps(func)
+        async def wrapper(ctx: Context, *args: P.args, **kwargs: P.kwargs) -> R:
+            try:
+                if write and not get_server_context(ctx).config.writes_enabled:
+                    raise UniFiReadOnlyError("write tool invoked while server is in read-only mode")
+                return await func(ctx, *args, **kwargs)
+            except Exception as exc:
+                handle_client_error(exc)
+
+        return wrapper
+
+    return decorator
 
 
 # ── Settings-smuggling denylist (#147) ─────────────────────────────────────
@@ -58,24 +106,17 @@ _DENYLIST_EXACT_KEYS: frozenset[str] = frozenset(
 _DENYLIST_KEY_PREFIXES: tuple[str, ...] = ("super_", "radius_")
 _DENYLIST_KEY_SUFFIXES: tuple[str, ...] = ("_url", "_command")
 
-
-def _normalize_key(key: str) -> str:
-    """Lowercase + strip underscores so the denylist catches both snake_case
-    (``super_mgmt_url``) and camelCase (``superMgmtUrl``, ``webhookUrl``)
-    variants of the same key. UniFi Network APIs use snake_case but Protect
-    APIs use camelCase, so a single denylist pattern must cover both.
-    """
-    return key.lower().replace("_", "")
-
-
-# Normalized forms of the patterns above — built once at import time.
-_NORM_EXACT_KEYS: frozenset[str] = frozenset(_normalize_key(k) for k in _DENYLIST_EXACT_KEYS)
-_NORM_PREFIXES: tuple[str, ...] = tuple(_normalize_key(p) for p in _DENYLIST_KEY_PREFIXES)
-_NORM_SUFFIXES: tuple[str, ...] = tuple(_normalize_key(s) for s in _DENYLIST_KEY_SUFFIXES)
+# Normalized forms of the patterns above — built once at import time. The
+# normalize step (lowercase + strip underscores) is shared with the redaction
+# denylist so both classify snake_case (Network) and camelCase (Protect) keys
+# identically; the denylists themselves stay independent.
+_NORM_EXACT_KEYS: frozenset[str] = frozenset(normalize_key(k) for k in _DENYLIST_EXACT_KEYS)
+_NORM_PREFIXES: tuple[str, ...] = tuple(normalize_key(p) for p in _DENYLIST_KEY_PREFIXES)
+_NORM_SUFFIXES: tuple[str, ...] = tuple(normalize_key(s) for s in _DENYLIST_KEY_SUFFIXES)
 
 
 def _is_dangerous_key(key: str) -> bool:
-    normalized = _normalize_key(key)
+    normalized = normalize_key(key)
     if normalized in _NORM_EXACT_KEYS:
         return True
     if any(normalized.startswith(p) for p in _NORM_PREFIXES):

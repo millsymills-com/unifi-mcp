@@ -66,6 +66,8 @@ async def _safe_close(name: str, client: Any) -> None:
         await client.close()
     except Exception:
         logger.exception("Error closing %s client during cleanup", name)
+    else:
+        logger.info("Closed %s client", name)
 
 
 async def _register_client(context: ServerContext, name: str, client: Any) -> BaseException | None:
@@ -194,17 +196,12 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
         yield context
     finally:
         # Close each client independently — one client's close() failure
-        # must never prevent the others from being closed. Broadening to
-        # bare Exception here is deliberate: this is a cleanup path, and
-        # leaking the first failure aborts the loop and leaks sockets for
-        # the remaining clients.
+        # must never prevent the others from being closed. ``_safe_close``
+        # swallows and logs each failure so the loop runs to completion and
+        # no remaining client leaks its socket.
         clients_to_close: list[tuple[str, BaseUniFiClient]] = list(context.clients.items())  # type: ignore[arg-type]  # ty: ignore[invalid-assignment]
         for name, c in clients_to_close:
-            try:
-                await c.close()
-                logger.info("Closed %s client", name)
-            except Exception:
-                logger.exception("Error closing %s client", name)
+            await _safe_close(name, c)
 
 
 def create_server(config: UniFiConfig | None = None) -> FastMCP:

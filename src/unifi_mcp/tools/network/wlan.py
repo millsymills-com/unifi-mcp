@@ -6,12 +6,12 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
 from unifi_mcp.tools._common import (
     JsonObject,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
+    tool_handler,
     validate_id,
 )
 
@@ -22,6 +22,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
     # ── Read tools ──────────────────────────────────────────────────────
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_list_wlans(ctx: Context) -> dict[str, Any]:
         """List all WLAN (Wi-Fi network) configurations.
 
@@ -35,13 +36,10 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].list_wlans())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].list_wlans())
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_wlan(ctx: Context, wlan_id: str) -> dict[str, Any]:
         """Get a specific WLAN configuration by ID.
 
@@ -55,16 +53,13 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(wlan_id, field="wlan_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_wlan(wlan_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(wlan_id, field="wlan_id")
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_wlan(wlan_id))
 
     # ── Write tools ─────────────────────────────────────────────────────
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_wlan(
         ctx: Context,
         name: str,
@@ -85,22 +80,17 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create WLAN in read-only mode")
-            data: JsonObject = {
-                "name": name,
-                "security": security,
-                "wpa_mode": wpa_mode,
-                "x_passphrase": x_passphrase,
-                "enabled": enabled,
-            }
-            return await context.clients["network"].create_wlan(data)
-        except Exception as e:
-            handle_client_error(e)
+        data: JsonObject = {
+            "name": name,
+            "security": security,
+            "wpa_mode": wpa_mode,
+            "x_passphrase": x_passphrase,
+            "enabled": enabled,
+        }
+        return await get_server_context(ctx).clients["network"].create_wlan(data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_wlan(ctx: Context, wlan_id: str, data: JsonObject) -> dict[str, Any]:
         """Update an existing WLAN configuration. Pass only fields to change.
 
@@ -111,17 +101,12 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(wlan_id, field="wlan_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update WLAN in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_update_wlan")
-            return await context.clients["network"].update_wlan(wlan_id, data)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(wlan_id, field="wlan_id")
+        reject_dangerous_keys(data, tool_name="unifi_network_update_wlan")
+        return await get_server_context(ctx).clients["network"].update_wlan(wlan_id, data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_delete_wlan(ctx: Context, wlan_id: str) -> dict[str, Any]:
         """Delete a WLAN configuration.
 
@@ -131,11 +116,5 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(wlan_id, field="wlan_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot delete WLAN in read-only mode")
-            return await context.clients["network"].delete_wlan(wlan_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(wlan_id, field="wlan_id")
+        return await get_server_context(ctx).clients["network"].delete_wlan(wlan_id)

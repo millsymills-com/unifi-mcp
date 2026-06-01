@@ -6,14 +6,21 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiReadOnlyError, handle_client_error
-from unifi_mcp.tools._common import JsonObject, get_server_context, redact_secrets, reject_dangerous_keys, validate_id
+from unifi_mcp.tools._common import (
+    JsonObject,
+    get_server_context,
+    redact_secrets,
+    reject_dangerous_keys,
+    tool_handler,
+    validate_id,
+)
 
 
 def register_port_forward_tools(mcp: FastMCP) -> None:
     """Register port forward tools."""
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_list_port_forwards(ctx: Context) -> dict[str, Any]:
         """List all port forwarding rules.
 
@@ -23,13 +30,10 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].list_port_forwards())
-        except Exception as e:
-            handle_client_error(e)
+        return redact_secrets(await get_server_context(ctx).clients["network"].list_port_forwards())
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_port_forward(ctx: Context, port_forward_id: str) -> dict[str, Any]:
         """Get a specific port forwarding rule by ID.
 
@@ -39,14 +43,11 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response with sensitive fields redacted.
         """
-        try:
-            validate_id(port_forward_id, field="port_forward_id")
-            context = get_server_context(ctx)
-            return redact_secrets(await context.clients["network"].get_port_forward(port_forward_id))
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(port_forward_id, field="port_forward_id")
+        return redact_secrets(await get_server_context(ctx).clients["network"].get_port_forward(port_forward_id))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_create_port_forward(
         ctx: Context,
         name: str,
@@ -69,23 +70,18 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot create port forward in read-only mode")
-            data: JsonObject = {
-                "name": name,
-                "dst_port": dst_port,
-                "fwd": fwd,
-                "fwd_port": fwd_port,
-                "proto": proto,
-                "enabled": enabled,
-            }
-            return await context.clients["network"].create_port_forward(data)
-        except Exception as e:
-            handle_client_error(e)
+        data: JsonObject = {
+            "name": name,
+            "dst_port": dst_port,
+            "fwd": fwd,
+            "fwd_port": fwd_port,
+            "proto": proto,
+            "enabled": enabled,
+        }
+        return await get_server_context(ctx).clients["network"].create_port_forward(data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_update_port_forward(ctx: Context, port_forward_id: str, data: JsonObject) -> dict[str, Any]:
         """Update an existing port forwarding rule. Pass only fields to change.
 
@@ -96,17 +92,12 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(port_forward_id, field="port_forward_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot update port forward in read-only mode")
-            reject_dangerous_keys(data, tool_name="unifi_network_update_port_forward")
-            return await context.clients["network"].update_port_forward(port_forward_id, data)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(port_forward_id, field="port_forward_id")
+        reject_dangerous_keys(data, tool_name="unifi_network_update_port_forward")
+        return await get_server_context(ctx).clients["network"].update_port_forward(port_forward_id, data)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_delete_port_forward(ctx: Context, port_forward_id: str) -> dict[str, Any]:
         """Delete a port forwarding rule.
 
@@ -116,11 +107,5 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_id(port_forward_id, field="port_forward_id")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot delete port forward in read-only mode")
-            return await context.clients["network"].delete_port_forward(port_forward_id)
-        except Exception as e:
-            handle_client_error(e)
+        validate_id(port_forward_id, field="port_forward_id")
+        return await get_server_context(ctx).clients["network"].delete_port_forward(port_forward_id)

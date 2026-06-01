@@ -6,8 +6,8 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiNotFoundError, UniFiReadOnlyError, handle_client_error
-from unifi_mcp.tools._common import get_server_context, redact_secrets, validate_mac
+from unifi_mcp.errors import UniFiNotFoundError
+from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler, validate_mac
 
 
 def register_device_tools(mcp: FastMCP) -> None:
@@ -16,6 +16,7 @@ def register_device_tools(mcp: FastMCP) -> None:
     # ── Read tools ──────────────────────────────────────────────────────
 
     @mcp.tool(tags={"network"})
+    @tool_handler()
     async def unifi_network_get_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Get detailed info for a specific network device by MAC address.
 
@@ -25,21 +26,18 @@ def register_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            result = await context.clients["network"].list_devices()
-            devices: list[dict[str, Any]] = result.get("data", [])
-            for device in devices:
-                if device.get("mac", "").lower() == mac.lower():
-                    return redact_secrets(device)
-            raise UniFiNotFoundError(f"Device with MAC {mac} not found")
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        result = await get_server_context(ctx).clients["network"].list_devices()
+        devices: list[dict[str, Any]] = result.get("data", [])
+        for device in devices:
+            if device.get("mac", "").lower() == mac.lower():
+                return redact_secrets(device)
+        raise UniFiNotFoundError(f"Device with MAC {mac} not found")
 
     # ── Write tools ─────────────────────────────────────────────────────
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_restart_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Restart an adopted network device.
 
@@ -49,16 +47,11 @@ def register_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot restart device in read-only mode")
-            return await context.clients["network"].restart_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].restart_device(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_adopt_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Adopt a new device into the network.
 
@@ -76,16 +69,11 @@ def register_device_tools(mcp: FastMCP) -> None:
         hard failure. The legacy ``cmd/*`` API has no compare-and-set
         primitive (#151).
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot adopt device in read-only mode")
-            return await context.clients["network"].adopt_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].adopt_device(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_locate_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Enable the locate LED on a device (makes it blink for identification).
 
@@ -95,16 +83,11 @@ def register_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot locate device in read-only mode")
-            return await context.clients["network"].locate_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].locate_device(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_unlocate_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Disable the locate LED on a device (stop blinking).
 
@@ -114,16 +97,11 @@ def register_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot unlocate device in read-only mode")
-            return await context.clients["network"].unlocate_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].unlocate_device(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @tool_handler(write=True)
     async def unifi_network_provision_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Force re-provision a device (push current configuration).
 
@@ -133,16 +111,11 @@ def register_device_tools(mcp: FastMCP) -> None:
         Returns:
             The upstream API response.
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot provision device in read-only mode")
-            return await context.clients["network"].provision_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].provision_device(mac)
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
+    @tool_handler(write=True)
     async def unifi_network_forget_device(ctx: Context, mac: str) -> dict[str, Any]:
         """Forget (unadopt) a previously-adopted device.
 
@@ -161,11 +134,5 @@ def register_device_tools(mcp: FastMCP) -> None:
         them races; the legacy ``cmd/*`` API has no compare-and-set
         primitive (#151).
         """
-        try:
-            validate_mac(mac, field="mac")
-            context = get_server_context(ctx)
-            if not context.config.writes_enabled:
-                raise UniFiReadOnlyError("Cannot forget device in read-only mode")
-            return await context.clients["network"].forget_device(mac)
-        except Exception as e:
-            handle_client_error(e)
+        validate_mac(mac, field="mac")
+        return await get_server_context(ctx).clients["network"].forget_device(mac)
