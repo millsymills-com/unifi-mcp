@@ -449,6 +449,18 @@ class BaseUniFiClient(ABC):
             return {}
         return self._parse_json(response)
 
+    async def patch(self, path: str, **kwargs: Any) -> Any:
+        """HTTP PATCH, returns parsed JSON.
+
+        PATCH is non-idempotent, so ``_request`` does not retry it on a lost
+        response (only GET/HEAD are retried on timeout) — a partially applied
+        write is never silently re-sent.
+        """
+        response = await self._request("PATCH", path, **kwargs)
+        if response.status_code == 204 or not response.content:
+            return {}
+        return self._parse_json(response)
+
     async def delete(self, path: str, **kwargs: Any) -> Any:
         """HTTP DELETE, returns parsed JSON or empty dict."""
         response = await self._request("DELETE", path, **kwargs)

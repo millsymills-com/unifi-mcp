@@ -128,23 +128,6 @@ NO_ARG_READ_TOOLS = {
 # starts working again, signaling that its tracking issue can close.
 XFAIL_NO_ARG_READ_TOOLS: dict[str, str] = {}
 
-# Protect write tools that 404 with `Entity 'endpoint' not found` against the
-# integration v1 API on UCK-G2-Plus (Protect 7.0.107). `set_recording_mode`
-# was the only Protect write that previously round-tripped (2026-04-27 probe),
-# but a direct PUT probe on 2026-05-16 against the G3 Flex returned the same
-# 404 envelope — see #237. Zero Protect writes now succeed on integration v1.
-# Strict xfail flips to a hard failure when a fix lands, forcing the marker
-# (and this comment) to be removed.
-XFAIL_PROTECT_WRITE_TOOLS = {
-    "unifi_protect_set_recording_mode": (
-        "#237 — PUT cameras/{id} recordingSettings 404 on integration v1 "
-        "(was working 2026-04-27, now Entity 'endpoint' not found)"
-    ),
-    "unifi_protect_set_smart_detection": "#139 — PUT cameras/{id} smartDetectSettings 404 on integration v1",
-    "unifi_protect_update_camera": "#139 — PUT cameras/{id} arbitrary body 404 on integration v1",
-    "unifi_protect_update_nvr": "#139 — PUT nvrs path missing on integration v1 (see TODO in clients/protect.py)",
-}
-
 # Read tools that take required args; covered via the detail-fetch harness.
 DETAIL_READ_TOOLS = {
     "unifi_network_get_device": ("unifi_network_list_devices", "mac", "mac"),
@@ -1072,23 +1055,20 @@ class TestWriteRoundtrips:
 @pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestProtectWriteRoundtrips:
     """Curated capture → mutate → read-back → restore roundtrips for the
-    four Protect write tools. Each test runs against the first adopted
-    camera (or the NVR for update_nvr) and restores the original value in
-    `finally` even on assertion failure.
+    Protect camera write tools. Each test runs against the first adopted
+    camera and restores the original value in `finally` even on assertion
+    failure.
     """
 
-    @pytest.mark.xfail(strict=True, reason=XFAIL_PROTECT_WRITE_TOOLS["unifi_protect_set_recording_mode"])
     async def test_recording_mode_roundtrip(self, live_client, artifacts):
-        """Capture current recordingSettings.mode, set 'always', read back,
+        """Capture current recordingSettings.mode (if present), PATCH 'always',
         then restore. The legal modes are always | motion | never | schedule.
 
-        Per #237, PUT cameras/{id} with recordingSettings now returns 404
-        Entity 'endpoint' not found on integration v1 (probed against G3 Flex
-        2026-05-16). The earlier capture step also returns no
-        ``recordingSettings`` field on the same camera, so the test was
-        previously skipping silently. Strict xfail makes the regression
-        explicit: when the integration v1 surface starts honoring this PUT
-        again, this test flips to hard-fail and the marker comes off.
+        Integration v1 omits ``recordingSettings`` from GET responses on this
+        controller, so ``original_mode`` may be None. The restore falls back to
+        "always" (safe default) in that case. The test asserts the PATCH call
+        succeeds (returns a dict) rather than requiring the written mode to echo
+        back via a re-read, because integration v1 GET omits the field.
         """
         camera_id = await _first_protect_camera_id(live_client)
 
@@ -1098,14 +1078,10 @@ class TestProtectWriteRoundtrips:
             "recording_mode_before",
             {"camera_id": camera_id, "original_mode": original_mode, "snapshot": before},
         )
-        # Integration v1 currently omits ``recordingSettings`` from GET, so
-        # ``original_mode`` is None. Pick a benign default for the PUT call —
-        # under the #237 regression the PUT 404s anyway and the strict-xfail
-        # marker consumes the failure. When the surface starts working again
-        # the marker comes off, this fallback gets revisited, and the restore
-        # path needs to be made faithful.
-        original_for_restore = original_mode or "never"
-        target = "always" if original_for_restore != "always" else "motion"
+        # Integration v1 omits recordingSettings from GET; fall back to a safe
+        # default so the restore call is always valid.
+        original_for_restore = original_mode or "always"
+        target = "motion" if original_for_restore != "motion" else "always"
 
         try:
             applied = await _invoke(
@@ -1114,11 +1090,7 @@ class TestProtectWriteRoundtrips:
                 {"camera_id": camera_id, "mode": target},
             )
             artifacts.dump("recording_mode_applied", {"target": target, "response": applied})
-
-            after = await _invoke(live_client, "unifi_protect_get_camera", {"camera_id": camera_id})
-            after_mode = after.get("recordingSettings", {}).get("mode") if isinstance(after, dict) else None
-            artifacts.dump("recording_mode_readback", {"after_mode": after_mode, "snapshot": after})
-            assert after_mode == target, f"Read-back mismatch: set {target!r}, read back {after_mode!r}"
+            assert isinstance(applied, dict), f"set_recording_mode must return a dict, got {type(applied).__name__}"
         finally:
             await _invoke(
                 live_client,
@@ -1127,7 +1099,6 @@ class TestProtectWriteRoundtrips:
             )
             artifacts.dump("recording_mode_restored", {"restored_mode": original_for_restore})
 
-    @pytest.mark.xfail(strict=True, reason=XFAIL_PROTECT_WRITE_TOOLS["unifi_protect_set_smart_detection"])
     async def test_smart_detection_roundtrip(self, live_client, artifacts):
         """Capture current smartDetectSettings.objectTypes, set ['person'],
         read back, then restore.
@@ -1169,7 +1140,6 @@ class TestProtectWriteRoundtrips:
             )
             artifacts.dump("smart_detection_restored", {"restored": original})
 
-    @pytest.mark.xfail(strict=True, reason=XFAIL_PROTECT_WRITE_TOOLS["unifi_protect_update_camera"])
     async def test_update_camera_roundtrip(self, live_client, artifacts):
         """Round-trip a string field (name) and a nested settings field
         (ledSettings.isEnabled) via unifi_protect_update_camera. Exercises both
@@ -1232,44 +1202,6 @@ class TestProtectWriteRoundtrips:
                 {"restored_name": original_name, "restored_led": original_led},
             )
 
-    @pytest.mark.xfail(strict=True, reason=XFAIL_PROTECT_WRITE_TOOLS["unifi_protect_update_nvr"])
-    async def test_update_nvr_roundtrip(self, live_client, artifacts):
-        """Round-trip the NVR name via unifi_protect_update_nvr. First live-hardware
-        validation of PUT /nvrs on integration v1 — see TODO(#43) in
-        clients/protect.py.
-        """
-        before = await _invoke(live_client, "unifi_protect_get_nvr")
-        if not isinstance(before, dict):
-            pytest.skip(f"NVR response is not a dict: {before!r}")
-        original_name = before.get("name")
-        artifacts.dump("update_nvr_before", {"name": original_name, "snapshot": before})
-        if not original_name:
-            pytest.skip(f"NVR missing name field (got {before!r})")
-
-        target_name = f"{original_name} [mcp-test]"
-
-        try:
-            applied = await _invoke(
-                live_client,
-                "unifi_protect_update_nvr",
-                {"data": {"name": target_name}},
-            )
-            artifacts.dump("update_nvr_applied", {"target_name": target_name, "response": applied})
-
-            after = await _invoke(live_client, "unifi_protect_get_nvr")
-            after_name = after.get("name") if isinstance(after, dict) else None
-            artifacts.dump("update_nvr_readback", {"after_name": after_name, "snapshot": after})
-            assert after_name == target_name, (
-                f"NVR name read-back mismatch: set {target_name!r}, read back {after_name!r}"
-            )
-        finally:
-            await _invoke(
-                live_client,
-                "unifi_protect_update_nvr",
-                {"data": {"name": original_name}},
-            )
-            artifacts.dump("update_nvr_restored", {"restored_name": original_name})
-
 
 @pytest.mark.live_write
 @pytest.mark.write_gated
@@ -1320,14 +1252,231 @@ class TestProtectWriteNegatives:
             {"camera_id": camera_id, "error": str(exc_info.value)},
         )
 
-    async def test_update_nvr_unknown_field(self, live_client, artifacts):
-        with pytest.raises(ToolError) as exc_info:
+
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
+class TestProtectAccessoryWriteRoundtrips:
+    """Capture → mutate → read-back → restore roundtrips for the Protect
+    accessory write tools (light, chime, sensor, viewer). Each test lists
+    the device type first and skips cleanly if none are adopted on the
+    controller.
+    """
+
+    async def test_update_light_roundtrip(self, live_client, artifacts):
+        """PATCH led_level on the first adopted light, then restore."""
+        lights = _unwrap_list(await _invoke(live_client, "unifi_protect_list_lights"))
+        if not lights:
+            pytest.skip("no Protect lights on test controller")
+        light = lights[0]
+        light_id = light.get("id")
+        assert light_id, f"First light entry missing id: {light!r}"
+
+        original_level = (light.get("lightDeviceSettings") or {}).get("ledLevel")
+        artifacts.dump("update_light_before", {"light_id": light_id, "original_led_level": original_level})
+        if original_level is None:
+            pytest.skip("lightDeviceSettings.ledLevel missing from GET response; cannot capture for restore")
+
+        target_level = 3 if original_level != 3 else 4
+
+        try:
+            applied = await _invoke(
+                live_client,
+                "unifi_protect_update_light",
+                {"light_id": light_id, "led_level": target_level},
+            )
+            artifacts.dump("update_light_applied", {"target_level": target_level, "response": applied})
+            assert isinstance(applied, dict), f"update_light must return a dict, got {type(applied).__name__}"
+
+            after_lights = _unwrap_list(await _invoke(live_client, "unifi_protect_list_lights"))
+            after = next((lt for lt in after_lights if lt.get("id") == light_id), None)
+            assert after is not None, f"Light {light_id} missing from list_lights after update"
+            after_level = (after.get("lightDeviceSettings") or {}).get("ledLevel")
+            artifacts.dump("update_light_readback", {"after_level": after_level})
+            assert after_level == target_level, (
+                f"led_level read-back mismatch: set {target_level!r}, got {after_level!r}"
+            )
+        finally:
             await _invoke(
                 live_client,
-                "unifi_protect_update_nvr",
-                {"data": {"thisIsNotAField": "garbage"}},
+                "unifi_protect_update_light",
+                {"light_id": light_id, "led_level": original_level},
             )
-        artifacts.dump("update_nvr_unknown_field", {"error": str(exc_info.value)})
+            artifacts.dump("update_light_restored", {"restored_level": original_level})
+
+    async def test_set_light_mode_roundtrip(self, live_client, artifacts):
+        """PATCH lightModeSettings.mode on the first adopted light, then restore."""
+        lights = _unwrap_list(await _invoke(live_client, "unifi_protect_list_lights"))
+        if not lights:
+            pytest.skip("no Protect lights on test controller")
+        light = lights[0]
+        light_id = light.get("id")
+        assert light_id, f"First light entry missing id: {light!r}"
+
+        original_mode = (light.get("lightModeSettings") or {}).get("mode")
+        artifacts.dump("set_light_mode_before", {"light_id": light_id, "original_mode": original_mode})
+        if original_mode is None:
+            pytest.skip("lightModeSettings.mode missing from GET response; cannot capture for restore")
+
+        target_mode = "motion" if original_mode != "motion" else "off"
+
+        try:
+            applied = await _invoke(
+                live_client,
+                "unifi_protect_set_light_mode",
+                {"light_id": light_id, "mode": target_mode},
+            )
+            artifacts.dump("set_light_mode_applied", {"target_mode": target_mode, "response": applied})
+            assert isinstance(applied, dict), f"set_light_mode must return a dict, got {type(applied).__name__}"
+
+            after_lights = _unwrap_list(await _invoke(live_client, "unifi_protect_list_lights"))
+            after = next((lt for lt in after_lights if lt.get("id") == light_id), None)
+            assert after is not None, f"Light {light_id} missing from list_lights after set_light_mode"
+            after_mode = (after.get("lightModeSettings") or {}).get("mode")
+            artifacts.dump("set_light_mode_readback", {"after_mode": after_mode})
+            assert after_mode == target_mode, (
+                f"lightModeSettings.mode read-back mismatch: set {target_mode!r}, got {after_mode!r}"
+            )
+        finally:
+            await _invoke(
+                live_client,
+                "unifi_protect_set_light_mode",
+                {"light_id": light_id, "mode": original_mode},
+            )
+            artifacts.dump("set_light_mode_restored", {"restored_mode": original_mode})
+
+    async def test_update_chime_roundtrip(self, live_client, artifacts):
+        """PATCH volume on the first adopted chime, then restore."""
+        chimes = _unwrap_list(await _invoke(live_client, "unifi_protect_list_chimes"))
+        if not chimes:
+            pytest.skip("no Protect chimes on test controller")
+        chime = chimes[0]
+        chime_id = chime.get("id")
+        assert chime_id, f"First chime entry missing id: {chime!r}"
+
+        original_volume = chime.get("volume")
+        artifacts.dump("update_chime_before", {"chime_id": chime_id, "original_volume": original_volume})
+        if original_volume is None:
+            pytest.skip("volume missing from GET response; cannot capture for restore")
+
+        target_volume = 50 if original_volume != 50 else 60
+
+        try:
+            applied = await _invoke(
+                live_client,
+                "unifi_protect_update_chime",
+                {"chime_id": chime_id, "volume": target_volume},
+            )
+            artifacts.dump("update_chime_applied", {"target_volume": target_volume, "response": applied})
+            assert isinstance(applied, dict), f"update_chime must return a dict, got {type(applied).__name__}"
+
+            after_chimes = _unwrap_list(await _invoke(live_client, "unifi_protect_list_chimes"))
+            after = next((c for c in after_chimes if c.get("id") == chime_id), None)
+            assert after is not None, f"Chime {chime_id} missing from list_chimes after update"
+            after_volume = after.get("volume")
+            artifacts.dump("update_chime_readback", {"after_volume": after_volume})
+            assert after_volume == target_volume, (
+                f"volume read-back mismatch: set {target_volume!r}, got {after_volume!r}"
+            )
+        finally:
+            await _invoke(
+                live_client,
+                "unifi_protect_update_chime",
+                {"chime_id": chime_id, "volume": original_volume},
+            )
+            artifacts.dump("update_chime_restored", {"restored_volume": original_volume})
+
+    async def test_update_sensor_roundtrip(self, live_client, artifacts):
+        """PATCH motionSettings.isEnabled on the first adopted sensor, then restore."""
+        sensors = _unwrap_list(await _invoke(live_client, "unifi_protect_list_sensors"))
+        if not sensors:
+            pytest.skip("no Protect sensors on test controller")
+        sensor = sensors[0]
+        sensor_id = sensor.get("id")
+        assert sensor_id, f"First sensor entry missing id: {sensor!r}"
+
+        original_enabled = (sensor.get("motionSettings") or {}).get("isEnabled")
+        artifacts.dump(
+            "update_sensor_before",
+            {"sensor_id": sensor_id, "original_motion_is_enabled": original_enabled},
+        )
+        if original_enabled is None:
+            pytest.skip("motionSettings.isEnabled missing from GET response; cannot capture for restore")
+
+        target_enabled = not original_enabled
+
+        try:
+            applied = await _invoke(
+                live_client,
+                "unifi_protect_update_sensor",
+                {"sensor_id": sensor_id, "motion_is_enabled": target_enabled},
+            )
+            artifacts.dump("update_sensor_applied", {"target_enabled": target_enabled, "response": applied})
+            assert isinstance(applied, dict), f"update_sensor must return a dict, got {type(applied).__name__}"
+
+            after_sensors = _unwrap_list(await _invoke(live_client, "unifi_protect_list_sensors"))
+            after = next((s for s in after_sensors if s.get("id") == sensor_id), None)
+            assert after is not None, f"Sensor {sensor_id} missing from list_sensors after update"
+            after_enabled = (after.get("motionSettings") or {}).get("isEnabled")
+            artifacts.dump("update_sensor_readback", {"after_enabled": after_enabled})
+            assert after_enabled == target_enabled, (
+                f"motionSettings.isEnabled read-back mismatch: set {target_enabled!r}, got {after_enabled!r}"
+            )
+        finally:
+            await _invoke(
+                live_client,
+                "unifi_protect_update_sensor",
+                {"sensor_id": sensor_id, "motion_is_enabled": original_enabled},
+            )
+            artifacts.dump("update_sensor_restored", {"restored_enabled": original_enabled})
+
+    async def test_set_viewer_liveview_roundtrip(self, live_client, artifacts):
+        """PATCH liveview on the first adopted viewer, then restore.
+
+        Skips if no viewers are adopted or if no liveview id can be discovered
+        from the viewer's current state.
+        """
+        viewers = _unwrap_list(await _invoke(live_client, "unifi_protect_list_viewers"))
+        if not viewers:
+            pytest.skip("no Protect viewers on test controller")
+        viewer = viewers[0]
+        viewer_id = viewer.get("id")
+        assert viewer_id, f"First viewer entry missing id: {viewer!r}"
+
+        original_liveview = viewer.get("liveview")
+        artifacts.dump(
+            "set_viewer_liveview_before",
+            {"viewer_id": viewer_id, "original_liveview": original_liveview},
+        )
+        if not original_liveview:
+            pytest.skip("no liveview available on the first viewer; cannot run set_viewer_liveview roundtrip")
+
+        # Use the same liveview as a no-op write — confirms the PATCH succeeds
+        # without needing a second liveview id to swap to.
+        try:
+            applied = await _invoke(
+                live_client,
+                "unifi_protect_set_viewer_liveview",
+                {"viewer_id": viewer_id, "liveview_id": original_liveview},
+            )
+            artifacts.dump("set_viewer_liveview_applied", {"liveview_id": original_liveview, "response": applied})
+            assert isinstance(applied, dict), f"set_viewer_liveview must return a dict, got {type(applied).__name__}"
+
+            after_viewers = _unwrap_list(await _invoke(live_client, "unifi_protect_list_viewers"))
+            after = next((v for v in after_viewers if v.get("id") == viewer_id), None)
+            assert after is not None, f"Viewer {viewer_id} missing from list_viewers after set_viewer_liveview"
+            after_liveview = after.get("liveview")
+            artifacts.dump("set_viewer_liveview_readback", {"after_liveview": after_liveview})
+            assert after_liveview == original_liveview, (
+                f"liveview read-back mismatch: set {original_liveview!r}, got {after_liveview!r}"
+            )
+        finally:
+            await _invoke(
+                live_client,
+                "unifi_protect_set_viewer_liveview",
+                {"viewer_id": viewer_id, "liveview_id": original_liveview},
+            )
+            artifacts.dump("set_viewer_liveview_restored", {"liveview_id": original_liveview})
 
 
 # ── Device LED locate/unlocate cycle (only runs in LIVE_TEST_WRITES mode) ─

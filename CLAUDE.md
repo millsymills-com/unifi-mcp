@@ -37,7 +37,7 @@ uv build
 
 # Run the server (after `uv sync`)
 uv run unifi-mcp                       # readonly mode (default, safe)
-UNIFI_MODE=readwrite uv run unifi-mcp  # exposes the 43 write tools
+UNIFI_MODE=readwrite uv run unifi-mcp  # exposes the 47 write tools
 ```
 
 ## Live Integration Tests — Hardware Safety
@@ -73,7 +73,7 @@ src/unifi_mcp/
 │   └── site_manager.py  # Site Manager API client
 └── tools/               # MCP tool definitions
     ├── network/         # 26 read + 39 write tools (65 total)
-    ├── protect/         # 9 read + 4 write tools (13 total, includes 2 media read tools)
+    ├── protect/         # 9 read + 8 write tools (17 total, includes 2 media read tools)
     └── site_manager/    # 3 read-only tools
 ```
 

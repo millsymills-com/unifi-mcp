@@ -94,9 +94,9 @@ class TestGetSnapshot:
 
 class TestUpdateCamera:
     @respx.mock
-    async def test_update_camera_sends_put(self, client):
+    async def test_update_camera_sends_patch(self, client):
         payload = {"name": "Back Yard"}
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(
             return_value=httpx.Response(200, json={"id": "cam-1", "name": "Back Yard"})
         )
         result = await client.update_camera("cam-1", payload)
@@ -109,7 +109,7 @@ class TestUpdateCamera:
 class TestSetRecordingMode:
     @respx.mock
     async def test_set_recording_mode_sends_correct_payload(self, client):
-        route = respx.put(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
         await client.set_recording_mode("cam-1", "motion", pre_padding=5, post_padding=10)
         assert route.called
         request_body = json.loads(route.calls[0].request.content)
@@ -121,6 +121,24 @@ class TestSetRecordingMode:
             }
         }
 
+    @respx.mock
+    async def test_set_recording_mode_always_sends_correct_payload(self, client):
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
+        await client.set_recording_mode("cam-1", "always")
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == {"recordingSettings": {"mode": "always"}}
+
+
+class TestSetSmartDetection:
+    @respx.mock
+    async def test_set_smart_detection_sends_correct_payload(self, client):
+        route = respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={"id": "cam-1"}))
+        await client.set_smart_detection("cam-1", ["person"])
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == {"smartDetectSettings": {"objectTypes": ["person"]}}
+
 
 class TestGetNvr:
     @respx.mock
@@ -129,6 +147,62 @@ class TestGetNvr:
         result = await client.get_nvr()
         assert route.called
         assert result == FIXTURES["nvr"]
+
+
+class TestUpdateChime:
+    @respx.mock
+    async def test_update_chime_sends_patch(self, client):
+        payload = {"volume": 75}
+        route = respx.patch(f"{API_PREFIX}chimes/ch1").mock(
+            return_value=httpx.Response(200, json={"id": "ch1", **payload})
+        )
+        result = await client.update_chime("ch1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "ch1"
+
+
+class TestUpdateLight:
+    @respx.mock
+    async def test_update_light_sends_patch(self, client):
+        payload = {"lightModeSettings": {"mode": "motion"}}
+        route = respx.patch(f"{API_PREFIX}lights/l1").mock(
+            return_value=httpx.Response(200, json={"id": "l1", **payload})
+        )
+        result = await client.update_light("l1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "l1"
+
+
+class TestUpdateSensor:
+    @respx.mock
+    async def test_update_sensor_sends_patch(self, client):
+        payload = {"mountType": "door"}
+        route = respx.patch(f"{API_PREFIX}sensors/s1").mock(
+            return_value=httpx.Response(200, json={"id": "s1", **payload})
+        )
+        result = await client.update_sensor("s1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "s1"
+
+
+class TestUpdateViewer:
+    @respx.mock
+    async def test_update_viewer_sends_patch(self, client):
+        payload = {"liveview": "lv1"}
+        route = respx.patch(f"{API_PREFIX}viewers/v1").mock(
+            return_value=httpx.Response(200, json={"id": "v1", **payload})
+        )
+        result = await client.update_viewer("v1", payload)
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body == payload
+        assert result["id"] == "v1"
 
 
 class TestValidateConnection:

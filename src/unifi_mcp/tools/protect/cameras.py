@@ -108,13 +108,6 @@ def register_camera_tools(mcp: FastMCP) -> None:
 
         Returns:
             The upstream API response.
-
-        Note:
-            The underlying endpoint is missing from Protect integration v1
-            on UCK-G2-Plus (Protect 7.0.107). Calls return ``HTTP 404 Entity
-            'endpoint' not found``. Tracked in #139; the tool stays
-            registered so it works automatically once Ubiquiti exposes the
-            endpoint on a future firmware.
         """
         validate_id(camera_id, field="camera_id")
         body = build_named_arg_body(
@@ -173,13 +166,6 @@ def register_camera_tools(mcp: FastMCP) -> None:
 
         Returns:
             The upstream API response.
-
-        Note:
-            The underlying endpoint is missing from Protect integration v1
-            on UCK-G2-Plus (Protect 7.0.107). Calls return ``HTTP 404 Entity
-            'endpoint' not found``. Tracked in #139; the tool stays
-            registered so it works automatically once Ubiquiti exposes the
-            endpoint on a future firmware.
         """
         validate_id(camera_id, field="camera_id")
         return await get_server_context(ctx).clients["protect"].set_smart_detection(camera_id, object_types)
