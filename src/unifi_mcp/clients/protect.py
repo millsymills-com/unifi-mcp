@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from unifi_mcp._redaction import flatten_key_names
 from unifi_mcp.clients.base import BaseUniFiClient
 from unifi_mcp.errors import UniFiError
 
@@ -39,6 +40,23 @@ class ProtectClient(BaseUniFiClient):
             timeout=timeout,
             max_retries=max_retries,
         )
+
+    # -- HTTP helpers -------------------------------------------------------
+
+    async def patch(self, path: str, **kwargs: Any) -> Any:
+        """HTTP PATCH that logs the outbound write's target and body key-set.
+
+        Every Protect write tool funnels through here. The integration-v1 API
+        returns 200 + empty body even when a nested field key is unrecognized,
+        so a write can silently no-op with no other evidence; this INFO line
+        records what was attempted. Only key *names* are logged (top-level and
+        nested, dotted) — never values, which may carry credentials. PATCH is
+        Protect-only, so this override is the single choke point. See #329.
+        """
+        body = kwargs.get("json")
+        keys = flatten_key_names(body)
+        logger.info("PATCH %s keys=[%s]", path, ", ".join(keys))
+        return await super().patch(path, **kwargs)
 
     # -- Read methods -------------------------------------------------------
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import httpx
@@ -203,6 +204,39 @@ class TestUpdateViewer:
         request_body = json.loads(route.calls[0].request.content)
         assert request_body == payload
         assert result["id"] == "v1"
+
+
+class TestPatchLogging:
+    @respx.mock
+    async def test_patch_logs_body_key_set_at_info(self, client, caplog):
+        """An outbound PATCH emits an INFO line naming the target and the
+        body's nested key set (#329)."""
+        respx.patch(f"{API_PREFIX}lights/l1").mock(return_value=httpx.Response(200, json={}))
+        payload = {"lightDeviceSettings": {"ledLevel": 3}, "lightModeSettings": {"mode": "motion"}}
+        with caplog.at_level(logging.INFO, logger="unifi_mcp.clients.protect"):
+            await client.update_light("l1", payload)
+
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        assert any("PATCH lights/l1" in m for m in info_messages), info_messages
+        log_line = next(m for m in info_messages if "PATCH lights/l1" in m)
+        assert "lightDeviceSettings.ledLevel" in log_line
+        assert "lightModeSettings.mode" in log_line
+
+    @respx.mock
+    async def test_patch_log_omits_values(self, client, caplog):
+        """The log line must contain key names but never their values, which
+        can carry credentials (#329)."""
+        respx.patch(f"{API_PREFIX}cameras/cam-1").mock(return_value=httpx.Response(200, json={}))
+        sensitive_value = "super-secret-token-value"
+        with caplog.at_level(logging.INFO, logger="unifi_mcp.clients.protect"):
+            await client.update_camera("cam-1", {"name": sensitive_value, "osdSettings": {"isNameEnabled": True}})
+
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        log_line = next(m for m in info_messages if "PATCH cameras/cam-1" in m)
+        assert "name" in log_line
+        assert "osdSettings.isNameEnabled" in log_line
+        assert sensitive_value not in log_line
+        assert "True" not in log_line
 
 
 class TestValidateConnection:
