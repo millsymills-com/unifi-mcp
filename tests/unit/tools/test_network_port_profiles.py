@@ -235,11 +235,11 @@ class TestListPortProfilesHandler:
 
     async def test_list_redacts_and_returns(self, mcp_with_profiles):
         client = AsyncMock()
-        client.list_port_profiles.return_value = {"data": [{"_id": "p-1", "name": "guest"}]}
+        client.list_port_profiles.return_value = {"data": [{"_id": "p-1", "name": "guest", "x_passphrase": "hunter2"}]}
         ctx = _ctx(_config(UniFiMode.READONLY), network=client)
         tool = await mcp_with_profiles.get_tool("unifi_network_list_port_profiles")
         result = await tool.fn(ctx)
-        assert result == {"data": [{"_id": "p-1", "name": "guest"}]}
+        assert result == {"data": [{"_id": "p-1", "name": "guest", "x_passphrase": "***REDACTED***"}]}
         client.list_port_profiles.assert_awaited_once_with()
 
     async def test_list_client_error_maps_to_tool_error(self, mcp_with_profiles):
