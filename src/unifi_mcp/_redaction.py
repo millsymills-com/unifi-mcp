@@ -70,6 +70,27 @@ def _is_sensitive_key(key: str) -> bool:
     return any(normalized.endswith(suffix) for suffix in _NORMALIZED_SUFFIXES)
 
 
+def flatten_key_names(value: Any, _prefix: str = "") -> list[str]:
+    """Return dotted top-level + nested key *names* of a JSON body, no values.
+
+    Used to log the shape of an outbound write without exposing any value
+    (values may carry credentials). Recurses into nested dicts, joining with
+    ``.`` (e.g. ``lightDeviceSettings.ledLevel``); lists and scalars are
+    leaves whose key name is recorded but whose contents are never walked.
+    A non-dict top-level ``value`` yields an empty list.
+    """
+    if not isinstance(value, dict):
+        return []
+    names: list[str] = []
+    for key, sub in value.items():
+        dotted = f"{_prefix}{key}"
+        if isinstance(sub, dict) and sub:
+            names.extend(flatten_key_names(sub, f"{dotted}."))
+        else:
+            names.append(dotted)
+    return names
+
+
 def redact_secrets(value: Any) -> Any:
     """Return a deep copy of ``value`` with sensitive keys replaced.
 
