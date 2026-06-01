@@ -114,6 +114,36 @@ def _build_ca_cert(
     return builder.sign(signing_key, hashes.SHA256())
 
 
+def _sign_leaf_cert(
+    *,
+    server_ip: str,
+    issuer: x509.Name,
+    public_key: rsa.RSAPublicKey,
+    signing_key: rsa.RSAPrivateKey,
+    now: datetime.datetime,
+    authority_ski: x509.SubjectKeyIdentifier,
+) -> x509.Certificate:
+    """Build a leaf (``ca=False``) cert with a ``server_ip`` SAN, signed by its issuer.
+
+    Shared by the two- and three-tier generators: in the two-tier case the
+    issuer is the self-signed CA; in the three-tier case it is the intermediate.
+    """
+    return (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, server_ip)]))
+        .issuer_name(issuer)
+        .public_key(public_key)
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=1))
+        .not_valid_after(now + datetime.timedelta(hours=1))
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(IPv4Address(server_ip))]), critical=False)
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False)
+        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(authority_ski), critical=False)
+        .sign(signing_key, hashes.SHA256())
+    )
+
+
 def _generate_ca_and_server_cert(
     server_ip: str,
 ) -> tuple[bytes, bytes, bytes]:
@@ -137,23 +167,13 @@ def _generate_ca_and_server_cert(
     )
 
     server_key = _new_key()
-    server_subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, server_ip)])
-    server_cert = (
-        x509.CertificateBuilder()
-        .subject_name(server_subject)
-        .issuer_name(ca_subject)
-        .public_key(server_key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(minutes=1))
-        .not_valid_after(now + datetime.timedelta(hours=1))
-        .add_extension(
-            x509.SubjectAlternativeName([x509.IPAddress(IPv4Address(server_ip))]),
-            critical=False,
-        )
-        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(x509.SubjectKeyIdentifier.from_public_key(server_key.public_key()), critical=False)
-        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ca_ski), critical=False)
-        .sign(ca_key, hashes.SHA256())
+    server_cert = _sign_leaf_cert(
+        server_ip=server_ip,
+        issuer=ca_subject,
+        public_key=server_key.public_key(),
+        signing_key=ca_key,
+        now=now,
+        authority_ski=ca_ski,
     )
 
     ca_pem = ca_cert.public_bytes(serialization.Encoding.PEM)
@@ -204,20 +224,13 @@ def _generate_three_tier_chain(server_ip: str) -> tuple[bytes, bytes, bytes, byt
     )
 
     leaf_key = _new_key()
-    leaf_subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, server_ip)])
-    leaf_cert = (
-        x509.CertificateBuilder()
-        .subject_name(leaf_subject)
-        .issuer_name(int_subject)
-        .public_key(leaf_key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(minutes=1))
-        .not_valid_after(now + datetime.timedelta(hours=1))
-        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(IPv4Address(server_ip))]), critical=False)
-        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(x509.SubjectKeyIdentifier.from_public_key(leaf_key.public_key()), critical=False)
-        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(int_ski), critical=False)
-        .sign(int_key, hashes.SHA256())
+    leaf_cert = _sign_leaf_cert(
+        server_ip=server_ip,
+        issuer=int_subject,
+        public_key=leaf_key.public_key(),
+        signing_key=int_key,
+        now=now,
+        authority_ski=int_ski,
     )
 
     enc = serialization.Encoding.PEM
@@ -317,18 +330,10 @@ def tls_server(tmp_path: Path) -> Iterator[tuple[_LocalHTTPSServer, Path]]:
     ca_pem, server_cert_pem, server_key_pem = _generate_ca_and_server_cert("127.0.0.1")
 
     ca_path = tmp_path / "ca.pem"
-    cert_path = tmp_path / "server.pem"
-    key_path = tmp_path / "server.key"
     ca_path.write_bytes(ca_pem)
-    cert_path.write_bytes(server_cert_pem)
-    key_path.write_bytes(server_key_pem)
 
-    server = _LocalHTTPSServer(cert_path=cert_path, key_path=key_path)
-    server.start()
-    try:
+    with _running_https_server(server_cert_pem, server_key_pem, tmp_path, name="tls-server") as server:
         yield server, ca_path
-    finally:
-        server.stop()
 
 
 class TestVerifySslTrue:
