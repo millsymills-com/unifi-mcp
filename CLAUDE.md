@@ -56,6 +56,8 @@ uv run pytest tests/integration/test_all_tools_live.py::TestDestructive -v -m in
 
 If the health check fails or any class hangs, stop the sweep and triage before continuing. See #271 for incident details.
 
+Protect **write** tests target only devices the operator approves via `LIVE_TEST_DEVICE_MACS` (comma-separated MACs, any separator/case) and `pytest.skip` when the allowlist is empty or no live camera matches — never `cameras[0]`. Full allowlist + capture/restore + run-protocol rules: `docs/agents/live-test-safety.md`.
+
 ## Architecture
 
 ```
