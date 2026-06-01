@@ -66,7 +66,7 @@ def register_client_tools(mcp: FastMCP) -> None:
         offers no compare-and-set primitive (#151).
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].block_client(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].block_client(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -84,7 +84,7 @@ def register_client_tools(mcp: FastMCP) -> None:
         with no compare-and-set primitive (#151).
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].unblock_client(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].unblock_client(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -98,7 +98,7 @@ def register_client_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].kick_client(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].kick_client(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -126,4 +126,4 @@ def register_client_tools(mcp: FastMCP) -> None:
                 f"minutes must be between {_AUTHORIZE_GUEST_MIN_MINUTES} and "
                 f"{_AUTHORIZE_GUEST_MAX_MINUTES} (got {minutes!r})"
             )
-        return await get_server_context(ctx).clients["network"].authorize_guest(mac, minutes=minutes)
+        return redact_secrets(await get_server_context(ctx).clients["network"].authorize_guest(mac, minutes=minutes))

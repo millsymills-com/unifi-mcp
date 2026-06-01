@@ -45,6 +45,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `unifi_protect_update_nvr`: the integration v1 API is GET-only for the
   NVR, so the tool could never succeed.
 
+### Security
+
+- Write-tool responses are now scrubbed through `redact_secrets` exactly
+  like read responses, so credential fields a write echoes back
+  (`x_passphrase`, `radius_secret`, `ssoToken`, camera creds, etc.) no
+  longer reach the agent in cleartext. The `#146` "don't scrub" stance is
+  re-scoped to REQUEST bodies only, which legitimately need cleartext to
+  reach the controller (#325).
+
 ## [0.3.0] - 2026-05-07
 
 ### Changed

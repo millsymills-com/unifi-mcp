@@ -76,7 +76,7 @@ def register_network_config_tools(mcp: FastMCP) -> None:
             data["subnet"] = subnet
         if vlan is not None:
             data["vlan"] = vlan
-        return await get_server_context(ctx).clients["network"].create_network(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_network(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -92,7 +92,7 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         """
         validate_id(network_id, field="network_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_network")
-        return await get_server_context(ctx).clients["network"].update_network(network_id, data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_network(network_id, data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -106,4 +106,4 @@ def register_network_config_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(network_id, field="network_id")
-        return await get_server_context(ctx).clients["network"].delete_network(network_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_network(network_id))

@@ -48,7 +48,7 @@ def register_device_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].restart_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].restart_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -70,7 +70,7 @@ def register_device_tools(mcp: FastMCP) -> None:
         primitive (#151).
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].adopt_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].adopt_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -84,7 +84,7 @@ def register_device_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].locate_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].locate_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -98,7 +98,7 @@ def register_device_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].unlocate_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].unlocate_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -112,7 +112,7 @@ def register_device_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].provision_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].provision_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -135,4 +135,4 @@ def register_device_tools(mcp: FastMCP) -> None:
         primitive (#151).
         """
         validate_mac(mac, field="mac")
-        return await get_server_context(ctx).clients["network"].forget_device(mac)
+        return redact_secrets(await get_server_context(ctx).clients["network"].forget_device(mac))
