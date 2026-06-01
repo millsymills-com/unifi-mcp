@@ -113,7 +113,15 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
                 combined with any named arg. Still passes the dangerous-key denylist.
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_list_chimes`` to confirm the change applied.
+
+        Note:
+            The ``repeatTimes`` field path is an official-API default,
+            unverified against live hardware (#330). The API returns 200 and
+            silently ignores unrecognized nested keys, so a wrong path no-ops
+            without error — the re-read above is how you catch it.
         """
         validate_id(chime_id, field="chime_id")
         body = build_named_arg_body(
@@ -159,7 +167,16 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
                 combined with any named arg. Still passes the dangerous-key denylist.
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_list_lights`` to confirm the change applied.
+
+        Note:
+            The ``lightDeviceSettings.*`` / ``lightModeSettings.mode`` field
+            paths are official-API defaults, unverified against live hardware
+            (#330). The API returns 200 and silently ignores unrecognized
+            nested keys, so a wrong path no-ops without error — the re-read
+            above is how you catch it.
         """
         validate_id(light_id, field="light_id")
         body = build_named_arg_body(
@@ -185,12 +202,23 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Set the activation mode for a Protect smart light.
 
+        A deliberate convenience shortcut over ``update_light(mode=...)``,
+        kept for agent ergonomics and to mirror ``set_recording_mode`` — the
+        single most common light write earns a dedicated verb.
+
         Args:
             light_id: The light device ID.
             mode: Light activation mode — "off", "motion", or "always".
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_list_lights`` to confirm the change applied.
+
+        Note:
+            The ``lightModeSettings.mode`` field path is an official-API
+            default, unverified against live hardware (#330); a wrong path
+            no-ops silently (200 + ignored key), so verify via the re-read.
         """
         validate_id(light_id, field="light_id")
         return redact_secrets(
@@ -227,7 +255,16 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
                 combined with any named arg. Still passes the dangerous-key denylist.
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_list_sensors`` to confirm the change applied.
+
+        Note:
+            The ``mountType`` / ``motionSettings.isEnabled`` /
+            ``lightSettings.isEnabled`` field paths are official-API defaults,
+            unverified against live hardware (#330). The API returns 200 and
+            silently ignores unrecognized nested keys, so a wrong path no-ops
+            without error — the re-read above is how you catch it.
         """
         validate_id(sensor_id, field="sensor_id")
         body = build_named_arg_body(
@@ -257,7 +294,14 @@ def register_protect_device_tools(mcp: FastMCP) -> None:
             liveview_id: The liveview ID to display on this viewer.
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_list_viewers`` to confirm the change applied.
+
+        Note:
+            The ``liveview`` body shape is an official-API default, unverified
+            against live hardware (#330); a wrong shape no-ops silently
+            (200 + ignored key), so verify via the re-read.
         """
         validate_id(viewer_id, field="viewer_id")
         validate_id(liveview_id, field="liveview_id")
