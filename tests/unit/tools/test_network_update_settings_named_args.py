@@ -298,6 +298,18 @@ class TestBuildNamedArgBodyContract:
                 data={},
             )
 
+    def test_named_arg_with_empty_data_dict_raises_mix_error(self):
+        # ``data={}`` counts as supplied (``data is not None``), so pairing it
+        # with a named arg trips the mix guard rather than silently winning.
+        field_paths: dict[str, tuple[str, ...]] = {"x": ("x",)}
+        with pytest.raises(UniFiBadRequestError, match="Cannot mix"):
+            build_named_arg_body(
+                tool_name="test_tool",
+                field_paths=field_paths,
+                named_values={"x": 1},
+                data={},
+            )
+
     def test_non_empty_data_dict_passes_through(self):
         field_paths: dict[str, tuple[str, ...]] = {"x": ("x",)}
         body = build_named_arg_body(
