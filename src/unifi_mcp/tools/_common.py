@@ -247,6 +247,12 @@ def build_named_arg_body(
 ) -> JsonObject:
     """Resolve named scalar args + legacy ``data`` dict into one request body.
 
+    "``data`` was supplied" means ``data is not None`` — an explicitly passed
+    empty dict counts as supplied. This single definition drives both guards:
+    mixing named args with any non-``None`` ``data`` raises the mix error, and
+    once that is cleared an empty ``data={}`` produces an empty body that falls
+    through to the "at least one field" error.
+
     Args:
         tool_name: Calling tool name, used in error messages.
         field_paths: Maps each kwarg name to its dotted destination in the
@@ -265,9 +271,10 @@ def build_named_arg_body(
             supplied, or neither.
     """
     supplied_named = {k: v for k, v in named_values.items() if v is not None}
-    if supplied_named and data is not None:
+    data_supplied = data is not None
+    if supplied_named and data_supplied:
         raise UniFiBadRequestError("Cannot mix named args with raw data dict")
-    if data:
+    if data_supplied and data:
         return data
     if not supplied_named:
         raise UniFiBadRequestError(f"{tool_name}: at least one field must be provided")
