@@ -446,6 +446,7 @@ class TestErrorBodyExtraction:
         msg = str(exc_info.value)
         assert "HTTP 500" in msg
         assert "<unparseable body, see DEBUG log>" in msg
+        assert "null" not in msg
 
     @respx.mock
     async def test_raw_body_debug_log_suppressed_by_default(self, client, caplog, monkeypatch):
