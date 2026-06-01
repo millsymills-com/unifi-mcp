@@ -124,7 +124,7 @@ if config.protect_enabled:
 - **CI**: Runs on push to main and PRs. Lint (ruff), typecheck (ty), and test (pytest) all on Python 3.13
 - **Security**: Weekly Bandit scans + dependency review on PRs
 - **Dependabot**: Weekly updates for Python deps and GitHub Actions
-- **Release**: No automated release pipeline yet — `uv build` produces a wheel locally; PyPI publishing is not wired up
+- **Release**: Tagging `v*` on `main` triggers `.github/workflows/release.yml` — gates on CI, builds with `uv build`, publishes to TestPyPI, then promotes to PyPI via trusted publishing (OIDC). Requires the `testpypi` and `pypi` GitHub environments and a configured trusted publisher on each index.
 
 ## Canonical MCP standards
 
