@@ -107,7 +107,9 @@ def register_camera_tools(mcp: FastMCP) -> None:
                 denylist. Cannot be combined with any named arg.
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_get_camera`` to confirm the change applied.
         """
         validate_id(camera_id, field="camera_id")
         body = build_named_arg_body(
@@ -124,7 +126,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
             data=data,
         )
         reject_dangerous_keys(body, tool_name="unifi_protect_update_camera")
-        return await get_server_context(ctx).clients["protect"].update_camera(camera_id, body)
+        return redact_secrets(await get_server_context(ctx).clients["protect"].update_camera(camera_id, body))
 
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -144,10 +146,12 @@ def register_camera_tools(mcp: FastMCP) -> None:
             post_padding: Post-event recording padding in seconds (optional).
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_get_camera`` to confirm the change applied.
         """
         validate_id(camera_id, field="camera_id")
-        return (
+        return redact_secrets(
             await get_server_context(ctx)
             .clients["protect"]
             .set_recording_mode(camera_id, mode, pre_padding=pre_padding, post_padding=post_padding)
@@ -165,7 +169,11 @@ def register_camera_tools(mcp: FastMCP) -> None:
             object_types: List of object types to detect — e.g., ["person", "vehicle", "animal"].
 
         Returns:
-            The upstream API response.
+            The controller acknowledgement. Integration v1 returns an empty
+            object on success, so expect ``{}``; re-read with
+            ``unifi_protect_get_camera`` to confirm the change applied.
         """
         validate_id(camera_id, field="camera_id")
-        return await get_server_context(ctx).clients["protect"].set_smart_detection(camera_id, object_types)
+        return redact_secrets(
+            await get_server_context(ctx).clients["protect"].set_smart_detection(camera_id, object_types)
+        )

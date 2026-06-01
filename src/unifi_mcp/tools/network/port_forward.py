@@ -78,7 +78,7 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
             "proto": proto,
             "enabled": enabled,
         }
-        return await get_server_context(ctx).clients["network"].create_port_forward(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_port_forward(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -94,7 +94,9 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
         """
         validate_id(port_forward_id, field="port_forward_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_port_forward")
-        return await get_server_context(ctx).clients["network"].update_port_forward(port_forward_id, data)
+        return redact_secrets(
+            await get_server_context(ctx).clients["network"].update_port_forward(port_forward_id, data)
+        )
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -108,4 +110,4 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(port_forward_id, field="port_forward_id")
-        return await get_server_context(ctx).clients["network"].delete_port_forward(port_forward_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_port_forward(port_forward_id))

@@ -1,10 +1,15 @@
 """Secret-redaction helper shared by clients (error bodies) and tools (responses).
 
 `clients/base.py` calls this to scrub the JSON parsed from upstream 4xx
-bodies before they reach the agent (#148). The tool layer calls it from
-read-mode read tools so PSKs / RADIUS secrets / SSO tokens never leave
-the server in cleartext (#146). Write tools deliberately do **not** scrub
-because the controller needs the cleartext values for round-trip writes.
+bodies before they reach the agent (#148). The tool layer calls it on
+every response — read and write alike — so PSKs / RADIUS secrets / SSO
+tokens never leave the server in cleartext (#146, #325).
+
+The "don't scrub" stance from #146 applies only to REQUEST bodies: the
+controller legitimately needs cleartext values to perform a round-trip
+write, so request/body construction is never run through this helper.
+Write RESPONSES, however, can echo those same credential fields straight
+back to the agent, so they are now scrubbed exactly like read responses.
 """
 
 from __future__ import annotations

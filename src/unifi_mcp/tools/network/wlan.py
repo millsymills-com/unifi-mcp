@@ -87,7 +87,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             "x_passphrase": x_passphrase,
             "enabled": enabled,
         }
-        return await get_server_context(ctx).clients["network"].create_wlan(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_wlan(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -103,7 +103,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         """
         validate_id(wlan_id, field="wlan_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_wlan")
-        return await get_server_context(ctx).clients["network"].update_wlan(wlan_id, data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_wlan(wlan_id, data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -117,4 +117,4 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(wlan_id, field="wlan_id")
-        return await get_server_context(ctx).clients["network"].delete_wlan(wlan_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_wlan(wlan_id))

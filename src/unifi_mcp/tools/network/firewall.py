@@ -130,7 +130,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
                 data["dst_address"] = dst_address
         else:
             reject_dangerous_keys(data, tool_name="unifi_network_create_firewall_rule")
-        return await get_server_context(ctx).clients["network"].create_firewall_rule(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_firewall_rule(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -146,7 +146,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         """
         validate_id(rule_id, field="rule_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_rule")
-        return await get_server_context(ctx).clients["network"].update_firewall_rule(rule_id, data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_firewall_rule(rule_id, data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -160,7 +160,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(rule_id, field="rule_id")
-        return await get_server_context(ctx).clients["network"].delete_firewall_rule(rule_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_firewall_rule(rule_id))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -185,7 +185,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
             "group_type": group_type,
             "group_members": group_members,
         }
-        return await get_server_context(ctx).clients["network"].create_firewall_group(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_firewall_group(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -201,7 +201,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         """
         validate_id(group_id, field="group_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_group")
-        return await get_server_context(ctx).clients["network"].update_firewall_group(group_id, data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_firewall_group(group_id, data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -215,4 +215,4 @@ def register_firewall_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(group_id, field="group_id")
-        return await get_server_context(ctx).clients["network"].delete_firewall_group(group_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_firewall_group(group_id))

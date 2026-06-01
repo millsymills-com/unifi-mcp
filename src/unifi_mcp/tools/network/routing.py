@@ -82,7 +82,7 @@ def register_routing_tools(mcp: FastMCP) -> None:
             data["static-route_nexthop"] = gateway_ip
         if interface is not None:
             data["static-route_interface"] = interface
-        return await get_server_context(ctx).clients["network"].create_route(data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_route(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
@@ -101,7 +101,7 @@ def register_routing_tools(mcp: FastMCP) -> None:
         """
         validate_id(route_id, field="route_id")
         reject_dangerous_keys(data, tool_name="unifi_network_update_route")
-        return await get_server_context(ctx).clients["network"].update_route(route_id, data)
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_route(route_id, data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
@@ -115,4 +115,4 @@ def register_routing_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         validate_id(route_id, field="route_id")
-        return await get_server_context(ctx).clients["network"].delete_route(route_id)
+        return redact_secrets(await get_server_context(ctx).clients["network"].delete_route(route_id))
