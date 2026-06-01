@@ -46,9 +46,9 @@ dev = [
 unifi-mcp = "unifi_mcp.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/millsmillsymills/unifi-mcp"
-Repository = "https://github.com/millsmillsymills/unifi-mcp"
-Issues = "https://github.com/millsmillsymills/unifi-mcp/issues"
+Homepage = "https://github.com/millsymills-com/unifi-mcp"
+Repository = "https://github.com/millsymills-com/unifi-mcp"
+Issues = "https://github.com/millsymills-com/unifi-mcp/issues"
 
 # =============================================================================
 # Ruff — linting and formatting

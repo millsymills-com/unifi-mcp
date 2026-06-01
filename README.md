@@ -24,7 +24,7 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 uv pip install unifi-mcp
 
 # Or install from source
-git clone https://github.com/millsmillsymills/unifi-mcp.git
+git clone https://github.com/millsymills-com/unifi-mcp.git
 cd unifi-mcp
 uv sync
 
@@ -148,7 +148,7 @@ almost always because its key is unset:
 
 - `unifi_network_*` tools require `UNIFI_NETWORK_API`, issued under the
   **Network** service in UniFi OS. A Site Manager or Protect key returns 401
-  and won't register Network tools ([#131](https://github.com/millsmillsymills/unifi-mcp/issues/131)).
+  and won't register Network tools ([#131](https://github.com/millsymills-com/unifi-mcp/issues/131)).
 - `unifi_protect_*` tools require `UNIFI_PROTECT_API` (and `UNIFI_PROTECT_HOST`
   on split deployments — see Known Issues).
 - `unifi_site_manager_*` tools require `UNIFI_SITE_MANAGER_API`.
@@ -242,7 +242,7 @@ uv run pre-commit install
 ## Known Issues
 
 - **Protect on a separate device requires explicit `UNIFI_PROTECT_HOST`** —
-  [#107](https://github.com/millsmillsymills/unifi-mcp/issues/107). If your
+  [#107](https://github.com/millsymills-com/unifi-mcp/issues/107). If your
   Protect NVR is on a different IP than your Network controller (common
   with UCK-G2-Plus + UDM/UCG setups), set `UNIFI_PROTECT_HOST` in `.env`.
   The default silently inherits `UNIFI_NETWORK_HOST`, which produces a

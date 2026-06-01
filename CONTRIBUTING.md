@@ -5,7 +5,7 @@ Thanks for your interest in improving `unifi-mcp`. This document covers the deve
 ## Development Setup
 
 ```bash
-git clone https://github.com/millsmillsymills/unifi-mcp.git
+git clone https://github.com/millsymills-com/unifi-mcp.git
 cd unifi-mcp
 uv sync --extra dev
 uv run pre-commit install
