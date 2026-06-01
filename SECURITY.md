@@ -15,7 +15,7 @@ Please report security vulnerabilities **privately**. Do **not** open a public G
 Two private disclosure channels:
 
 1. **GitHub Security Advisories** — preferred. Open a private advisory at
-   <https://github.com/millsmillsymills/unifi-mcp/security/advisories/new>.
+   <https://github.com/millsymills-com/unifi-mcp/security/advisories/new>.
 2. **Email** — `andyandymillsmills@gmail.com` with subject prefix `[unifi-mcp security]`.
 
 Please include:

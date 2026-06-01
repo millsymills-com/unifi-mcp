@@ -141,7 +141,7 @@ uv run consistency-check audit --repo $(basename "$PWD")
 
 ### Issue tracker
 
-GitHub issues at `millsmillsymills/unifi-mcp` via `gh` CLI. See `docs/agents/issue-tracker.md`.
+GitHub issues at `millsymills-com/unifi-mcp` via `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
