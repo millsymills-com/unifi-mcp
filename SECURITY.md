@@ -14,9 +14,9 @@ Please report security vulnerabilities **privately**. Do **not** open a public G
 
 Two private disclosure channels:
 
-1. **GitHub Security Advisories** — preferred. Open a private advisory at
+1. **GitHub Security Advisories** (preferred). Open a private advisory at
    <https://github.com/millsymills-com/unifi-mcp/security/advisories/new>.
-2. **Email** — `andyandymillsmills@gmail.com` with subject prefix `[unifi-mcp security]`.
+2. **Email**: `andyandymillsmills@gmail.com` with subject prefix `[unifi-mcp security]`.
 
 Please include:
 
@@ -46,7 +46,7 @@ In scope:
 
 Out of scope:
 
-- Vulnerabilities in upstream UniFi firmware or APIs — please report those to
+- Vulnerabilities in upstream UniFi firmware or APIs; please report those to
   Ubiquiti directly.
 - Issues that require an attacker who already has shell access on the host
   running the server.

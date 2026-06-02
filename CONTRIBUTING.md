@@ -11,7 +11,7 @@ uv sync --extra dev
 uv run pre-commit install
 ```
 
-Copy `.env.example` to `.env` and fill in the API keys for whichever UniFi surfaces you want to test against. An unset key disables that surface — the server still starts, it just doesn't register those tools.
+Copy `.env.example` to `.env` and fill in the API keys for whichever UniFi surfaces you want to test against. An unset key disables that surface; the server still starts, it just doesn't register those tools.
 
 ## Workflow
 
@@ -41,7 +41,7 @@ uv run bandit -r src/unifi_mcp/ -c pyproject.toml
 
 - **Python >=3.13**, strict `ty` type checks, `ruff` for lint and format.
 - **Line length**: 120 characters.
-- **No print statements** — use the `logging` module (enforced by ruff T20).
+- **No print statements**: use the `logging` module (enforced by ruff T20).
 - **Clients** use `httpx.AsyncClient` with `tenacity`-based retry. API
   responses flow through as `dict[str, Any]`; there is no Pydantic validation
   layer between clients and tools.
@@ -68,7 +68,7 @@ uv run bandit -r src/unifi_mcp/ -c pyproject.toml
 
 ## Releases
 
-The package is installed from source (`uv sync`, or `uvx --from git+…`), not published to a package index. Releases are marked by tagging `v*` on `main` with a matching entry in [CHANGELOG.md](CHANGELOG.md). Maintainers own the tag step — contributors should not tag releases directly.
+The package is installed from source (`uv sync`, or `uvx --from git+…`), not published to a package index. Releases are marked by tagging `v*` on `main` with a matching entry in [CHANGELOG.md](CHANGELOG.md). Maintainers own the tag step; contributors should not tag releases directly.
 
 ## Reporting Security Issues
 
