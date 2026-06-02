@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-The latest minor release on PyPI receives security fixes. Older minors are not supported.
+The latest minor release receives security fixes. Older minors are not supported.
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -42,7 +42,7 @@ In scope:
 
 - Code in this repository (`src/unifi_mcp/`, tests, packaging).
 - Documented configuration surfaces (env vars in `README.md` / `.env.example`).
-- The published `unifi-mcp` PyPI package.
+- The `unifi-mcp` package built from source in this repository.
 
 Out of scope:
 

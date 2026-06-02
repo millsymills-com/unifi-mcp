@@ -4,7 +4,7 @@ Domain glossary and core concepts for `unifi-mcp`. Producer skills (e.g. `/grill
 
 ## What this project is
 
-Production-grade Python MCP server bridging UniFi Site Manager, Network, and Protect APIs to MCP-speaking clients. Published to PyPI as `unifi-mcp`. Built on FastMCP.
+Production-grade Python MCP server bridging UniFi Site Manager, Network, and Protect APIs to MCP-speaking clients. Installed from source via `uv sync`; not published to PyPI. Built on FastMCP.
 
 ## Glossary
 
