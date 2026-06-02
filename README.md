@@ -8,7 +8,9 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 
 ## Status
 
-**Under active development** — see [implementation plan](docs/plans/2026-04-16-001-feat-unifi-mcp-server-plan.md) for roadmap.
+Actively maintained. Feature-complete across all three UniFi APIs (82 tools).
+Installed from source — not published to PyPI. See [CHANGELOG.md](CHANGELOG.md)
+for release history.
 
 ## Features
 
@@ -17,13 +19,30 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 - **Graceful per-API degradation** — only registers tools for configured APIs
 - **Typed, linted, tested** — strict `ty`, `ruff`, `pytest` with CI on Python 3.13
 
+## Safety: read/write mode
+
+The server starts in **readonly mode** by default and only exposes read tools.
+The 47 write tools are invisible until you explicitly set
+`UNIFI_MODE=readwrite`.
+
+> [!WARNING]
+> Write tools mutate live controller configuration. UniFi controllers do **not**
+> apply config changes transactionally — a rejected create (e.g. a VLAN
+> conflict) can leave a partial record on disk. Accumulated bad writes have, in
+> testing, corrupted a gateway's on-disk config badly enough to require a
+> factory reset. Before enabling `readwrite`:
+>
+> - Keep an exported controller backup you can restore from.
+> - Prefer testing against non-production hardware.
+> - Review what an agent is about to do; write tools carry per-tool caveats in
+>   their descriptions.
+>
+> If you only need to query your network, leave the server in readonly mode.
+
 ## Quick Start
 
 ```bash
-# Install from PyPI (once published)
-uv pip install unifi-mcp
-
-# Or install from source
+# Install from source
 git clone https://github.com/millsymills-com/unifi-mcp.git
 cd unifi-mcp
 uv sync
@@ -32,8 +51,14 @@ uv sync
 cp .env.example .env
 # Edit .env with your UniFi API keys
 
-# Run
-unifi-mcp
+# Run (readonly mode by default)
+uv run unifi-mcp
+```
+
+Or run directly from the repo with `uvx`, no clone required:
+
+```bash
+uvx --from git+https://github.com/millsymills-com/unifi-mcp.git unifi-mcp
 ```
 
 ## MCP client setup
@@ -51,7 +76,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
   "mcpServers": {
     "unifi": {
       "command": "uvx",
-      "args": ["unifi-mcp"],
+      "args": ["--from", "git+https://github.com/millsymills-com/unifi-mcp.git", "unifi-mcp"],
       "env": {
         "UNIFI_NETWORK_HOST": "192.168.1.1",
         "UNIFI_NETWORK_API": "<network-key>",
@@ -69,7 +94,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
 Add as a project-scoped MCP server:
 
 ```bash
-claude mcp add unifi --command "uvx unifi-mcp" \
+claude mcp add unifi --command "uvx --from git+https://github.com/millsymills-com/unifi-mcp.git unifi-mcp" \
   --env UNIFI_NETWORK_HOST=192.168.1.1 \
   --env UNIFI_NETWORK_API=<network-key> \
   --env UNIFI_PROTECT_API=<protect-key> \
@@ -85,7 +110,7 @@ Add to `~/.cursor/mcp.json`:
   "mcpServers": {
     "unifi": {
       "command": "uvx",
-      "args": ["unifi-mcp"],
+      "args": ["--from", "git+https://github.com/millsymills-com/unifi-mcp.git", "unifi-mcp"],
       "env": {
         "UNIFI_NETWORK_HOST": "192.168.1.1",
         "UNIFI_NETWORK_API": "<network-key>"
@@ -105,7 +130,7 @@ Add to `~/.continue/config.json`:
     {
       "name": "unifi",
       "command": "uvx",
-      "args": ["unifi-mcp"],
+      "args": ["--from", "git+https://github.com/millsymills-com/unifi-mcp.git", "unifi-mcp"],
       "env": {
         "UNIFI_NETWORK_HOST": "192.168.1.1",
         "UNIFI_NETWORK_API": "<network-key>"
@@ -121,7 +146,7 @@ See [.env.example](.env.example) for all configuration options.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UNIFI_MODE` | `readonly` | `readonly` or `readwrite` |
+| `UNIFI_MODE` | `readonly` | `readonly` or `readwrite` — see [Safety](#safety-readwrite-mode) before enabling writes |
 | `UNIFI_NETWORK_API` | — | Network API key |
 | `UNIFI_PROTECT_API` | — | Protect API key |
 | `UNIFI_SITE_MANAGER_API` | — | Site Manager cloud API key |

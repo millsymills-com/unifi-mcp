@@ -68,7 +68,7 @@ uv run bandit -r src/unifi_mcp/ -c pyproject.toml
 
 ## Releases
 
-Releases are cut by tagging `v*` on `main`. CI builds with `uv build`, publishes to TestPyPI, and then promotes to PyPI via trusted publishing. Maintainers own the tag step — contributors should not tag releases directly.
+The package is installed from source (`uv sync`, or `uvx --from git+…`), not published to a package index. Releases are marked by tagging `v*` on `main` with a matching entry in [CHANGELOG.md](CHANGELOG.md). Maintainers own the tag step — contributors should not tag releases directly.
 
 ## Reporting Security Issues
 
