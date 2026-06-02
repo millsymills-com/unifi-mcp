@@ -196,7 +196,7 @@ NETWORK_HAPPY_PATHS = [
         register_system_tools,
         "unifi_network_update_settings",
         "update_settings",
-        {"data": {"timezone": "UTC"}},
+        {"ntp_server_1": "time.example.com"},
         None,
     ),
     (register_system_tools, "unifi_network_run_speedtest", "run_speedtest", {}, None),
@@ -240,7 +240,7 @@ PROTECT_HAPPY_PATHS = [
         register_camera_tools,
         "unifi_protect_update_camera",
         "update_camera",
-        {"camera_id": "cam-1", "data": {"name": "cam"}},
+        {"camera_id": "cam-1", "name": "cam"},
     ),
     (
         register_camera_tools,

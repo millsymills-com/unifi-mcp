@@ -259,7 +259,7 @@ class TestProtectHandlers:
         client = AsyncMock()
         ctx = _fake_ctx(_readonly_config(), protect=client)
         with pytest.raises(ToolError, match="read-only mode"):
-            await _call(s, "unifi_protect_update_camera", ctx, camera_id="cam-1", data={"name": "x"})
+            await _call(s, "unifi_protect_update_camera", ctx, camera_id="cam-1", name="x")
 
     async def test_set_recording_mode_forwards_padding(self):
         s = FastMCP(name="t")

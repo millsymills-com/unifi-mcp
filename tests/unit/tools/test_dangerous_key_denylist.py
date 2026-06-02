@@ -23,9 +23,7 @@ from unifi_mcp.tools.network.networks import register_network_config_tools
 from unifi_mcp.tools.network.port_forward import register_port_forward_tools
 from unifi_mcp.tools.network.port_profiles import register_port_profile_tools
 from unifi_mcp.tools.network.routing import register_routing_tools
-from unifi_mcp.tools.network.system import register_system_tools
 from unifi_mcp.tools.network.wlan import register_wlan_tools
-from unifi_mcp.tools.protect.cameras import register_camera_tools
 from unifi_mcp.tools.protect.devices import register_protect_device_tools
 
 # ── Helper: direct denylist tests ──────────────────────────────────────────
@@ -171,7 +169,6 @@ async def _call(server: FastMCP, tool_name: str, ctx: AsyncMock, **kwargs: Any) 
 # Payload uses a denied key so a successful call would mean the guard missed.
 DENIED_PAYLOAD = {"radius_secret": "boom"}
 GUARDED_WRITE_TOOLS = [
-    ("unifi_network_update_settings", register_system_tools, {"data": DENIED_PAYLOAD}),
     ("unifi_network_update_wlan", register_wlan_tools, {"wlan_id": "w-1", "data": DENIED_PAYLOAD}),
     ("unifi_network_update_network", register_network_config_tools, {"network_id": "n-1", "data": DENIED_PAYLOAD}),
     (
@@ -193,7 +190,6 @@ GUARDED_WRITE_TOOLS = [
         {"profile_id": "p-1", "data": DENIED_PAYLOAD},
     ),
     ("unifi_network_update_route", register_routing_tools, {"route_id": "r-1", "data": DENIED_PAYLOAD}),
-    ("unifi_protect_update_camera", register_camera_tools, {"camera_id": "c-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_chime", register_protect_device_tools, {"chime_id": "ch-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_light", register_protect_device_tools, {"light_id": "l-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_sensor", register_protect_device_tools, {"sensor_id": "s-1", "data": DENIED_PAYLOAD}),
@@ -209,7 +205,6 @@ async def test_each_write_tool_blocks_radius_secret(tool_name, register_fn, kwar
     network_client = AsyncMock()
     protect_client = AsyncMock()
     for name in (
-        "update_settings",
         "update_wlan",
         "update_network",
         "create_firewall_rule",
@@ -223,7 +218,7 @@ async def test_each_write_tool_blocks_radius_secret(tool_name, register_fn, kwar
         getattr(network_client, name).side_effect = AssertionError(
             f"client {name}() must NOT be called when payload contains a denied key"
         )
-    for name in ("update_camera", "update_chime", "update_light", "update_sensor"):
+    for name in ("update_chime", "update_light", "update_sensor"):
         getattr(protect_client, name).side_effect = AssertionError(
             f"client {name}() must NOT be called when payload contains a denied key"
         )

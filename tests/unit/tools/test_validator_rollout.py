@@ -236,7 +236,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_camera_tools,
         "unifi_protect_update_camera",
-        {"camera_id": TRAVERSAL, "data": {}},
+        {"camera_id": TRAVERSAL, "name": "x"},
         "update_camera",
         "protect",
     ),
