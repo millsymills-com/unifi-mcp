@@ -1,12 +1,17 @@
 ---
 title: "feat: Build production-grade UniFi MCP server"
 type: feat
-status: active
+status: historical
 date: 2026-04-16
 deepened: 2026-04-16
 ---
 
 # feat: Build production-grade UniFi MCP server
+
+> **Historical document.** This is the original build plan, kept for context.
+> Some decisions have since changed — notably, the project is **not** published
+> to PyPI; it installs from source / git (see the README). Treat references to
+> PyPI publishing below as superseded.
 
 ## Overview
 
