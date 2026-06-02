@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-The latest minor release on PyPI receives security fixes. Older minors are not supported.
+The latest minor release receives security fixes. Older minors are not supported.
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -14,9 +14,9 @@ Please report security vulnerabilities **privately**. Do **not** open a public G
 
 Two private disclosure channels:
 
-1. **GitHub Security Advisories** — preferred. Open a private advisory at
+1. **GitHub Security Advisories** (preferred). Open a private advisory at
    <https://github.com/millsymills-com/unifi-mcp/security/advisories/new>.
-2. **Email** — `andyandymillsmills@gmail.com` with subject prefix `[unifi-mcp security]`.
+2. **Email**: `andyandymillsmills@gmail.com` with subject prefix `[unifi-mcp security]`.
 
 Please include:
 
@@ -42,11 +42,11 @@ In scope:
 
 - Code in this repository (`src/unifi_mcp/`, tests, packaging).
 - Documented configuration surfaces (env vars in `README.md` / `.env.example`).
-- The published `unifi-mcp` PyPI package.
+- The `unifi-mcp` package built from source in this repository.
 
 Out of scope:
 
-- Vulnerabilities in upstream UniFi firmware or APIs — please report those to
+- Vulnerabilities in upstream UniFi firmware or APIs; please report those to
   Ubiquiti directly.
 - Issues that require an attacker who already has shell access on the host
   running the server.

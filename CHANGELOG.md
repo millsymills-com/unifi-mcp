@@ -49,7 +49,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `unifi_protect_update_nvr`: the integration v1 API is GET-only for the
   NVR, so the tool could never succeed.
-- **Breaking** — the deprecated `data` raw-dict parameter on
+- **Breaking**: the deprecated `data` raw-dict parameter on
   `unifi_network_update_settings` and `unifi_protect_update_camera`. Use the
   named scalar args (`ntp_server_1`, `mgmt_led_enabled`, `name`,
   `led_settings_is_enabled`, the `osd_settings_*` flags), which are the
@@ -68,7 +68,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Breaking — minimum supported Python is now 3.13.** Drops 3.11 and 3.12.
+- **Breaking: minimum supported Python is now 3.13.** Drops 3.11 and 3.12.
   Update your runtime before installing 0.3.0. CI matrix and the
   `Programming Language` classifiers were trimmed to 3.13 only (#171).
 
@@ -88,14 +88,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   error-mapping helper matches the standard's pattern (#170).
 - Use PEP 695 `type` syntax for `JsonObject` now that the floor is 3.13.
 - The "Returns: The upstream API response." docstring is no longer
-  generated as a fallback for new tools — write a tool-specific
+  generated as a fallback for new tools; write a tool-specific
   Returns description instead.
 
 ## [0.2.0] - 2026-05-06
 
 ### Changed
 
-- **Breaking — every MCP tool is now exposed under the `unifi_*` namespace.**
+- **Breaking: every MCP tool is now exposed under the `unifi_*` namespace.**
   `network_*` tools are renamed to `unifi_network_*`, `protect_*` tools to
   `unifi_protect_*`, and `site_manager_*` tools to `unifi_site_manager_*`.
   Update any client configuration or scripts that reference tools by name.

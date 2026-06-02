@@ -9,17 +9,17 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 ## Status
 
 Actively maintained. Feature-complete across all three UniFi APIs (82 tools).
-Installed from source — not published to PyPI. See [CHANGELOG.md](CHANGELOG.md)
+Installed from source, not published to PyPI. See [CHANGELOG.md](CHANGELOG.md)
 for release history.
 
 ## Features
 
 - **82 MCP tools** covering UniFi Network (66), Protect (13), and Site Manager (3) APIs, all under the `unifi_*` namespace
-- **Read/write mode separation** — write tools invisible in readonly mode
-- **Graceful per-API degradation** — only registers tools for configured APIs
-- **Typed, linted, tested** — strict `ty`, `ruff`, `pytest` with CI on Python 3.13
+- **Read/write mode separation**: write tools invisible in readonly mode
+- **Graceful per-API degradation**: only registers tools for configured APIs
+- **Typed, linted, tested**: strict `ty`, `ruff`, `pytest` with CI on Python 3.13
 
-## Safety: read/write mode
+## Write safety
 
 The server starts in **readonly mode** by default and only exposes read tools.
 The 47 write tools are invisible until you explicitly set
@@ -27,7 +27,7 @@ The 47 write tools are invisible until you explicitly set
 
 > [!WARNING]
 > Write tools mutate live controller configuration. UniFi controllers do **not**
-> apply config changes transactionally — a rejected create (e.g. a VLAN
+> apply config changes transactionally. A rejected create (e.g. a VLAN
 > conflict) can leave a partial record on disk. Accumulated bad writes have, in
 > testing, corrupted a gateway's on-disk config badly enough to require a
 > factory reset. Before enabling `readwrite`:
@@ -146,14 +146,14 @@ See [.env.example](.env.example) for all configuration options.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UNIFI_MODE` | `readonly` | `readonly` or `readwrite` — see [Safety](#safety-readwrite-mode) before enabling writes |
-| `UNIFI_NETWORK_API` | — | Network API key |
-| `UNIFI_PROTECT_API` | — | Protect API key |
-| `UNIFI_SITE_MANAGER_API` | — | Site Manager cloud API key |
+| `UNIFI_MODE` | `readonly` | `readonly` or `readwrite`; see [Write safety](#write-safety) before enabling writes |
+| `UNIFI_NETWORK_API` | none | Network API key |
+| `UNIFI_PROTECT_API` | none | Protect API key |
+| `UNIFI_SITE_MANAGER_API` | none | Site Manager cloud API key |
 | `UNIFI_NETWORK_VERIFY_SSL` | `false` | Validate the Network controller's TLS chain |
 | `UNIFI_PROTECT_VERIFY_SSL` | `false` | Validate the Protect NVR's TLS chain |
-| `UNIFI_NETWORK_CERT_FINGERPRINT` | — | SHA-256 leaf-cert pin (Network); takes precedence over chain verification |
-| `UNIFI_PROTECT_CERT_FINGERPRINT` | — | SHA-256 leaf-cert pin (Protect); takes precedence over chain verification |
+| `UNIFI_NETWORK_CERT_FINGERPRINT` | none | SHA-256 leaf-cert pin (Network); takes precedence over chain verification |
+| `UNIFI_PROTECT_CERT_FINGERPRINT` | none | SHA-256 leaf-cert pin (Protect); takes precedence over chain verification |
 
 `.env` is read from the current working directory; run `unifi-mcp` only from a
 trusted directory so an unrelated `.env` cannot override your API keys.
@@ -167,19 +167,19 @@ hot-reload.
 
 Tools register only for APIs that are both **configured and reachable**
 (graceful per-API degradation). A caller that gets
-`Unknown tool: 'unifi_network_get_health'` — or any other `unifi_network_*` /
-`unifi_protect_*` name — is hitting an API whose tools were never registered,
+`Unknown tool: 'unifi_network_get_health'` (or any other `unifi_network_*` /
+`unifi_protect_*` name) is hitting an API whose tools were never registered,
 almost always because its key is unset:
 
 - `unifi_network_*` tools require `UNIFI_NETWORK_API`, issued under the
   **Network** service in UniFi OS. A Site Manager or Protect key returns 401
   and won't register Network tools ([#131](https://github.com/millsymills-com/unifi-mcp/issues/131)).
 - `unifi_protect_*` tools require `UNIFI_PROTECT_API` (and `UNIFI_PROTECT_HOST`
-  on split deployments — see Known Issues).
+  on split deployments; see Known Issues).
 - `unifi_site_manager_*` tools require `UNIFI_SITE_MANAGER_API`.
 
 Call `tools/list` after startup to see what registered, and check the startup
-log: a configured-but-unreachable API logs `<api> tools disabled — ...`, while
+log: a configured-but-unreachable API logs a `tools disabled` line, while
 an unconfigured API logs nothing and simply exposes no tools.
 
 ## TLS
@@ -194,7 +194,7 @@ link-local.
 
 You have three options to silence the warnings safely.
 
-### Option A — Pin the controller's leaf cert (recommended for self-signed)
+### Option A: pin the controller's leaf cert (recommended for self-signed)
 
 Capture the fingerprint once:
 
@@ -212,12 +212,12 @@ UNIFI_PROTECT_CERT_FINGERPRINT=DD:EE:FF:...
 
 When a pin is set, the client validates the leaf cert's SHA-256 fingerprint
 on every response and refuses to talk to any other cert. Chain and hostname
-verification are bypassed because the pin replaces them — that's the whole
+verification are bypassed because the pin replaces them; that's the whole
 point of pinning a self-signed cert. If the controller's cert is rotated,
 the pin must be updated; mismatched pins fail loudly with the expected vs.
 actual fingerprints in the error.
 
-### Option B — Install your own CA and enable full verification
+### Option B: install your own CA and enable full verification
 
 If you've configured your controller with a cert signed by your own CA,
 point Python at the CA bundle and turn full verification on:
@@ -237,7 +237,7 @@ mark it trusted for SSL; on Linux drop it into `/usr/local/share/ca-certificates
 and run `update-ca-certificates`. Either path teaches the platform trust
 store about your CA so `verify_ssl=true` works without a custom bundle.
 
-### Option C — Stay on `verify_ssl=False` (not recommended)
+### Option C: stay on `verify_ssl=False` (not recommended)
 
 Accept the startup `WARNING`. Only safe on a trusted private LAN where you
 control every hop between the MCP server and the controller. The
@@ -266,8 +266,8 @@ uv run pre-commit install
 
 ## Known Issues
 
-- **Protect on a separate device requires explicit `UNIFI_PROTECT_HOST`** —
-  [#107](https://github.com/millsymills-com/unifi-mcp/issues/107). If your
+- **Protect on a separate device requires explicit `UNIFI_PROTECT_HOST`**
+  ([#107](https://github.com/millsymills-com/unifi-mcp/issues/107)). If your
   Protect NVR is on a different IP than your Network controller (common
   with UCK-G2-Plus + UDM/UCG setups), set `UNIFI_PROTECT_HOST` in `.env`.
   The default silently inherits `UNIFI_NETWORK_HOST`, which produces a
@@ -276,7 +276,7 @@ uv run pre-commit install
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE).
 
 ## Trademarks
 
