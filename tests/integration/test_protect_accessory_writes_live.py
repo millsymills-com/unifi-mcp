@@ -31,7 +31,12 @@ from typing import Any
 
 import pytest
 
-from tests.integration.conftest import _normalize_mac, live_test_device_macs
+from tests.integration.conftest import (
+    PROTECT_WRITE_GATE_REASON,
+    _normalize_mac,
+    _protect_writes_enabled,
+    live_test_device_macs,
+)
 from unifi_mcp.tools.protect.devices import (
     _CHIME_FIELD_PATHS,
     _LIGHT_FIELD_PATHS,
@@ -43,13 +48,6 @@ LOG = logging.getLogger(__name__)
 pytestmark = pytest.mark.integration
 
 _UNSET = object()
-
-
-def _writes_enabled() -> bool:
-    return os.environ.get("LIVE_TEST_PROTECT_WRITES", "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-PROTECT_WRITE_GATE_REASON = "Set LIVE_TEST_PROTECT_WRITES=1 to PATCH a Protect accessory on the test controller"
 
 
 def _nested_get(record: dict[str, Any], path: tuple[str, ...]) -> Any:
@@ -134,7 +132,9 @@ def _device_id(record: dict[str, Any]) -> str:
     return device_id
 
 
-@pytest.mark.skipif(not _writes_enabled(), reason=PROTECT_WRITE_GATE_REASON)
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _protect_writes_enabled(), reason=PROTECT_WRITE_GATE_REASON)
 class TestAccessoryFieldPaths:
     """Round-trip each accessory family's primary scalar field path against live hardware."""
 

@@ -17,22 +17,19 @@ firmware), since the original mode can't be captured for restoration.
 from __future__ import annotations
 
 import logging
-import os
 
 import pytest
 
-from tests.integration.conftest import _normalize_mac, live_test_device_macs
+from tests.integration.conftest import (
+    PROTECT_WRITE_GATE_REASON,
+    _normalize_mac,
+    _protect_writes_enabled,
+    live_test_device_macs,
+)
 
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.integration
-
-
-def _writes_enabled() -> bool:
-    return os.environ.get("LIVE_TEST_PROTECT_WRITES", "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-PROTECT_WRITE_GATE_REASON = "Set LIVE_TEST_PROTECT_WRITES=1 to run set_recording_mode against the test camera"
 
 
 async def _pick_test_camera_id(protect_live_client) -> str:
@@ -61,7 +58,9 @@ async def _pick_test_camera_id(protect_live_client) -> str:
     )
 
 
-@pytest.mark.skipif(not _writes_enabled(), reason=PROTECT_WRITE_GATE_REASON)
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _protect_writes_enabled(), reason=PROTECT_WRITE_GATE_REASON)
 class TestSetRecordingModeWrite:
     """``set_recording_mode`` round-trip against the test camera.
 
