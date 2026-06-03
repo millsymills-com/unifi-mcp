@@ -105,18 +105,41 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Dependency audit (pip-audit)
+        run: uv run pip-audit
+
   # Gate — all required checks must pass before merging
   ci-pass:
     name: CI Pass
     if: always()
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, audit]
     runs-on: ubuntu-latest
     steps:
       - name: Check results
         run: |
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.typecheck.result }}" != "success" ]] || \
-             [[ "${{ needs.test.result }}" != "success" ]]; then
+             [[ "${{ needs.test.result }}" != "success" ]] || \
+             [[ "${{ needs.audit.result }}" != "success" ]]; then
             echo "::error::One or more CI jobs failed"
             exit 1
           fi
