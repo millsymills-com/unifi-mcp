@@ -61,3 +61,6 @@ Thumbs.db
 # AI/agent review and local config artifacts
 .context/
 .claude/
+
+# Internal-agent planning run-books — keep local, do not track (#367)
+docs/superpowers/
