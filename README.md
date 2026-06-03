@@ -8,6 +8,8 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 
 ## Status
 
+Stage: S3
+
 Actively maintained. Feature-complete across all three UniFi APIs (85 tools).
 Installed from source, not published to PyPI. See [CHANGELOG.md](CHANGELOG.md)
 for release history.
