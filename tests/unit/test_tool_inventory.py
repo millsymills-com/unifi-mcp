@@ -9,6 +9,7 @@ here. Historical CHANGELOG release counts are point-in-time and excluded.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from unifi_mcp._inventory import (
     EXPECTED_READ_TOOLS,
@@ -20,10 +21,16 @@ from unifi_mcp._inventory import (
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from fastmcp.tools import Tool
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-async def _list_all_tools():
+async def _list_all_tools() -> Sequence[Tool]:
+    """List every tool the server registers in readwrite mode (writes included)."""
     cfg = UniFiConfig(
         _env_file=None,
         unifi_mode=UniFiMode.READWRITE,
