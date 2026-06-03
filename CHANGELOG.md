@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Tool-count drift guard: `unifi_mcp._inventory` is the single source of truth
+  for the registered tool surface, and `tests/unit/test_tool_inventory.py`
+  asserts both the live count (total, per-API, read/write split) and the
+  current-state docs against it (#363).
 - Protect light, chime, sensor, and viewer write tools
   (`unifi_protect_update_light`, `unifi_protect_set_light_mode`,
   `unifi_protect_update_chime`, `unifi_protect_update_sensor`,
