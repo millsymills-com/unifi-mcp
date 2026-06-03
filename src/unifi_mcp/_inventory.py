@@ -1,0 +1,32 @@
+"""Canonical tool-count inventory — the single source of truth for #363.
+
+Tool counts were hand-maintained across the README and CLAUDE.md and drifted
+repeatedly (#357 → #361). These constants are the one place the numbers live;
+``tests/unit/test_tool_inventory.py`` asserts both the live registered surface
+and the current-state docs against them, so adding or removing a tool without
+updating this module (and the docs) fails CI.
+
+Historical, point-in-time counts in CHANGELOG release sections (e.g. the
+``84 MCP tools`` recorded at 0.1.0) are intentionally frozen and are *not*
+guarded here.
+"""
+
+from __future__ import annotations
+
+EXPECTED_TOOL_COUNTS: dict[str, int] = {
+    "network": 65,
+    "protect": 17,
+    "site_manager": 3,
+}
+
+EXPECTED_WRITE_TOOLS = 47
+
+TOTAL_TOOLS = sum(EXPECTED_TOOL_COUNTS.values())
+
+EXPECTED_READ_TOOLS = TOTAL_TOOLS - EXPECTED_WRITE_TOOLS
+
+NAMESPACE_PREFIXES: dict[str, str] = {
+    "network": "unifi_network_",
+    "protect": "unifi_protect_",
+    "site_manager": "unifi_site_manager_",
+}
