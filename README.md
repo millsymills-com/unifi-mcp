@@ -282,6 +282,7 @@ Apache-2.0. See [LICENSE](LICENSE).
 
 UniFi, UbiOS, and Ubiquiti are trademarks of Ubiquiti Inc. This project is an
 independent, third-party MCP server and is not affiliated with, endorsed by, or
-sponsored by Ubiquiti Inc. The repo logo (`docs/assets/logo.svg`) is a stylized
-8-bit derivative of Ubiquiti's UniFi access-point artwork, used here for
-identification only.
+sponsored by Ubiquiti Inc. "UniFi" is referenced only to identify the product
+this server integrates with. The repo logo (`docs/assets/logo.svg`) is an
+original neon-CRT pixel-art "U" mark from the millsymills design system; it does
+not use or derive from any Ubiquiti artwork.
