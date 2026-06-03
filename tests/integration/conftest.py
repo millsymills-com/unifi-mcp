@@ -87,6 +87,21 @@ def _protect_port() -> int:
     return int(os.environ.get("UNIFI_PROTECT_PORT", "443"))
 
 
+def _protect_writes_enabled() -> bool:
+    """True when LIVE_TEST_PROTECT_WRITES=1 (or true/yes/on) is set.
+
+    Used by the Protect write test classes across multiple modules; defined
+    here to prevent gate-definition drift (#354).
+
+    Returns:
+        Whether the Protect write gate is open.
+    """
+    return os.environ.get("LIVE_TEST_PROTECT_WRITES", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+PROTECT_WRITE_GATE_REASON = "Set LIVE_TEST_PROTECT_WRITES=1 to run Protect write tests against the test controller"
+
+
 def _bool_env(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None:
