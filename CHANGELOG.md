@@ -126,7 +126,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- 84 MCP tools across UniFi Network, Protect, and Site Manager (current total is 85; see [Unreleased]).
+- 84 MCP tools across UniFi Network, Protect, and Site Manager.
 - Read-only / read-write mode separation, gated by `UNIFI_MODE`.
 - Graceful per-API degradation when a key is missing or unreachable.
 - Strict typing, ruff lint + format, full unit + opt-in integration suites.
