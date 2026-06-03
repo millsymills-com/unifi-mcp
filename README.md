@@ -8,13 +8,13 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 
 ## Status
 
-Actively maintained. Feature-complete across all three UniFi APIs (82 tools).
+Actively maintained. Feature-complete across all three UniFi APIs (85 tools).
 Installed from source, not published to PyPI. See [CHANGELOG.md](CHANGELOG.md)
 for release history.
 
 ## Features
 
-- **82 MCP tools** covering UniFi Network (66), Protect (13), and Site Manager (3) APIs, all under the `unifi_*` namespace
+- **85 MCP tools** covering UniFi Network (65), Protect (17), and Site Manager (3) APIs, all under the `unifi_*` namespace
 - **Read/write mode separation**: write tools invisible in readonly mode
 - **Graceful per-API degradation**: only registers tools for configured APIs
 - **Typed, linted, tested**: strict `ty`, `ruff`, `pytest` with CI on Python 3.13
@@ -94,11 +94,12 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
 Add as a project-scoped MCP server:
 
 ```bash
-claude mcp add unifi --command "uvx --from git+https://github.com/millsymills-com/unifi-mcp.git unifi-mcp" \
-  --env UNIFI_NETWORK_HOST=192.168.1.1 \
-  --env UNIFI_NETWORK_API=<network-key> \
-  --env UNIFI_PROTECT_API=<protect-key> \
-  --env UNIFI_SITE_MANAGER_API=<site-manager-key>
+claude mcp add unifi \
+  -e UNIFI_NETWORK_HOST=192.168.1.1 \
+  -e UNIFI_NETWORK_API=<network-key> \
+  -e UNIFI_PROTECT_API=<protect-key> \
+  -e UNIFI_SITE_MANAGER_API=<site-manager-key> \
+  -- uvx --from git+https://github.com/millsymills-com/unifi-mcp.git unifi-mcp
 ```
 
 ### Cursor
@@ -147,6 +148,8 @@ See [.env.example](.env.example) for all configuration options.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `UNIFI_MODE` | `readonly` | `readonly` or `readwrite`; see [Write safety](#write-safety) before enabling writes |
+| `UNIFI_NETWORK_HOST` | none | Hostname or IP of the UniFi Network controller |
+| `UNIFI_PROTECT_HOST` | `UNIFI_NETWORK_HOST` | Hostname or IP of the Protect NVR; defaults to the Network host if not set |
 | `UNIFI_NETWORK_API` | none | Network API key |
 | `UNIFI_PROTECT_API` | none | Protect API key |
 | `UNIFI_SITE_MANAGER_API` | none | Site Manager cloud API key |
