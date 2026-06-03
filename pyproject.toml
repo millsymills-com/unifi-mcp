@@ -47,7 +47,7 @@ dev = [
 # starlette/pyjwt arrive transitively via fastmcp; the versions it pins carry
 # advisories pip-audit flags (starlette PYSEC-2026-161, pyjwt PYSEC-2026-175/177/178/179).
 # Force patched floors without bumping the fastmcp pin.
-override-dependencies = ["starlette>=1.0.1", "pyjwt>=2.13.0"]
+override-dependencies = ["starlette>=1.0.1", "pyjwt[crypto]>=2.13.0"]
 
 [project.scripts]
 unifi-mcp = "unifi_mcp.__main__:main"
