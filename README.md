@@ -6,6 +6,8 @@
 
 Production-grade Python MCP server for UniFi Site Manager, Network, and Protect APIs.
 
+**[Live demo →](https://millsymills.com/unifi)**
+
 ## Status
 
 Stage: S3
