@@ -39,7 +39,7 @@ dev = [
     "ty>=0.0.39",
     "bandit[toml]>=1.9.4",
     "pre-commit>=4.6.0",
-    "hypothesis>=6.153.0",
+    "hypothesis>=6.155.1",
     "pip-audit==2.10.0",
 ]
 
