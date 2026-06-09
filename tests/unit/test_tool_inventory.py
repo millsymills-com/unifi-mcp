@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from unifi_mcp._inventory import (
+    EXPECTED_NAMESPACE_SPLITS,
     EXPECTED_READ_TOOLS,
     EXPECTED_TOOL_COUNTS,
     EXPECTED_WRITE_TOOLS,
@@ -67,6 +68,16 @@ class TestLiveCountMatchesConstant:
         assert writes == EXPECTED_WRITE_TOOLS
         assert len(tools) - writes == EXPECTED_READ_TOOLS
 
+    async def test_per_namespace_read_write_split(self):
+        tools = await _list_all_tools()
+        splits = {namespace: {"read": 0, "write": 0} for namespace in NAMESPACE_PREFIXES}
+        for tool in tools:
+            for namespace, prefix in NAMESPACE_PREFIXES.items():
+                if tool.name.startswith(prefix):
+                    kind = "write" if "write" in set(tool.tags) else "read"
+                    splits[namespace][kind] += 1
+        assert splits == EXPECTED_NAMESPACE_SPLITS
+
 
 class TestDocsCiteCanonicalCounts:
     """Current-state docs must quote the same numbers as the constant."""
@@ -87,3 +98,10 @@ class TestDocsCiteCanonicalCounts:
         assert f"{EXPECTED_WRITE_TOOLS} write tools" in text
         assert f"({EXPECTED_TOOL_COUNTS['network']} total)" in text
         assert f"({EXPECTED_TOOL_COUNTS['protect']} total" in text
+
+    def test_claude_md_per_api_splits(self):
+        text = _doc("CLAUDE.md")
+        for namespace in ("network", "protect"):
+            split = EXPECTED_NAMESPACE_SPLITS[namespace]
+            total = EXPECTED_TOOL_COUNTS[namespace]
+            assert f"{split['read']} read + {split['write']} write tools ({total} total" in text
