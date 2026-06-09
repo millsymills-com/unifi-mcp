@@ -660,7 +660,7 @@ unifi-mcp/
 
 - [x] **Unit 11: MCP client registration and end-to-end test** *(verified 2026-06-09 against live UDR Ultra + Protect G3 Flex)*
 
-  **Verification note (2026-06-09):** Read-only live suite green (33 passed / 5 env-skips / 1 known xfail #227); live Protect JPEG snapshot confirmed; mode-gating verified on live config (readonly 38 tools hides `unifi_network_create_wlan`, readwrite 85 tools exposes it, 47 write-gated); write tool invoked + reversed on live hardware in readwrite mode via `create_network`→`delete_network` on a disposable sandbox VLAN. `create_wlan` itself was blocked by controller WLAN capacity (4/4), so the network create/delete roundtrip stood in to exercise the same write path. See GitHub #43.
+  **Verification note (2026-06-09):** Read-only live suite green (33 passed / 5 env-skips / 1 known xfail #227 — `uv run pytest tests/integration/test_network_live.py tests/integration/test_network_clients_live.py tests/integration/test_protect_live.py tests/integration/test_site_manager_live.py -v -m integration`); live Protect JPEG snapshot confirmed; mode-gating verified on live config (readonly 38 tools hides `unifi_network_create_wlan`, readwrite 85 tools exposes it, 47 write-gated); write tool invoked + reversed on live hardware in readwrite mode via `create_network`→`delete_network` on a disposable sandbox VLAN. `create_wlan` itself was blocked by controller WLAN capacity (4/4), so the network create/delete roundtrip stood in to exercise the same write path. See GitHub #43.
 
 **Goal:** Register the server in Claude Code and verify end-to-end functionality.
 
@@ -699,7 +699,7 @@ unifi-mcp/
 
 | Risk | Mitigation |
 |------|------------|
-| UniFi API undocumented changes across firmware versions | Pydantic models use `extra="allow"` to tolerate unknown fields. Live integration tests catch breaking changes. |
+| UniFi API undocumented changes across firmware versions | Clients pass raw `dict[str, Any]` responses through to tools (the planned Pydantic layer was abandoned), so unknown fields are tolerated by construction. Live integration tests and tool-inventory drift guards catch breaking changes. |
 | Protect API largely reverse-engineered (not fully official) | Use official developer docs where available. Verified live against a Protect G3 Flex (2026-06-09); broader device-type coverage still limited. |
 | FastMCP v3.x API changes | Pin `>=3.2.0,<4.0.0` in deps. In-memory test pattern is stable. |
 | Rate limiting on Site Manager API (10k/min) | Not a practical concern for MCP usage patterns. Log 429 errors clearly. |
