@@ -17,7 +17,7 @@ deepened: 2026-04-16
 
 Build a standalone, open-source Python MCP server providing comprehensive coverage of UniFi Site Manager, Network, and Protect APIs. Published to PyPI as `unifi-mcp`. Uses FastMCP framework with declarative read/write mode separation, graceful per-API degradation, and atomic agent-native tool design.
 
-**Status:** Units 1–11 implemented and merged. Unit 11 (MCP client registration and end-to-end live-hardware verification) was verified 2026-06-09 against a live UDR Ultra + Protect G3 Flex (see Unit 11 note below).
+**Status:** Units 1–10 implemented and merged; Unit 11 (MCP client registration and end-to-end live-hardware verification) verified 2026-06-09 against a live UDR Ultra + Protect G3 Flex (see Unit 11 note below).
 
 ## Problem Frame
 
@@ -700,7 +700,7 @@ unifi-mcp/
 | Risk | Mitigation |
 |------|------------|
 | UniFi API undocumented changes across firmware versions | Pydantic models use `extra="allow"` to tolerate unknown fields. Live integration tests catch breaking changes. |
-| Protect API largely reverse-engineered (not fully official) | Use official developer docs where available. Protect cameras currently disconnected — defer full testing. |
+| Protect API largely reverse-engineered (not fully official) | Use official developer docs where available. Verified live against a Protect G3 Flex (2026-06-09); broader device-type coverage still limited. |
 | FastMCP v3.x API changes | Pin `>=3.2.0,<4.0.0` in deps. In-memory test pattern is stable. |
 | Rate limiting on Site Manager API (10k/min) | Not a practical concern for MCP usage patterns. Log 429 errors clearly. |
 | SSL certificate issues with local controller | Default `verify_ssl=False` for local controllers. Document the tradeoff. |
