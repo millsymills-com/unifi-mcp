@@ -13,13 +13,17 @@ guarded here.
 
 from __future__ import annotations
 
-EXPECTED_TOOL_COUNTS: dict[str, int] = {
-    "network": 65,
-    "protect": 17,
-    "site_manager": 3,
+EXPECTED_NAMESPACE_SPLITS: dict[str, dict[str, int]] = {
+    "network": {"read": 26, "write": 39},
+    "protect": {"read": 9, "write": 8},
+    "site_manager": {"read": 3, "write": 0},
 }
 
-EXPECTED_WRITE_TOOLS = 47
+EXPECTED_TOOL_COUNTS: dict[str, int] = {
+    namespace: split["read"] + split["write"] for namespace, split in EXPECTED_NAMESPACE_SPLITS.items()
+}
+
+EXPECTED_WRITE_TOOLS = sum(split["write"] for split in EXPECTED_NAMESPACE_SPLITS.values())
 
 TOTAL_TOOLS = sum(EXPECTED_TOOL_COUNTS.values())
 
