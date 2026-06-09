@@ -17,7 +17,7 @@ deepened: 2026-04-16
 
 Build a standalone, open-source Python MCP server providing comprehensive coverage of UniFi Site Manager, Network, and Protect APIs. Published to PyPI as `unifi-mcp`. Uses FastMCP framework with declarative read/write mode separation, graceful per-API degradation, and atomic agent-native tool design.
 
-**Status:** Units 1–10 implemented and merged. Unit 11 (MCP client registration and end-to-end live-hardware verification) is deferred pending access to the target UDR Ultra + Protect cameras.
+**Status:** Units 1–11 implemented and merged. Unit 11 (MCP client registration and end-to-end live-hardware verification) was verified 2026-06-09 against a live UDR Ultra + Protect G3 Flex (see Unit 11 note below).
 
 ## Problem Frame
 
@@ -658,7 +658,9 @@ unifi-mcp/
 
 ---
 
-- [ ] **Unit 11: MCP client registration and end-to-end test** *(deferred — requires live hardware)*
+- [x] **Unit 11: MCP client registration and end-to-end test** *(verified 2026-06-09 against live UDR Ultra + Protect G3 Flex)*
+
+  **Verification note (2026-06-09):** Read-only live suite green (33 passed / 5 env-skips / 1 known xfail #227); live Protect JPEG snapshot confirmed; mode-gating verified on live config (readonly 38 tools hides `unifi_network_create_wlan`, readwrite 85 tools exposes it, 47 write-gated); write tool invoked + reversed on live hardware in readwrite mode via `create_network`→`delete_network` on a disposable sandbox VLAN. `create_wlan` itself was blocked by controller WLAN capacity (4/4), so the network create/delete roundtrip stood in to exercise the same write path. See GitHub #43.
 
 **Goal:** Register the server in Claude Code and verify end-to-end functionality.
 
