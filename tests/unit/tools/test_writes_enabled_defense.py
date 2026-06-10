@@ -23,6 +23,31 @@ from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
 
 
+@pytest.fixture(autouse=True)
+def _stub_live_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the FastMCP lifespan offline so the write-gate test is hermetic.
+
+    Opening ``Client(server)`` runs ``server_lifespan``, which calls each
+    client's ``validate_connection`` against the configured host (default
+    ``192.168.1.1``). On a LAN with a real UniFi controller — the documented
+    ``.env`` dev setup — those live calls return 401, the lifespan disables
+    every API's tools, and the write tool under test resolves to "Unknown tool"
+    before its in-handler ``writes_enabled`` gate can fire. Stubbing validation
+    to succeed keeps registration offline and deterministic regardless of the
+    machine's network.
+    """
+
+    async def _ok(self: Any) -> bool:
+        return True
+
+    for target in (
+        "unifi_mcp.clients.network.NetworkClient.validate_connection",
+        "unifi_mcp.clients.protect.ProtectClient.validate_connection",
+        "unifi_mcp.clients.site_manager.SiteManagerClient.validate_connection",
+    ):
+        monkeypatch.setattr(target, _ok, raising=True)
+
+
 def _make_config(**overrides: Any) -> UniFiConfig:
     defaults: dict[str, Any] = {
         "_env_file": None,
