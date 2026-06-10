@@ -110,6 +110,7 @@ NO_ARG_READ_TOOLS = {
     "unifi_network_list_firewall_groups",
     "unifi_network_list_port_forwards",
     "unifi_network_list_routes",
+    "unifi_network_list_port_profiles",
     "unifi_network_get_settings",
     # Protect
     "unifi_protect_get_nvr",
@@ -261,6 +262,75 @@ class TestReadTools:
         assert data_b64, "Missing or empty data_base64 field"
         decoded = base64.b64decode(data_b64)
         assert decoded.startswith(b"\xff\xd8\xff"), f"Decoded bytes are not a JPEG (first 4 bytes: {decoded[:4]!r})"
+        assert len(decoded) == payload["size_bytes"], (
+            f"size_bytes={payload['size_bytes']} disagrees with decoded length {len(decoded)}"
+        )
+
+    async def test_list_events_tool_boundary(self, live_client, artifacts):
+        """``list_events`` through the MCP boundary with an explicit ``limit``.
+
+        The backing ``list/alarm`` path 404s on current UCG firmware (#138);
+        the tool stays registered, so the boundary contract is "returns a dict
+        envelope, or maps the documented 404 to a ``ToolError``". Either outcome
+        validates the argument schema and the error mapping.
+        """
+        tool_defs = {t.name for t in await live_client.list_tools()}
+        if "unifi_network_list_events" not in tool_defs:
+            pytest.skip("unifi_network_list_events not registered")
+        try:
+            payload = await _invoke(live_client, "unifi_network_list_events", {"limit": 5})
+        except ToolError as exc:
+            artifacts.dump("unifi_network_list_events", {"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            pytest.skip(f"list_events unavailable on this controller (#138): {exc}")
+        artifacts.dump("unifi_network_list_events", {"ok": True, "payload": payload})
+        assert isinstance(payload, dict), f"list_events must return dict, got {type(payload).__name__}"
+        assert "data" in payload or "meta" in payload, f"Unexpected list_events shape: {sorted(payload)}"
+
+    async def test_get_dpi_stats_tool_boundary(self, live_client, artifacts):
+        """``get_dpi_stats`` through the MCP boundary with an explicit ``dpi_type``."""
+        tool_defs = {t.name for t in await live_client.list_tools()}
+        if "unifi_network_get_dpi_stats" not in tool_defs:
+            pytest.skip("unifi_network_get_dpi_stats not registered")
+        payload = await _invoke(live_client, "unifi_network_get_dpi_stats", {"dpi_type": "by_app"})
+        artifacts.dump("unifi_network_get_dpi_stats", {"ok": True, "payload": payload})
+        assert isinstance(payload, dict), f"get_dpi_stats must return dict, got {type(payload).__name__}"
+        assert "data" in payload or "meta" in payload, f"Unexpected get_dpi_stats shape: {sorted(payload)}"
+
+    async def test_export_video_tool_boundary(self, live_client, artifacts):
+        """``export_video`` through the MCP boundary over a tiny window.
+
+        Mirrors :meth:`test_protect_get_snapshot_shape`. The integration v1
+        export endpoint is missing on some firmware (404, #227); a documented
+        404 maps to ``ToolError`` and skips. A success must carry the documented
+        ``{format: mp4, data_base64, size_bytes}`` shape with self-consistent
+        byte length. The window is kept to 1 minute to match the client-level
+        test and bound the inline payload.
+        """
+        tool_defs = {t.name for t in await live_client.list_tools()}
+        if "unifi_protect_export_video" not in tool_defs or "unifi_protect_list_cameras" not in tool_defs:
+            pytest.skip("Protect tools not registered")
+        camera_id = await _first_protect_camera_id(live_client)
+        end_ms = int(datetime.now(tz=UTC).timestamp() * 1000)
+        start_ms = end_ms - 60_000
+        try:
+            payload = await _invoke(
+                live_client,
+                "unifi_protect_export_video",
+                {"camera_id": camera_id, "start": start_ms, "end": end_ms},
+            )
+        except ToolError as exc:
+            artifacts.dump("unifi_protect_export_video", {"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            pytest.skip(f"export_video unavailable on this firmware (#227): {exc}")
+        artifacts.dump(
+            "unifi_protect_export_video",
+            {"ok": True, "camera_id": camera_id, "payload": _redact_data_base64(payload)},
+        )
+        assert isinstance(payload, dict), f"export payload must be dict, got {type(payload).__name__}"
+        assert payload.get("format") == "mp4", f"Expected format='mp4', got {payload.get('format')!r}"
+        assert payload.get("size_bytes", 0) > 0, f"Empty export: {payload.get('size_bytes')} bytes"
+        data_b64 = payload.get("data_base64") or ""
+        assert data_b64, "Missing or empty data_base64 field"
+        decoded = base64.b64decode(data_b64)
         assert len(decoded) == payload["size_bytes"], (
             f"size_bytes={payload['size_bytes']} disagrees with decoded length {len(decoded)}"
         )
@@ -910,6 +980,74 @@ class TestWriteRoundtrips:
                 await network_live_client.delete_wlan(wlan_id)
             except Exception as cleanup_exc:
                 artifacts.dump("delete_wlan_cleanup_failed", {"error": str(cleanup_exc)})
+            raise
+
+    async def test_update_delete_network_via_tool_boundary(
+        self, live_client, artifacts, network_live_client, default_lan_id
+    ):
+        """Tool-boundary positive path for ``update_network`` and ``delete_network``.
+
+        Self-bootstraps a disposable VLAN via the client layer (the tool-layer
+        ``create_network`` is the ``VlanUsed`` bug pinned in
+        :meth:`test_create_network_vlan_pins_vlan_enabled`), then updates and
+        deletes it through the MCP tool boundary, asserting the read-back and
+        confirming removal. Never targets the default LAN; on any failure it
+        deletes the VLAN via the client layer so a failed assertion can't leak
+        it. Uses VLANs 80-89 (the session sandbox fixture owns 90-99).
+        """
+        existing = _unwrap_list(await _invoke(live_client, "unifi_network_list_networks"))
+        used_vlans = {n.get("vlan") for n in existing if isinstance(n, dict) and n.get("vlan")}
+        chosen_vlan = next((v for v in range(80, 90) if v not in used_vlans), None)
+        if chosen_vlan is None:
+            pytest.skip("VLAN IDs 80-89 are all in use; cannot create a disposable network")
+
+        suffix = uuid.uuid4().hex[:8]
+        name = f"mcp-audit-net-{suffix}"
+        created = await network_live_client.create_network(
+            {
+                "name": name,
+                "purpose": "corporate",
+                "vlan": chosen_vlan,
+                "vlan_enabled": True,
+                "subnet": f"10.80.{chosen_vlan}.1/24",
+                "dhcpd_enabled": False,
+            }
+        )
+        network_id = (created.get("data") or [{}])[0].get("_id")
+        assert isinstance(network_id, str), f"Disposable create_network missing _id: {created}"
+        assert network_id != default_lan_id, "Refusing to target the default LAN"
+        artifacts.dump("update_delete_network_target", {"network_id": network_id, "vlan": chosen_vlan, "name": name})
+
+        try:
+            new_name = f"{name}-updated"
+            updated = await _invoke(
+                live_client,
+                "unifi_network_update_network",
+                {"network_id": network_id, "data": {"name": new_name}},
+            )
+            artifacts.dump(f"update_network-{suffix}", {"ok": True, "payload": updated})
+
+            read_back = _unwrap_list(
+                await _invoke(live_client, "unifi_network_get_network", {"network_id": network_id})
+            )
+            found = next((n for n in read_back if n.get("_id") == network_id), None)
+            assert found is not None, f"Updated network {network_id} not found via get_network"
+            assert found.get("name") == new_name, (
+                f"Read-back name mismatch: set {new_name!r}, got {found.get('name')!r}"
+            )
+
+            assert network_id != default_lan_id, "Refusing to delete the default LAN"
+            deleted = await _invoke(live_client, "unifi_network_delete_network", {"network_id": network_id})
+            artifacts.dump(f"delete_network-{suffix}", {"ok": True, "payload": deleted})
+
+            after = _unwrap_list(await _invoke(live_client, "unifi_network_list_networks"))
+            still_there = next((n for n in after if n.get("_id") == network_id), None)
+            assert still_there is None, f"Network {network_id} still present after delete_network: {still_there}"
+        except Exception:
+            try:
+                await network_live_client.delete_network(network_id)
+            except Exception as cleanup_exc:
+                artifacts.dump("update_delete_network_cleanup_failed", {"error": str(cleanup_exc)})
             raise
 
     async def test_create_network_vlan_pins_vlan_enabled(self, live_client, artifacts):
