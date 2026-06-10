@@ -23,6 +23,23 @@ Site Manager 3 = 85).
 **Snapshot date:** 2026-06-09. Re-verify against upstream when these versions move
 (this enumeration is a manual snapshot; there is no automated drift check).
 
+**Upstream counts last verified:** 2026-06-09, against the pinned OpenAPI mirrors
+(beezly/unifi-apis). Network `10.4.57` and Protect `7.1.42` each enumerate **73**
+operations, and the §3b Network table is an exact path-set match to `10.4.57.json`
+(zero diff). Reproduce per spec with:
+
+```
+jq '[.paths[]|to_entries[]|select(.key|test("^(get|post|put|patch|delete)$"))]|length' <spec>.json
+```
+
+Drift at verification time: Network `10.4.57` is the latest mirrored spec. Protect
+has advanced to `7.1.77` upstream, but its path set is **identical** to the pinned
+`7.1.42` (73 ops, zero diff), so the Protect rows below are unaffected. Site Manager
+(9 ops) has no OpenAPI mirror; its count was confirmed against
+developer.ui.com/site-manager (`/hosts`, `/hosts/{id}`, `/sites`, `/devices`,
+`/isp-metrics/{type}`, `/isp-metrics/{type}/query`, and the three `/ea/sd-wan-configs`
+early-access rows).
+
 > **Network caveat — two different surfaces.** The official, developer.ui.com-documented
 > UniFi Network API is the modern *Integration API* at `/proxy/network/integration/v1/`
 > (UUID site IDs, `X-API-KEY`). **This server does not use it.** Our `NetworkClient`
