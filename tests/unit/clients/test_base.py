@@ -15,6 +15,7 @@ from unifi_mcp.errors import (
     UniFiConnectionError,
     UniFiError,
     UniFiNotFoundError,
+    UniFiPortalHtmlError,
     UniFiRateLimitError,
     UniFiServerError,
     UniFiTimeoutError,
@@ -616,10 +617,10 @@ class TestMalformedJson:
         respx.get(f"{BASE_URL}/test").mock(
             return_value=httpx.Response(200, content=html_portal, headers={"content-type": "text/html; charset=utf-8"})
         )
-        with pytest.raises(UniFiAuthError, match="HTML instead of JSON") as exc_info:
+        with pytest.raises(UniFiPortalHtmlError, match="HTML instead of JSON") as exc_info:
             await client.get("test")
         assert exc_info.value.status_code == 200
-        assert "auth/path mismatch" in str(exc_info.value)
+        assert "API-key scope" in str(exc_info.value)
 
     @respx.mock
     async def test_200_with_html_content_type_any_casing_caught(self, client):

@@ -28,6 +28,7 @@ from unifi_mcp.errors import (
     UniFiConnectionError,
     UniFiError,
     UniFiNotFoundError,
+    UniFiPortalHtmlError,
     UniFiRateLimitError,
     UniFiServerError,
     UniFiTimeoutError,
@@ -406,8 +407,9 @@ class BaseUniFiClient(ABC):
     def _parse_json(self, response: httpx.Response) -> Any:
         """Parse JSON response body, wrapping decode errors as UniFiError.
 
-        Raises UniFiAuthError when the controller returns HTML on a JSON
-        endpoint. UniFi OS serves the SPA portal (HTML) on ``/proxy/<api>/*``
+        Raises UniFiPortalHtmlError (a UniFiAuthError subclass) when the
+        controller returns HTML on a JSON endpoint. UniFi OS serves the SPA
+        portal (HTML) on ``/proxy/<api>/*``
         when the request hits a path that rejects the configured auth — a
         signature of wrong ``_path_prefix``, key-for-wrong-host, or an
         API that requires session auth. Classifying this case as "auth /
@@ -417,12 +419,7 @@ class BaseUniFiClient(ABC):
         content_type = response.headers.get("content-type", "").lower()
         if content_type.startswith("text/html"):
             body = self._scrub_secret(response.text[:200])
-            raise UniFiAuthError(
-                f"Controller returned HTML instead of JSON on HTTP {response.status_code} — "
-                f"likely an auth/path mismatch (hit the UniFi OS portal). Check host, "
-                f"port, and API-key scope. Body: {body}",
-                status_code=response.status_code,
-            )
+            raise UniFiPortalHtmlError(body, status_code=response.status_code)
         try:
             return response.json()
         except ValueError as exc:
