@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from unifi_mcp.errors import UniFiAuthError, UniFiConnectionError
+from unifi_mcp.errors import UniFiAuthError, UniFiConnectionError, UniFiPortalHtmlError
 from unifi_mcp.server import ServerContext, _register_client, create_server, server_lifespan
 
 
@@ -261,6 +261,50 @@ class TestServerLifespan:
         msg = disabled_warns[0].getMessage()
         assert "UniFiAuthError" in msg, f"expected exception class in WARN; got {msg!r}"
         assert "HTTP 401" in msg, f"expected exception message text in WARN; got {msg!r}"
+
+    async def test_html_portal_failure_warn_is_actionable_not_contradictory(self, monkeypatch, caplog):
+        """A host returning the UniFi OS portal HTML on a JSON proxy path fails
+        validation with ``UniFiPortalHtmlError`` (typically HTTP 200). The WARN
+        must name host/path/key-scope as the likely cause instead of the
+        self-contradictory bare ``UniFiAuthError (HTTP 200)`` (#382), and must
+        keep the reflected HTML body out of the WARN sink (#148).
+        """
+        import logging
+
+        _setup_env_for_lifespan(monkeypatch)
+
+        reflected_body = "<!doctype html><title>UniFi OS</title>"
+        failing_prot = AsyncMock()
+        failing_prot.validate_connection.side_effect = UniFiPortalHtmlError(reflected_body, status_code=200)
+
+        good_net = _make_validating_client()
+        good_sm = _make_validating_client()
+
+        with (
+            patch("unifi_mcp.clients.network.NetworkClient", return_value=good_net),
+            patch("unifi_mcp.clients.protect.ProtectClient", return_value=failing_prot),
+            patch("unifi_mcp.clients.site_manager.SiteManagerClient", return_value=good_sm),
+            caplog.at_level(logging.DEBUG, logger="unifi_mcp.server"),
+        ):
+            gen = server_lifespan._fn(None)
+            async with aclosing(gen):
+                await gen.__anext__()
+                with pytest.raises(StopAsyncIteration):
+                    await gen.__anext__()
+
+        disabled_warns = [
+            r for r in caplog.records if "protect tools disabled" in r.getMessage() and r.levelno == logging.WARNING
+        ]
+        assert disabled_warns, "expected 'protect tools disabled' WARN"
+        msg = disabled_warns[0].getMessage()
+        assert "UniFiPortalHtmlError" in msg, f"expected distinct portal-HTML class in WARN; got {msg!r}"
+        assert "host" in msg.lower(), f"expected actionable host guidance in WARN; got {msg!r}"
+        assert "API-key scope" in msg, f"expected actionable key-scope guidance in WARN; got {msg!r}"
+        assert reflected_body not in msg, f"reflected HTML body must not reach the WARN sink; got {msg!r}"
+        debug_records = [r for r in caplog.records if r.levelno == logging.DEBUG and r.exc_info]
+        assert any(reflected_body in str(r.exc_info[1]) for r in debug_records if r.exc_info), (
+            "expected DEBUG log carrying the full exception (with reflected body) via exc_info"
+        )
 
     async def test_validation_false_return_warn_includes_stashed_exception(self, monkeypatch, caplog):
         """When validate_connection returns False after swallowing the

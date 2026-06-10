@@ -22,6 +22,30 @@ class UniFiAuthError(UniFiError):
     """Authentication or authorization failure (401/403)."""
 
 
+class UniFiPortalHtmlError(UniFiAuthError):
+    """Controller served the UniFi OS SPA portal (HTML) on a JSON ``/proxy/<api>/*``
+    path — a wrong-host / wrong-path / wrong-key-scope signature, not a credential
+    rejection.
+
+    Subclasses :class:`UniFiAuthError` so existing auth-error mapping still applies,
+    while the distinct name keeps the typical ``HTTP 200`` case from reading as a
+    self-contradictory "auth failure" in the startup deregistration WARN.
+
+    ``guidance`` is a fixed, reflected-content-free hint safe to surface at WARN;
+    the scrubbed reflected body snippet rides ``str(self)`` for DEBUG/tool sinks only.
+    """
+
+    guidance = (
+        "Controller returned HTML instead of JSON (hit the UniFi OS portal) — likely "
+        "a wrong host/port or API-key scope, not a credential rejection. Check host, "
+        "port, and API-key scope for this service."
+    )
+
+    def __init__(self, body: str, status_code: int | None = None) -> None:
+        self.body = body
+        super().__init__(f"{self.guidance} Body: {body}", status_code=status_code)
+
+
 class UniFiBadRequestError(UniFiError):
     """Malformed or invalid request payload (400)."""
 

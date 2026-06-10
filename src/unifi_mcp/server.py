@@ -176,11 +176,14 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
                 server.disable(tags={api_name})
             err = failures.get(api_name)
             if err is not None:
+                guidance = getattr(err, "guidance", None)
+                detail = f": {guidance}" if guidance else ""
                 logger.warning(
-                    "%s tools disabled — %s (HTTP %s); see DEBUG log for details",
+                    "%s tools disabled — %s (HTTP %s)%s; see DEBUG log for details",
                     api_name,
                     type(err).__name__,
                     getattr(err, "status_code", None),
+                    detail,
                 )
                 logger.debug("%s tools disabled — full exception", api_name, exc_info=err)
             else:
