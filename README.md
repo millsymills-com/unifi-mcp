@@ -12,9 +12,12 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 
 Stage: S3
 
-Actively maintained. Feature-complete across all three UniFi APIs (85 tools).
-Installed from source, not published to PyPI. See [CHANGELOG.md](CHANGELOG.md)
-for release history.
+Actively maintained. 85 tools spanning all three UniFi APIs — complete for the
+core Network controller workflows it targets, with documented gaps against the
+official Network/Protect/Site Manager API surfaces. See the
+[API coverage matrix](docs/api-coverage-matrix.md) for the endpoint-by-endpoint
+breakdown. Installed from source, not published to PyPI. See
+[CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Features
 
