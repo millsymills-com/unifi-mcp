@@ -68,7 +68,25 @@ uv run bandit -r src/unifi_mcp/ -c pyproject.toml
 
 ## Releases
 
-The package is installed from source (`uv sync`, or `uvx --from git+…`), not published to a package index. Releases are marked by tagging `v*` on `main` with a matching entry in [CHANGELOG.md](CHANGELOG.md). Maintainers own the tag step; contributors should not tag releases directly.
+The package is installed from source (`uv sync`, or `uvx --from git+…`), not published to a package index. Releases are marked by tagging `v*` on `main` with a matching [CHANGELOG.md](CHANGELOG.md) entry. Maintainers own the tag step; contributors should not tag releases directly.
+
+There is no automated release pipeline. Maintainers cut a release manually:
+
+1. Pick the new version per [SemVer](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+2. Bump the version in both `pyproject.toml` (`version = "X.Y.Z"`) and `src/unifi_mcp/__init__.py` (`__version__ = "X.Y.Z"`). The two must match.
+3. Promote the `## [Unreleased]` section in `CHANGELOG.md` to `## [X.Y.Z] - YYYY-MM-DD` and open a fresh empty `## [Unreleased]` above it.
+4. Land steps 1–3 on `main` via PR.
+5. Verify the gates pass on `main`, then build the wheel:
+   ```bash
+   uv build   # produces dist/unifi_mcp-X.Y.Z-py3-none-any.whl
+   ```
+6. Tag the release commit and push the tag:
+   ```bash
+   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+PyPI publishing is not wired up; the `dist/` wheel is a local artifact.
 
 ## Reporting Security Issues
 
