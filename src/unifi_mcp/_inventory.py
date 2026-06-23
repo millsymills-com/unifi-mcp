@@ -16,7 +16,7 @@ from __future__ import annotations
 EXPECTED_NAMESPACE_SPLITS: dict[str, dict[str, int]] = {
     "network": {"read": 26, "write": 39},
     "protect": {"read": 9, "write": 8},
-    "site_manager": {"read": 3, "write": 0},
+    "site_manager": {"read": 9, "write": 0},
 }
 
 EXPECTED_TOOL_COUNTS: dict[str, int] = {
