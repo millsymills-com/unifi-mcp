@@ -47,12 +47,14 @@ def render_type(spec: dict[str, Any]) -> str:
     """Collapse a JSON Schema property spec into a compact type string."""
     if "anyOf" in spec:
         return " | ".join(render_type(member) for member in spec["anyOf"])
+    if "enum" in spec:
+        return " | ".join(json.dumps(value) for value in spec["enum"])
     schema_type = spec.get("type")
     if schema_type == "array":
         items = spec.get("items")
         return f"array<{render_type(items)}>" if items else "array"
     if schema_type is None:
-        return "enum" if "enum" in spec else "any"
+        return "any"
     return schema_type
 
 
@@ -128,7 +130,8 @@ def render_matrix(tools: Sequence[Tool]) -> str:
         "Each parameter is `name: type` (required) or `name?: type` (optional), with `` = <default>`` "
         "when the schema carries one. `—` means the tool takes no arguments. `|` denotes a union "
         "(e.g. `string | null` is an optional/nullable value); `array<T>` and `object` mirror the "
-        "JSON Schema type.",
+        "JSON Schema type. An enum renders its allowed values as quoted literals joined by `|` "
+        '(e.g. `"5m" | "1h"`); `any` marks a parameter with no declared type.',
         "",
         "## Counts",
         "",
