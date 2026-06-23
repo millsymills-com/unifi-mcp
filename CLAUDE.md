@@ -77,8 +77,9 @@ src/unifi_mcp/
 └── tools/                   # MCP tool definitions
     ├── network/             # legacy controller tools: 26 read + 39 write
     ├── network_integration/ # Network Integration read tools: 28 read (tagged {"network_integration"})
-    ├── protect/             # 9 read + 8 write tools (17 total, includes 2 media read tools)
-    └── site_manager/        # 3 read-only tools
+    ├── protect/             # 37 read + 8 write tools (45 total, includes 2 media read tools)
+    │                        #   device_reads.py / liveviews.py / access.py add 28 read tools
+    └── site_manager/        # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
 
 Per-API tool counts: Network 54 read + 39 write tools (93 total); Protect 9 read
