@@ -81,7 +81,7 @@ class TestAllTaggedNetworkIntegration:
     async def test_write_tools_tagged_and_named(self, server):
         tools = await server.list_tools()
         writes = [t for t in tools if "network_integration" in set(t.tags) and "write" in set(t.tags)]
-        assert len(writes) == 10
+        assert len(writes) == 13
         for t in writes:
             assert t.name.startswith("unifi_network_")
 
@@ -347,3 +347,75 @@ class TestFirewallZoneWrites:
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_firewall_zone")
         assert tool.annotations.destructiveHint is True
+
+
+class TestVoucherWrites:
+    async def test_create_vouchers_happy_path(self, server):
+        client = AsyncMock()
+        client.create_vouchers.return_value = {"data": []}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_create_vouchers", ctx, name="g", time_limit_minutes=60, count=2)
+        client.create_vouchers.assert_awaited_once_with(
+            name="g",
+            time_limit_minutes=60,
+            count=2,
+            authorized_guest_limit=None,
+            data_usage_limit_mbytes=None,
+            rx_rate_limit_kbps=None,
+            tx_rate_limit_kbps=None,
+        )
+
+    async def test_create_vouchers_blocked_in_readonly(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config(), client)
+        with pytest.raises(ToolError, match="read-only mode"):
+            await _call(server, "unifi_network_create_vouchers", ctx, name="g", time_limit_minutes=60)
+        client.create_vouchers.assert_not_called()
+
+    async def test_delete_vouchers_rejects_blank_filter(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="non-blank"):
+            await _call(server, "unifi_network_delete_vouchers", ctx, voucher_filter="   ", confirm=True)
+        client.delete_vouchers.assert_not_called()
+
+    async def test_delete_vouchers_requires_confirm(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="confirm=True"):
+            await _call(server, "unifi_network_delete_vouchers", ctx, voucher_filter="name.eq('t')")
+        client.delete_vouchers.assert_not_called()
+
+    async def test_delete_vouchers_with_confirm_calls_client(self, server):
+        client = AsyncMock()
+        client.delete_vouchers.return_value = {"vouchersDeleted": 1}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_delete_vouchers", ctx, voucher_filter="name.eq('t')", confirm=True)
+        client.delete_vouchers.assert_awaited_once_with(voucher_filter="name.eq('t')")
+
+    async def test_delete_voucher_requires_confirm(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="confirm=True"):
+            await _call(server, "unifi_network_delete_voucher", ctx, voucher_id="v1")
+        client.delete_voucher.assert_not_called()
+
+    async def test_delete_voucher_validates_id(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="voucher_id: invalid id format"):
+            await _call(server, "unifi_network_delete_voucher", ctx, voucher_id="../x", confirm=True)
+        client.delete_voucher.assert_not_called()
+
+    async def test_delete_voucher_with_confirm_calls_client(self, server):
+        client = AsyncMock()
+        client.delete_voucher.return_value = {}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_delete_voucher", ctx, voucher_id="v1", confirm=True)
+        client.delete_voucher.assert_awaited_once_with("v1")
+
+    async def test_voucher_deletes_marked_destructive(self, server):
+        tools = await server.list_tools()
+        for name in ("unifi_network_delete_vouchers", "unifi_network_delete_voucher"):
+            tool = next(t for t in tools if t.name == name)
+            assert tool.annotations.destructiveHint is True

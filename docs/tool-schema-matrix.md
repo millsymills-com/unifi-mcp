@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **157 MCP tools** (100 read, 57 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **160 MCP tools** (100 read, 60 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -13,10 +13,10 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 
 | API | Read | Write | Total |
 |---|---:|---:|---:|
-| Network API | 54 | 49 | 103 |
+| Network API | 54 | 52 | 106 |
 | Protect API | 37 | 8 | 45 |
 | Site Manager API | 9 | 0 | 9 |
-| **All** | **100** | **57** | **157** |
+| **All** | **100** | **60** | **160** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -24,7 +24,7 @@ Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendere
 
 ## Network API
 
-Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 103 tools.
+Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
@@ -42,6 +42,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 103 tools.
 | `unifi_network_create_port_forward` | W | `name: string, dst_port: string, fwd: string, fwd_port: string, proto?: string = "tcp_udp", enabled?: boolean = true` |
 | `unifi_network_create_port_profile` | W | `data: object` |
 | `unifi_network_create_route` | W | `name: string, network: string, route_type?: string = "nexthop-route", gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean = true` |
+| `unifi_network_create_vouchers` | W | `name: string, time_limit_minutes: integer, count?: integer = 1, authorized_guest_limit?: integer \| null = null, data_usage_limit_mbytes?: integer \| null = null, rx_rate_limit_kbps?: integer \| null = null, tx_rate_limit_kbps?: integer \| null = null` |
 | `unifi_network_create_wlan` | W | `name: string, security?: string = "wpapsk", wpa_mode?: string = "wpa2", x_passphrase?: string = "", enabled?: boolean = true` |
 | `unifi_network_delete_acl_rule` | W | `acl_rule_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_dns_policy` | W | `dns_policy_id: string, confirm?: boolean = false` |
@@ -52,6 +53,8 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 103 tools.
 | `unifi_network_delete_port_forward` | W | `port_forward_id: string` |
 | `unifi_network_delete_port_profile` | W | `profile_id: string` |
 | `unifi_network_delete_route` | W | `route_id: string` |
+| `unifi_network_delete_voucher` | W | `voucher_id: string, confirm?: boolean = false` |
+| `unifi_network_delete_vouchers` | W | `voucher_filter: string, confirm?: boolean = false` |
 | `unifi_network_delete_wlan` | W | `wlan_id: string` |
 | `unifi_network_forget_device` | W | `mac: string` |
 | `unifi_network_get_acl_rule` | R | `acl_rule_id: string` |

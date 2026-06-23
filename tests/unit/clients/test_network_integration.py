@@ -231,6 +231,43 @@ class TestFirewallZoneWriteMethods:
         assert route.call_count == 1
 
 
+class TestVoucherWriteMethods:
+    @respx.mock
+    async def test_create_vouchers_posts_required_and_omits_none(self, client):
+        route = respx.post(f"{PREFIX}sites/{SITE_UUID}/hotspot/vouchers").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+        await client.create_vouchers(name="guest", time_limit_minutes=60, count=5)
+        body = route.calls[0].request.content
+        assert b"timeLimitMinutes" in body
+        assert b"guest" in body
+        # Unset optional fields are omitted, not sent as null.
+        assert b"rxRateLimitKbps" not in body
+
+    @respx.mock
+    async def test_create_vouchers_includes_supplied_optionals(self, client):
+        route = respx.post(f"{PREFIX}sites/{SITE_UUID}/hotspot/vouchers").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+        await client.create_vouchers(name="g", time_limit_minutes=60, rx_rate_limit_kbps=1000)
+        assert b"rxRateLimitKbps" in route.calls[0].request.content
+
+    @respx.mock
+    async def test_delete_vouchers_sends_filter_query(self, client):
+        route = respx.delete(f"{PREFIX}sites/{SITE_UUID}/hotspot/vouchers").mock(
+            return_value=httpx.Response(200, json={"vouchersDeleted": 3})
+        )
+        await client.delete_vouchers(voucher_filter="name.eq('test')")
+        assert route.called
+        assert route.calls[0].request.url.params["filter"] == "name.eq('test')"
+
+    @respx.mock
+    async def test_delete_voucher_by_id(self, client):
+        route = respx.delete(f"{PREFIX}sites/{SITE_UUID}/hotspot/vouchers/v-1").mock(return_value=httpx.Response(204))
+        assert await client.delete_voucher("v-1") == {}
+        assert route.call_count == 1
+
+
 class TestSitePathGuard:
     def test_site_path_raises_when_unresolved(self):
         c = _make_client()
