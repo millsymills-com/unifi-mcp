@@ -76,7 +76,7 @@ src/unifi_mcp/
 └── tools/               # MCP tool definitions
     ├── network/         # 26 read + 39 write tools (65 total)
     ├── protect/         # 9 read + 8 write tools (17 total, includes 2 media read tools)
-    └── site_manager/    # 3 read-only tools
+    └── site_manager/    # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
 
 ## Conventions

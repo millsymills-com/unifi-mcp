@@ -116,12 +116,12 @@ class BaseUniFiClient(ABC):
 
     # ── HTTP helpers ────────────────────────────────────────────────────
 
-    def _url(self, path: str) -> str:
+    def _url(self, path: str, *, prefix: str | None = None) -> str:
         """Build full path with prefix.
 
         Refuses paths that could override ``base_url`` after concatenation:
 
-        - Leading ``/`` would route past ``_path_prefix`` entirely.
+        - Leading ``/`` would route past the prefix entirely.
         - ``http://`` / ``https://`` get parsed as absolute URLs by httpx,
           pivoting the request off the configured controller.
         - Protocol-relative ``//host`` is parsed as a network-path reference
@@ -134,10 +134,15 @@ class BaseUniFiClient(ABC):
         (``stat/device``, ``rest/wlanconf/{id}``); a leading-slash path
         would be a bug — fail fast rather than silently rewrite the URL.
         See #151.
+
+        ``prefix`` overrides ``_path_prefix`` for the call. Site Manager's
+        ``/ea/`` early-access surface sits beside ``/v1/`` rather than under
+        it, so those methods pass a per-call prefix; the leading-slash/scheme
+        gate above still applies to ``path``.
         """
         if not isinstance(path, str) or path.startswith(("/", "http://", "https://")):
             raise UniFiBadRequestError(f"invalid request path: {path!r}")
-        return f"{self._path_prefix}{path}"
+        return f"{prefix if prefix is not None else self._path_prefix}{path}"
 
     @staticmethod
     def _segment(value: str) -> str:
@@ -317,7 +322,7 @@ class BaseUniFiClient(ABC):
             raise UniFiServerError(f"HTTP {status}: {body}", status_code=status)
         raise UniFiError(f"HTTP {status}: {body}", status_code=status)
 
-    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+    async def _request(self, method: str, path: str, *, prefix: str | None = None, **kwargs: Any) -> Any:
         """Execute an HTTP request with retry on transient errors.
 
         ConnectError is always retried (the request never reached the server).
@@ -356,7 +361,7 @@ class BaseUniFiClient(ABC):
             reraise=True,
         )
         async def _do() -> httpx.Response:
-            return await self._client.request(method, self._url(path), **kwargs)
+            return await self._client.request(method, self._url(path, prefix=prefix), **kwargs)
 
         rate_limit_attempts = 0
         while True:

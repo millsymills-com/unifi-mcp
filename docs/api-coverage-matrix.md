@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 85 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 91 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -9,7 +9,7 @@ exactly one disposition:
 - **Excluded** — deliberately out of scope (one-line reason).
 
 Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 65, Protect 17,
-Site Manager 3 = 85).
+Site Manager 9 = 91).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -62,7 +62,7 @@ early-access rows).
 | Network — official Integration API (functional equivalent) | 26 | 1 | 46 | 73 ops | **36%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
 | Protect — Integration API | 13 | 2 | 58 | 73 ops | **18%** |
-| Site Manager API | 3 | 0 | 6 | 9 | **33%** |
+| Site Manager API | 9 | 0 | 0 | 9 | **100%** |
 
 The "feature-complete" framing in the README is accurate for the **legacy Network
 controller workflows** the server was built around, and for the *core device classes*
@@ -73,21 +73,21 @@ Integration API and of Protect's full device catalog. See the per-API gap lists.
 
 ## 1. Site Manager API (`https://api.ui.com`)
 
-3 of 3 tools map here. Read-only API (no documented write endpoints yet).
+9 of 9 tools map here. Read-only API (no documented write endpoints yet).
 
 | Method | Path | Tier | Disposition | Tool / reason |
 |---|---|---|---|---|
 | GET | `/v1/hosts` | GA | **Covered** | `unifi_site_manager_list_hosts` |
-| GET | `/v1/hosts/{id}` | GA | **Gap** | Single-host detail (reported state + user data); we only list. |
+| GET | `/v1/hosts/{id}` | GA | **Covered** | `unifi_site_manager_get_host` |
 | GET | `/v1/sites` | GA | **Covered** | `unifi_site_manager_list_sites` |
 | GET | `/v1/devices` | GA | **Covered** | `unifi_site_manager_list_devices` (optional `host_id` filter) |
-| GET | `/v1/isp-metrics/{type}` | GA | **Gap** | ISP performance metrics (5m/1h windows); no metrics tool. |
-| POST | `/v1/isp-metrics/{type}/query` | GA | **Gap** | Query ISP metrics for specific sites/ranges; no metrics tool. |
-| GET | `/ea/sd-wan-configs` | EA | **Gap** | List SD-WAN configs (early-access; 100 req/min tier). |
-| GET | `/ea/sd-wan-configs/{id}` | EA | **Gap** | Get an SD-WAN config (early-access). |
-| GET | `/ea/sd-wan-configs/{id}/status` | EA | **Gap** | SD-WAN deployment status (early-access). |
+| GET | `/v1/isp-metrics/{type}` | GA | **Covered** | `unifi_site_manager_get_isp_metrics` (5m/1h windows) |
+| POST | `/v1/isp-metrics/{type}/query` | GA | **Covered** | `unifi_site_manager_query_isp_metrics` (pure selector query) |
+| GET | `/ea/sd-wan-configs` | EA | **Covered** | `unifi_site_manager_list_sdwan_configs` |
+| GET | `/ea/sd-wan-configs/{id}` | EA | **Covered** | `unifi_site_manager_get_sdwan_config` |
+| GET | `/ea/sd-wan-configs/{id}/status` | EA | **Covered** | `unifi_site_manager_get_sdwan_config_status` |
 
-GA coverage 3/6 (50%); overall 3/9 (33%).
+GA coverage 6/6 (100%); overall 9/9 (100%).
 
 ---
 

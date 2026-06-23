@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **85 MCP tools** (38 read, 47 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **91 MCP tools** (44 read, 47 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -15,8 +15,8 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 |---|---:|---:|---:|
 | Network API | 26 | 39 | 65 |
 | Protect API | 9 | 8 | 17 |
-| Site Manager API | 3 | 0 | 3 |
-| **All** | **38** | **47** | **85** |
+| Site Manager API | 9 | 0 | 9 |
+| **All** | **44** | **47** | **91** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -124,13 +124,19 @@ Backing surface: `/proxy/protect/integration/v1/`. 17 tools.
 
 ## Site Manager API
 
-Backing surface: `https://api.ui.com/v1/`. 3 tools.
+Backing surface: `https://api.ui.com/v1/`. 9 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
+| `unifi_site_manager_get_host` | R | `host_id: string` |
+| `unifi_site_manager_get_isp_metrics` | R | `metric_type: string, begin_timestamp?: string \| null = null, end_timestamp?: string \| null = null, duration?: string \| null = null` |
+| `unifi_site_manager_get_sdwan_config` | R | `config_id: string` |
+| `unifi_site_manager_get_sdwan_config_status` | R | `config_id: string` |
 | `unifi_site_manager_list_devices` | R | `host_id?: string \| null = null` |
 | `unifi_site_manager_list_hosts` | R | — |
+| `unifi_site_manager_list_sdwan_configs` | R | — |
 | `unifi_site_manager_list_sites` | R | — |
+| `unifi_site_manager_query_isp_metrics` | R | `metric_type: string, sites: array<object>` |
 
 ---
 
