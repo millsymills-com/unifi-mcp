@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 157 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 160 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -10,9 +10,9 @@ exactly one disposition:
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
-Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 103, Protect 45,
-Site Manager 9 = 157). The Network 103 splits into 65 legacy-controller tools
-(§3a) and 38 Network Integration tools (28 read + 10 write, §3b).
+Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 106, Protect 45,
+Site Manager 9 = 160). The Network 106 splits into 65 legacy-controller tools
+(§3a) and 41 Network Integration tools (28 read + 13 write, §3b).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -59,22 +59,23 @@ early-access rows).
 > firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
 > The Network section below therefore has two tables: (3a) the legacy paths we call,
 > mapping the 65 legacy Network tools; and (3b) the official Integration API, with the
-> 28 read tools and the ACL + DNS + firewall-zone write groups named, and the remaining
-> writes left as functional-equivalent or gap rows.
+> 28 read tools and the ACL + DNS + firewall-zone + voucher write groups named, and the
+> remaining writes left as functional-equivalent or gap rows.
 
 ## Coverage summary
 
 | API | Covered | Excluded | Gap | Documented total | Coverage |
 |---|---:|---:|---:|---:|---:|
-| Network — official Integration API (functional equivalent + direct reads) | 64 | 1 | 8 | 73 ops | **89%** |
+| Network — official Integration API (functional equivalent + direct reads) | 67 | 1 | 5 | 73 ops | **93%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
 | Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
 
 The "feature-complete" framing in the README is accurate for the **legacy Network
 controller workflows** the server was built around, and for the *core device classes*
-of Protect and Site Manager — but it overstates coverage of the **official** Network
-Integration API and of Protect's full device catalog. See the per-API gap lists.
+of Protect and Site Manager. The **official** Network Integration API is now 93%
+covered (only the firewall-policy and traffic-matching-list write groups remain),
+but coverage still overstates Protect's full device catalog. See the per-API gap lists.
 
 ---
 
@@ -267,7 +268,7 @@ on a `cmd` body field.
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
 We now call this surface via `NetworkIntegrationClient` (28 read tools plus the
-ACL, DNS, and firewall-zone write groups, all `unifi_network_*`, tagged
+ACL, DNS, firewall-zone, and voucher write groups, all `unifi_network_*`, tagged
 `{"network_integration"}`; write tools also carry `{"write"}`). "Covered" rows are
 backed either by a direct Integration tool (named) or — for resources the legacy
 controller already serves — by a **functional-equivalent** legacy tool. The site
@@ -330,10 +331,10 @@ tools take no `siteId` argument.
 | PUT | `/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}` | **Covered** | `unifi_network_update_wlan` |
 | DELETE | `/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}` | **Covered** | `unifi_network_delete_wlan` |
 | GET | `/v1/sites/{siteId}/hotspot/vouchers` | **Covered** | `unifi_network_list_vouchers` |
-| POST | `/v1/sites/{siteId}/hotspot/vouchers` | **Gap** | Generate vouchers. |
-| DELETE | `/v1/sites/{siteId}/hotspot/vouchers` | **Gap** | Delete vouchers by filter. |
+| POST | `/v1/sites/{siteId}/hotspot/vouchers` | **Covered** | `unifi_network_create_vouchers` |
+| DELETE | `/v1/sites/{siteId}/hotspot/vouchers` | **Covered** | `unifi_network_delete_vouchers` (bulk, by filter) |
 | GET | `/v1/sites/{siteId}/hotspot/vouchers/{voucherId}` | **Covered** | `unifi_network_get_voucher` |
-| DELETE | `/v1/sites/{siteId}/hotspot/vouchers/{voucherId}` | **Gap** | Delete single voucher. |
+| DELETE | `/v1/sites/{siteId}/hotspot/vouchers/{voucherId}` | **Covered** | `unifi_network_delete_voucher` |
 | GET | `/v1/sites/{siteId}/traffic-matching-lists` | **Covered** | `unifi_network_list_traffic_matching_lists` |
 | POST | `/v1/sites/{siteId}/traffic-matching-lists` | **Gap** | Create traffic-matching list. |
 | GET | `/v1/sites/{siteId}/traffic-matching-lists/{id}` | **Covered** | `unifi_network_get_traffic_matching_list` |
