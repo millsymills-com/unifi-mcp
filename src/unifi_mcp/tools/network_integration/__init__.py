@@ -1,6 +1,6 @@
 """Network Integration API read and write tools (#409, #423).
 
-28 read tools plus the write tools over the official
+28 read tools plus the ACL and DNS write tools over the official
 ``/proxy/network/integration/v1/`` surface, consuming
 :class:`~unifi_mcp.clients.network_integration.NetworkIntegrationClient`. Every
 tool is named ``unifi_network_*`` (folding into the existing ``network``

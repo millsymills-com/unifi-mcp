@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **151 MCP tools** (100 read, 51 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **154 MCP tools** (100 read, 54 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -13,10 +13,10 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 
 | API | Read | Write | Total |
 |---|---:|---:|---:|
-| Network API | 54 | 43 | 97 |
+| Network API | 54 | 46 | 100 |
 | Protect API | 37 | 8 | 45 |
 | Site Manager API | 9 | 0 | 9 |
-| **All** | **100** | **51** | **151** |
+| **All** | **100** | **54** | **154** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -24,7 +24,7 @@ Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendere
 
 ## Network API
 
-Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 97 tools.
+Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 100 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
@@ -34,6 +34,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 97 tools.
 | `unifi_network_block_client` | W | `mac: string` |
 | `unifi_network_create_acl_rule` | W | `data: object` |
 | `unifi_network_create_backup` | W | — |
+| `unifi_network_create_dns_policy` | W | `data: object` |
 | `unifi_network_create_firewall_group` | W | `name: string, group_type: string, group_members: array<string>` |
 | `unifi_network_create_firewall_rule` | W | `name: string, ruleset: string, action?: string = "drop", enabled?: boolean = true, protocol?: string = "all", src_address?: string \| null = null, dst_address?: string \| null = null, data?: object \| null = null` |
 | `unifi_network_create_network` | W | `name: string, purpose?: string = "corporate", subnet?: string \| null = null, vlan?: integer \| null = null, dhcpd_enabled?: boolean = true` |
@@ -42,6 +43,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 97 tools.
 | `unifi_network_create_route` | W | `name: string, network: string, route_type?: string = "nexthop-route", gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean = true` |
 | `unifi_network_create_wlan` | W | `name: string, security?: string = "wpapsk", wpa_mode?: string = "wpa2", x_passphrase?: string = "", enabled?: boolean = true` |
 | `unifi_network_delete_acl_rule` | W | `acl_rule_id: string, confirm?: boolean = false` |
+| `unifi_network_delete_dns_policy` | W | `dns_policy_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_firewall_group` | W | `group_id: string` |
 | `unifi_network_delete_firewall_rule` | W | `rule_id: string` |
 | `unifi_network_delete_network` | W | `network_id: string` |
@@ -116,6 +118,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 97 tools.
 | `unifi_network_unblock_client` | W | `mac: string` |
 | `unifi_network_unlocate_device` | W | `mac: string` |
 | `unifi_network_update_acl_rule` | W | `acl_rule_id: string, data: object` |
+| `unifi_network_update_dns_policy` | W | `dns_policy_id: string, data: object` |
 | `unifi_network_update_firewall_group` | W | `group_id: string, data: object` |
 | `unifi_network_update_firewall_rule` | W | `rule_id: string, data: object` |
 | `unifi_network_update_network` | W | `network_id: string, data: object` |
