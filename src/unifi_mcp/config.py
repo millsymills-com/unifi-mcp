@@ -29,6 +29,12 @@ _FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 # itself, ahead of the per-request ``_segment`` defense. See #145.
 _SITE_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
+# The Network Integration API identifies sites by UUID, a distinct identifier
+# space from the legacy slug site (``_SITE_RE``). The configured UUID is
+# interpolated into per-site Integration paths, so it is constrained at load
+# time ahead of the per-request ``_segment`` defense. See #408.
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 
 def _normalize_fingerprint(raw: str) -> str:
     """Return canonical sha256 fingerprint (64 lowercase hex chars, no colons).
@@ -67,6 +73,13 @@ class UniFiConfig(BaseSettings):
     unifi_network_site: str = "default"
     unifi_network_verify_ssl: bool = False
     unifi_network_cert_fingerprint: str | None = None
+
+    # Network Integration API — the official ``/proxy/network/integration/v1/``
+    # surface on the same appliance as the legacy controller. Reuses the
+    # Network host/port/key/TLS config; only the opt-out flag and a UUID site
+    # id are distinct. See #408.
+    unifi_network_integration_enabled: bool = True
+    unifi_network_integration_site: str | None = None
 
     # Protect API
     unifi_protect_host: str | None = None
@@ -131,6 +144,29 @@ class UniFiConfig(BaseSettings):
         """
         if not _SITE_RE.match(value):
             raise ValueError(f"invalid unifi_network_site {value!r}: expected one or more chars from [A-Za-z0-9_-]")
+        return value
+
+    @field_validator("unifi_network_integration_site", mode="before")
+    @classmethod
+    def _validate_integration_site(cls, value: object) -> str | None:
+        """Reject a Network Integration site id that isn't a UUID.
+
+        Empty/blank strings normalize to ``None`` (mirroring
+        ``_validate_fingerprint``) so an unset env var doesn't trip the
+        validator and the client falls back to auto-discovery. A set value is
+        interpolated into the per-site Integration path prefix, so it is
+        constrained to the UUID form here, ahead of the per-request
+        ``_segment`` gate. ``_SITE_RE`` (the legacy slug space) is the wrong
+        validator for this identifier. See #408.
+        """
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("unifi_network_integration_site must be a string")
+        if not value.strip():
+            return None
+        if not _UUID_RE.match(value):
+            raise ValueError(f"invalid unifi_network_integration_site {value!r}: expected a UUID")
         return value
 
     @model_validator(mode="after")
@@ -250,9 +286,28 @@ class UniFiConfig(BaseSettings):
         return self.unifi_site_manager_api is not None
 
     @property
+    def network_integration_enabled(self) -> bool:
+        """Whether the Network Integration API should be wired up.
+
+        Gated on a configured Network key *and* the operator not having opted
+        out via ``UNIFI_NETWORK_INTEGRATION_ENABLED=false`` (e.g. on firmware
+        that predates ``/integration/v1``).
+        """
+        return self.network_enabled and self.unifi_network_integration_enabled
+
+    @property
     def network_base_url(self) -> str:
         """Base URL for Network API."""
         return f"https://{self.unifi_network_host}:{self.unifi_network_port}"
+
+    @property
+    def network_integration_base_url(self) -> str:
+        """Base URL for the Network Integration API.
+
+        Identical to ``network_base_url`` — the Integration API lives on the
+        same appliance root; the client appends the fixed ``_path_prefix``.
+        """
+        return self.network_base_url
 
     @property
     def protect_base_url(self) -> str:

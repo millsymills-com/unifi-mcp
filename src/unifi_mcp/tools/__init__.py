@@ -26,6 +26,12 @@ def _register_for_each_api(mcp: FastMCP, config: UniFiConfig) -> None:
         register_network_tools(mcp)
         logger.info("Registered Network tools")
 
+    if config.network_integration_enabled:
+        from unifi_mcp.tools.network_integration import register_network_integration_tools
+
+        register_network_integration_tools(mcp)
+        logger.info("Registered Network Integration tools")
+
     if config.protect_enabled:
         from unifi_mcp.tools.protect import register_protect_tools
 
