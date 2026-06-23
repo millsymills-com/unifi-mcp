@@ -160,12 +160,14 @@ class TestErrorPath:
 
 class TestValidateConnection:
     @respx.mock
-    async def test_success_with_explicit_uuid(self):
+    async def test_success_with_explicit_uuid(self, caplog):
         respx.get(f"{PREFIX}sites").mock(return_value=httpx.Response(200, json={"data": [{"id": "other"}]}))
         c = _make_client(site=SITE_UUID)
-        assert await c.validate_connection() is True
+        with caplog.at_level(logging.INFO, logger="unifi_mcp.clients.network_integration"):
+            assert await c.validate_connection() is True
         # Configured UUID is used verbatim, not the discovered "other".
         assert c._resolved_site == SITE_UUID
+        assert any(SITE_UUID in r.getMessage() and r.levelno == logging.INFO for r in caplog.records)
 
     @respx.mock
     async def test_auto_discovery_picks_default(self, caplog):
