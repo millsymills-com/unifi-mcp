@@ -231,6 +231,13 @@ class TestAclWrites:
             await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["ok", "../bad"])
         client.update_acl_rules_ordering.assert_not_called()
 
+    async def test_reorder_acl_rules_rejects_empty_list(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="must be non-empty"):
+            await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=[])
+        client.update_acl_rules_ordering.assert_not_called()
+
     async def test_reorder_acl_rules_happy_path(self, server):
         client = AsyncMock()
         client.update_acl_rules_ordering.return_value = {}

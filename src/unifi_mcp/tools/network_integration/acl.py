@@ -169,8 +169,10 @@ def register_acl_tools(mcp: FastMCP) -> None:
             The upstream API response with sensitive fields redacted.
 
         Raises:
-            ToolError: If write mode is disabled or any id is malformed.
+            ToolError: If write mode is disabled, the id list is empty, or any id is malformed.
         """
+        if not ordered_acl_rule_ids:
+            raise UniFiBadRequestError("ordered_acl_rule_ids must be non-empty; an empty list wipes all ACL ordering")
         for rule_id in ordered_acl_rule_ids:
             validate_id(rule_id, field="ordered_acl_rule_ids")
         return redact_secrets(
