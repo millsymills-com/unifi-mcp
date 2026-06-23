@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from unifi_mcp.clients.base import BaseUniFiClient
     from unifi_mcp.clients.network import NetworkClient
+    from unifi_mcp.clients.network_integration import NetworkIntegrationClient
     from unifi_mcp.clients.protect import ProtectClient
     from unifi_mcp.clients.site_manager import SiteManagerClient
 
@@ -43,6 +44,7 @@ class APIClients(TypedDict, total=False):
     """Per-API clients keyed by short name. Keys may be absent when the API is disabled or failed validation."""
 
     network: NetworkClient
+    network_integration: NetworkIntegrationClient
     protect: ProtectClient
     site_manager: SiteManagerClient
 
@@ -115,6 +117,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
 
     # Lazily import clients to avoid circular deps
     from unifi_mcp.clients.network import NetworkClient
+    from unifi_mcp.clients.network_integration import NetworkIntegrationClient
     from unifi_mcp.clients.protect import ProtectClient
     from unifi_mcp.clients.site_manager import SiteManagerClient
 
@@ -130,6 +133,21 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
                 base_url=config.network_base_url,
                 api_key=_require_api_key("network", config.unifi_network_api),
                 site=config.unifi_network_site,
+                verify_ssl=config.unifi_network_verify_ssl,
+                cert_fingerprint=config.unifi_network_cert_fingerprint,
+                timeout=config.unifi_request_timeout,
+                max_retries=config.unifi_max_retries,
+            ),
+        )
+
+    if config.network_integration_enabled:
+        failures["network_integration"] = await _register_client(
+            context,
+            "network_integration",
+            NetworkIntegrationClient(
+                base_url=config.network_integration_base_url,
+                api_key=_require_api_key("network", config.unifi_network_api),
+                site=config.unifi_network_integration_site,
                 verify_ssl=config.unifi_network_verify_ssl,
                 cert_fingerprint=config.unifi_network_cert_fingerprint,
                 timeout=config.unifi_request_timeout,
@@ -168,6 +186,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
     # no tools were ever registered.
     for api_name, enabled in (
         ("network", config.network_enabled),
+        ("network_integration", config.network_integration_enabled),
         ("protect", config.protect_enabled),
         ("site_manager", config.site_manager_enabled),
     ):

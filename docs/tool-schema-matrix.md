@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **119 MCP tools** (72 read, 47 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **147 MCP tools** (100 read, 47 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -13,10 +13,10 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 
 | API | Read | Write | Total |
 |---|---:|---:|---:|
-| Network API | 26 | 39 | 65 |
+| Network API | 54 | 39 | 93 |
 | Protect API | 37 | 8 | 45 |
 | Site Manager API | 9 | 0 | 9 |
-| **All** | **72** | **47** | **119** |
+| **All** | **100** | **47** | **147** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -24,7 +24,7 @@ Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendere
 
 ## Network API
 
-Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 65 tools.
+Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 93 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
@@ -48,32 +48,60 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 65 tools.
 | `unifi_network_delete_route` | W | `route_id: string` |
 | `unifi_network_delete_wlan` | W | `wlan_id: string` |
 | `unifi_network_forget_device` | W | `mac: string` |
+| `unifi_network_get_acl_rule` | R | `acl_rule_id: string` |
+| `unifi_network_get_acl_rules_ordering` | R | — |
 | `unifi_network_get_client` | R | `mac: string` |
 | `unifi_network_get_device` | R | `mac: string` |
+| `unifi_network_get_dns_policy` | R | `dns_policy_id: string` |
 | `unifi_network_get_dpi_stats` | R | `dpi_type?: string = "by_app"` |
 | `unifi_network_get_firewall_group` | R | `group_id: string` |
+| `unifi_network_get_firewall_policies_ordering` | R | — |
 | `unifi_network_get_firewall_rule` | R | `rule_id: string` |
+| `unifi_network_get_firewall_zone` | R | `zone_id: string` |
 | `unifi_network_get_health` | R | — |
+| `unifi_network_get_lag` | R | `lag_id: string` |
+| `unifi_network_get_mc_lag_domain` | R | `domain_id: string` |
 | `unifi_network_get_network` | R | `network_id: string` |
+| `unifi_network_get_network_references` | R | `network_id: string` |
 | `unifi_network_get_port_forward` | R | `port_forward_id: string` |
 | `unifi_network_get_port_profile` | R | `profile_id: string` |
 | `unifi_network_get_route` | R | `route_id: string` |
 | `unifi_network_get_settings` | R | — |
+| `unifi_network_get_switch_stack` | R | `stack_id: string` |
 | `unifi_network_get_sysinfo` | R | — |
+| `unifi_network_get_traffic_matching_list` | R | `list_id: string` |
+| `unifi_network_get_voucher` | R | `voucher_id: string` |
 | `unifi_network_get_wlan` | R | `wlan_id: string` |
 | `unifi_network_kick_client` | W | `mac: string` |
+| `unifi_network_list_acl_rules` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_active_clients` | R | — |
 | `unifi_network_list_all_clients` | R | — |
 | `unifi_network_list_configured_clients` | R | — |
+| `unifi_network_list_device_tags` | R | — |
 | `unifi_network_list_devices` | R | — |
 | `unifi_network_list_devices_basic` | R | — |
+| `unifi_network_list_dns_policies` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_dpi_applications` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_dpi_categories` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_events` | R | `limit?: integer = 100` |
 | `unifi_network_list_firewall_groups` | R | — |
 | `unifi_network_list_firewall_rules` | R | — |
+| `unifi_network_list_firewall_zones` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_lags` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_mc_lag_domains` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_networks` | R | — |
+| `unifi_network_list_pending_devices` | R | — |
 | `unifi_network_list_port_forwards` | R | — |
 | `unifi_network_list_port_profiles` | R | — |
+| `unifi_network_list_radius_profiles` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_routes` | R | — |
+| `unifi_network_list_site_to_site_tunnels` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_sites` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_switch_stacks` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_traffic_matching_lists` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_vouchers` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_vpn_servers` | R | `offset?: integer = 0, limit?: integer = 200` |
+| `unifi_network_list_wans` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_wlans` | R | — |
 | `unifi_network_locate_device` | W | `mac: string` |
 | `unifi_network_power_cycle_port` | W | `mac: string, port_idx: integer` |

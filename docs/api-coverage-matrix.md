@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 119 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 147 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -8,8 +8,9 @@ exactly one disposition:
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
-Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 65, Protect 45,
-Site Manager 9 = 119).
+Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 93, Protect 45,
+Site Manager 9 = 147). The Network 93 splits into 65 legacy-controller tools
+(§3a) and 28 Network Integration read tools (§3b).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -46,20 +47,24 @@ early-access rows).
 
 > **Network caveat — two different surfaces.** The official, developer.ui.com-documented
 > UniFi Network API is the modern *Integration API* at `/proxy/network/integration/v1/`
-> (UUID site IDs, `X-API-KEY`). **This server does not use it.** Our `NetworkClient`
-> targets the older *controller API* at `/proxy/network/api/s/{site}/` (legacy
-> `stat/*`, `rest/*`, `cmd/*` paths), which is undocumented by Ubiquiti but exposes a
-> much broader surface (port-forwards, routing, port profiles, settings, firewall
-> groups, device/client commands) that the Integration API still lacks. The Network
-> section below therefore has two tables: (3a) the legacy paths we actually call,
-> mapping all 65 Network tools; and (3b) the official Integration API enumerated with
-> a functional-equivalent disposition.
+> (UUID site IDs, `X-API-KEY`). The server now calls **both** surfaces. Our legacy
+> `NetworkClient` targets the older *controller API* at `/proxy/network/api/s/{site}/`
+> (legacy `stat/*`, `rest/*`, `cmd/*` paths), which is undocumented by Ubiquiti but
+> exposes a much broader surface (port-forwards, routing, port profiles, settings,
+> firewall groups, device/client commands) that the Integration API still lacks. A
+> separate read-only `NetworkIntegrationClient` adds 28 GET/list tools over the
+> Integration API for resources the legacy controller doesn't expose (ACL rules,
+> firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
+> The Network section below therefore has two tables: (3a) the legacy paths we call,
+> mapping the 65 legacy Network tools; and (3b) the official Integration API, with the
+> 28 new read tools named and the remaining writes left as functional-equivalent or gap
+> rows.
 
 ## Coverage summary
 
 | API | Covered | Excluded | Gap | Documented total | Coverage |
 |---|---:|---:|---:|---:|---:|
-| Network — official Integration API (functional equivalent) | 26 | 1 | 46 | 73 ops | **36%** |
+| Network — official Integration API (functional equivalent + direct reads) | 54 | 1 | 18 | 73 ops | **75%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
 | Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 9 | 0 | 0 | 9 | **100%** |
@@ -253,17 +258,21 @@ on a `cmd` body field.
 
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
-We do not call this surface. Disposition is **functional equivalence**: "Covered"
-means a legacy-backed tool delivers the same capability against the controller API.
+We now call this surface for reads via `NetworkIntegrationClient` (28 read tools,
+all `unifi_network_*`, tagged `{"network_integration"}`). "Covered" rows are
+backed either by a direct Integration tool (named) or — for resources the legacy
+controller already serves — by a **functional-equivalent** legacy tool. The site
+UUID is resolved once at startup and injected by the client, so the per-site
+tools take no `siteId` argument.
 
 | Method | Path | Disposition | Tool / note |
 |---|---|---|---|
 | GET | `/v1/info` | **Covered** | `unifi_network_get_sysinfo` (legacy `stat/sysinfo`) |
-| GET | `/v1/sites` | **Gap** | List local sites; we hardcode the site in the path (`default`). |
-| GET | `/v1/pending-devices` | **Gap** | Devices awaiting adoption; we adopt by MAC but can't list pending. |
+| GET | `/v1/sites` | **Covered** | `unifi_network_list_sites` |
+| GET | `/v1/pending-devices` | **Covered** | `unifi_network_list_pending_devices` |
 | GET | `/v1/countries` | **Excluded** | Reference data (country list) — UI-only. |
-| GET | `/v1/dpi/applications` | **Gap** | DPI application reference list (distinct from our `stat/dpi` stats). |
-| GET | `/v1/dpi/categories` | **Gap** | DPI category reference list. |
+| GET | `/v1/dpi/applications` | **Covered** | `unifi_network_list_dpi_applications` |
+| GET | `/v1/dpi/categories` | **Covered** | `unifi_network_list_dpi_categories` |
 | GET | `/v1/sites/{siteId}/clients` | **Covered** | `unifi_network_list_active_clients` (legacy `stat/sta`) |
 | GET | `/v1/sites/{siteId}/clients/{clientId}` | **Covered** | `unifi_network_get_client` (legacy `stat/alluser`) |
 | POST | `/v1/sites/{siteId}/clients/{clientId}/actions` | **Covered** | `authorize_guest`/`unauthorize_guest`/`block_client`/`unblock_client`/`kick_client` (legacy `cmd/stamgr`) |
@@ -274,30 +283,30 @@ means a legacy-backed tool delivers the same capability against the controller A
 | POST | `/v1/sites/{siteId}/devices/{deviceId}/actions` | **Covered** | `restart_device`/`provision_device`/`upgrade_device`/`locate_device`/`unlocate_device` (legacy `cmd/devmgr`) |
 | GET | `/v1/sites/{siteId}/devices/{deviceId}/statistics/latest` | **Covered** | `unifi_network_list_devices` returns per-device stats (legacy `stat/device`) |
 | POST | `/v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions` | **Covered** | `unifi_network_power_cycle_port` (legacy `cmd/devmgr power-cycle`) |
-| GET | `/v1/sites/{siteId}/device-tags` | **Gap** | Device tag list; no tag tooling. |
-| GET | `/v1/sites/{siteId}/acl-rules` | **Gap** | L2/L3 ACL rules (distinct from legacy firewall rules). |
+| GET | `/v1/sites/{siteId}/device-tags` | **Covered** | `unifi_network_list_device_tags` |
+| GET | `/v1/sites/{siteId}/acl-rules` | **Covered** | `unifi_network_list_acl_rules` |
 | POST | `/v1/sites/{siteId}/acl-rules` | **Gap** | Create ACL rule. |
-| GET | `/v1/sites/{siteId}/acl-rules/ordering` | **Gap** | ACL rule ordering. |
+| GET | `/v1/sites/{siteId}/acl-rules/ordering` | **Covered** | `unifi_network_get_acl_rules_ordering` |
 | PUT | `/v1/sites/{siteId}/acl-rules/ordering` | **Gap** | Reorder ACL rules. |
-| GET | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Gap** | Get ACL rule. |
+| GET | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Covered** | `unifi_network_get_acl_rule` |
 | PUT | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Gap** | Update ACL rule. |
 | DELETE | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Gap** | Delete ACL rule. |
 | GET | `/v1/sites/{siteId}/firewall/policies` | **Covered** | `unifi_network_list_firewall_rules` (legacy `rest/firewallrule`) |
 | POST | `/v1/sites/{siteId}/firewall/policies` | **Covered** | `unifi_network_create_firewall_rule` |
-| GET | `/v1/sites/{siteId}/firewall/policies/ordering` | **Gap** | Policy ordering read; legacy rules carry an index field but no ordering endpoint. |
+| GET | `/v1/sites/{siteId}/firewall/policies/ordering` | **Covered** | `unifi_network_get_firewall_policies_ordering` |
 | PUT | `/v1/sites/{siteId}/firewall/policies/ordering` | **Gap** | Reorder policies. |
 | GET | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Covered** | `unifi_network_get_firewall_rule` |
 | PUT | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Covered** | `unifi_network_update_firewall_rule` |
 | PATCH | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Gap** | Partial update; our tool does full-object PUT only. |
 | DELETE | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Covered** | `unifi_network_delete_firewall_rule` |
-| GET | `/v1/sites/{siteId}/firewall/zones` | **Gap** | Zone-based firewall; legacy controller has no zones. |
+| GET | `/v1/sites/{siteId}/firewall/zones` | **Covered** | `unifi_network_list_firewall_zones` |
 | POST | `/v1/sites/{siteId}/firewall/zones` | **Gap** | Create firewall zone. |
-| GET | `/v1/sites/{siteId}/firewall/zones/{firewallZoneId}` | **Gap** | Get firewall zone. |
+| GET | `/v1/sites/{siteId}/firewall/zones/{firewallZoneId}` | **Covered** | `unifi_network_get_firewall_zone` |
 | PUT | `/v1/sites/{siteId}/firewall/zones/{firewallZoneId}` | **Gap** | Update firewall zone. |
 | DELETE | `/v1/sites/{siteId}/firewall/zones/{firewallZoneId}` | **Gap** | Delete firewall zone. |
-| GET | `/v1/sites/{siteId}/dns/policies` | **Gap** | DNS policy list; no DNS-policy tooling. |
+| GET | `/v1/sites/{siteId}/dns/policies` | **Covered** | `unifi_network_list_dns_policies` |
 | POST | `/v1/sites/{siteId}/dns/policies` | **Gap** | Create DNS policy. |
-| GET | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Gap** | Get DNS policy. |
+| GET | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_get_dns_policy` |
 | PUT | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Gap** | Update DNS policy. |
 | DELETE | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Gap** | Delete DNS policy. |
 | GET | `/v1/sites/{siteId}/networks` | **Covered** | `unifi_network_list_networks` (legacy `rest/networkconf`) |
@@ -305,34 +314,37 @@ means a legacy-backed tool delivers the same capability against the controller A
 | GET | `/v1/sites/{siteId}/networks/{networkId}` | **Covered** | `unifi_network_get_network` |
 | PUT | `/v1/sites/{siteId}/networks/{networkId}` | **Covered** | `unifi_network_update_network` |
 | DELETE | `/v1/sites/{siteId}/networks/{networkId}` | **Covered** | `unifi_network_delete_network` |
-| GET | `/v1/sites/{siteId}/networks/{networkId}/references` | **Gap** | Dependency references for a network; not exposed. |
+| GET | `/v1/sites/{siteId}/networks/{networkId}/references` | **Covered** | `unifi_network_get_network_references` |
 | GET | `/v1/sites/{siteId}/wifi/broadcasts` | **Covered** | `unifi_network_list_wlans` (legacy `rest/wlanconf`) |
 | POST | `/v1/sites/{siteId}/wifi/broadcasts` | **Covered** | `unifi_network_create_wlan` |
 | GET | `/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}` | **Covered** | `unifi_network_get_wlan` |
 | PUT | `/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}` | **Covered** | `unifi_network_update_wlan` |
 | DELETE | `/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}` | **Covered** | `unifi_network_delete_wlan` |
-| GET | `/v1/sites/{siteId}/hotspot/vouchers` | **Gap** | Guest hotspot vouchers; no voucher tooling. |
+| GET | `/v1/sites/{siteId}/hotspot/vouchers` | **Covered** | `unifi_network_list_vouchers` |
 | POST | `/v1/sites/{siteId}/hotspot/vouchers` | **Gap** | Generate vouchers. |
 | DELETE | `/v1/sites/{siteId}/hotspot/vouchers` | **Gap** | Delete vouchers by filter. |
-| GET | `/v1/sites/{siteId}/hotspot/vouchers/{voucherId}` | **Gap** | Get voucher. |
+| GET | `/v1/sites/{siteId}/hotspot/vouchers/{voucherId}` | **Covered** | `unifi_network_get_voucher` |
 | DELETE | `/v1/sites/{siteId}/hotspot/vouchers/{voucherId}` | **Gap** | Delete single voucher. |
-| GET | `/v1/sites/{siteId}/traffic-matching-lists` | **Gap** | Traffic-matching lists; no tooling. |
+| GET | `/v1/sites/{siteId}/traffic-matching-lists` | **Covered** | `unifi_network_list_traffic_matching_lists` |
 | POST | `/v1/sites/{siteId}/traffic-matching-lists` | **Gap** | Create traffic-matching list. |
-| GET | `/v1/sites/{siteId}/traffic-matching-lists/{id}` | **Gap** | Get traffic-matching list. |
+| GET | `/v1/sites/{siteId}/traffic-matching-lists/{id}` | **Covered** | `unifi_network_get_traffic_matching_list` |
 | PUT | `/v1/sites/{siteId}/traffic-matching-lists/{id}` | **Gap** | Update traffic-matching list. |
 | DELETE | `/v1/sites/{siteId}/traffic-matching-lists/{id}` | **Gap** | Delete traffic-matching list. |
-| GET | `/v1/sites/{siteId}/switching/lags` | **Gap** | Link-aggregation groups; no switching tooling. |
-| GET | `/v1/sites/{siteId}/switching/lags/{lagId}` | **Gap** | Get LAG. |
-| GET | `/v1/sites/{siteId}/switching/mc-lag-domains` | **Gap** | MC-LAG domains. |
-| GET | `/v1/sites/{siteId}/switching/mc-lag-domains/{id}` | **Gap** | Get MC-LAG domain. |
-| GET | `/v1/sites/{siteId}/switching/switch-stacks` | **Gap** | Switch stacks. |
-| GET | `/v1/sites/{siteId}/switching/switch-stacks/{id}` | **Gap** | Get switch stack. |
-| GET | `/v1/sites/{siteId}/vpn/servers` | **Gap** | VPN servers; no VPN tooling. |
-| GET | `/v1/sites/{siteId}/vpn/site-to-site-tunnels` | **Gap** | Site-to-site VPN tunnels. |
-| GET | `/v1/sites/{siteId}/wans` | **Gap** | WAN interfaces; no WAN tooling. |
-| GET | `/v1/sites/{siteId}/radius/profiles` | **Gap** | RADIUS profiles; no RADIUS tooling. |
+| GET | `/v1/sites/{siteId}/switching/lags` | **Covered** | `unifi_network_list_lags` |
+| GET | `/v1/sites/{siteId}/switching/lags/{lagId}` | **Covered** | `unifi_network_get_lag` |
+| GET | `/v1/sites/{siteId}/switching/mc-lag-domains` | **Covered** | `unifi_network_list_mc_lag_domains` |
+| GET | `/v1/sites/{siteId}/switching/mc-lag-domains/{id}` | **Covered** | `unifi_network_get_mc_lag_domain` |
+| GET | `/v1/sites/{siteId}/switching/switch-stacks` | **Covered** | `unifi_network_list_switch_stacks` |
+| GET | `/v1/sites/{siteId}/switching/switch-stacks/{id}` | **Covered** | `unifi_network_get_switch_stack` |
+| GET | `/v1/sites/{siteId}/vpn/servers` | **Covered** | `unifi_network_list_vpn_servers` |
+| GET | `/v1/sites/{siteId}/vpn/site-to-site-tunnels` | **Covered** | `unifi_network_list_site_to_site_tunnels` |
+| GET | `/v1/sites/{siteId}/wans` | **Covered** | `unifi_network_list_wans` |
+| GET | `/v1/sites/{siteId}/radius/profiles` | **Covered** | `unifi_network_list_radius_profiles` |
 
-Functional-equivalent coverage 26/73 ops (36%); 1 excluded; 46 gaps.
+Coverage 54/73 ops (75%); 1 excluded; 18 gaps. All 18 remaining gaps are writes
+(POST/PUT/PATCH/DELETE) — the read ceiling for this surface. The 28 direct
+Network Integration read tools are named (above); the remaining Covered rows are
+functional-equivalent legacy tools.
 
 **Legacy-only capabilities** (we cover these; the official Integration API does *not*
 document them): port-forwards, static routes, switch-port profiles, controller

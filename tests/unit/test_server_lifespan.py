@@ -575,6 +575,46 @@ class TestServerLifespan:
             f"Protect should inherit Network host and use its own explicit port; got {seen!r}"
         )
 
+    async def test_old_firmware_disables_only_integration_tag(self, monkeypatch):
+        """#408/#409: an old-firmware 404 from the Network Integration API must
+        deregister only the ``network_integration``-tagged tools (the 28
+        ``unifi_network_list_*`` / ``get_*`` Integration reads). The legacy
+        ``{"network"}``-tagged tools share the ``unifi_network_`` name prefix
+        but a different tag, so they must survive.
+
+        The legacy NetworkClient and the NetworkIntegrationClient are both
+        constructed against the Network key/host; here the legacy one validates
+        and the Integration one fails, mirroring old firmware.
+        """
+        _setup_env_for_lifespan(monkeypatch)
+        monkeypatch.delenv("UNIFI_PROTECT_API", raising=False)
+        monkeypatch.delenv("UNIFI_SITE_MANAGER_API", raising=False)
+
+        net_client = _make_validating_client()
+        failing_ni = _make_validating_client(valid=False)
+
+        server = create_server()
+        with (
+            patch("unifi_mcp.clients.network.NetworkClient", return_value=net_client),
+            patch(
+                "unifi_mcp.clients.network_integration.NetworkIntegrationClient",
+                return_value=failing_ni,
+            ),
+        ):
+            gen = server_lifespan._fn(server)
+            async with aclosing(gen):
+                await gen.__anext__()
+                tools = await server.list_tools()
+                by_tag = {t.name: set(t.tags) for t in tools}
+                # Legacy network reads survive (e.g. list_devices is {"network"}).
+                assert "unifi_network_list_devices" in by_tag
+                # Every remaining unifi_network_ tool is the legacy {"network"}
+                # tag — no {"network_integration"} tool is still registered.
+                ni_left = [n for n, tags in by_tag.items() if "network_integration" in tags]
+                assert ni_left == [], f"integration tools should be disabled, still present: {ni_left}"
+                with pytest.raises(StopAsyncIteration):
+                    await gen.__anext__()
+
     async def test_unreachable_api_does_not_disable_others(self, monkeypatch):
         """Disabling one API's tools must not touch other APIs' tools."""
         _setup_env_for_lifespan(monkeypatch)

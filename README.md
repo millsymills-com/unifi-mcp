@@ -12,7 +12,7 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 
 Stage: S3
 
-Actively maintained. 119 tools spanning all three UniFi APIs — complete for the
+Actively maintained. 147 tools spanning all three UniFi APIs — complete for the
 core Network controller workflows it targets, with documented gaps against the
 official Network/Protect/Site Manager API surfaces. See the
 [API coverage matrix](docs/api-coverage-matrix.md) for the endpoint-by-endpoint
@@ -21,7 +21,7 @@ breakdown. Installed from source, not published to PyPI. See
 
 ## Features
 
-- **119 MCP tools** covering UniFi Network (65), Protect (45), and Site Manager (9) APIs, all under the `unifi_*` namespace
+- **147 MCP tools** covering UniFi Network (93), Protect (45), and Site Manager (9) APIs, all under the `unifi_*` namespace
 - **Read/write mode separation**: write tools invisible in readonly mode
 - **Graceful per-API degradation**: only registers tools for configured APIs
 - **Typed, linted, tested**: strict `ty`, `ruff`, `pytest` with CI on Python 3.13
@@ -164,6 +164,8 @@ See [.env.example](.env.example) for all configuration options.
 | `UNIFI_PROTECT_VERIFY_SSL` | `false` | Validate the Protect NVR's TLS chain |
 | `UNIFI_NETWORK_CERT_FINGERPRINT` | none | SHA-256 leaf-cert pin (Network); takes precedence over chain verification |
 | `UNIFI_PROTECT_CERT_FINGERPRINT` | none | SHA-256 leaf-cert pin (Protect); takes precedence over chain verification |
+| `UNIFI_NETWORK_INTEGRATION_ENABLED` | `true` | Register the Network Integration (`/integration/v1`) read tools; set `false` on firmware that predates the Integration API to suppress a startup WARN |
+| `UNIFI_NETWORK_INTEGRATION_SITE` | none (auto-discover) | UUID of the Integration-API site. When unset the default/first site is discovered at startup and cached; multi-site controllers should set this. A site added after startup needs a restart |
 
 `.env` is read from the current working directory; run `unifi-mcp` only from a
 trusted directory so an unrelated `.env` cannot override your API keys.

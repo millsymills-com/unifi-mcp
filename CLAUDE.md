@@ -68,17 +68,26 @@ src/unifi_mcp/
 ├── server.py            # FastMCP server creation + lifespan
 ├── config.py            # Pydantic settings (env vars, including UNIFI_MODE)
 ├── errors.py            # Exception hierarchy + error mapping
-├── clients/             # API clients (httpx async)
-│   ├── base.py          # BaseUniFiClient with retry/auth/error mapping
-│   ├── network.py       # Network API client
-│   ├── protect.py       # Protect API client
-│   └── site_manager.py  # Site Manager API client
-└── tools/               # MCP tool definitions
-    ├── network/         # 26 read + 39 write tools (65 total)
-    ├── protect/         # 37 read + 8 write tools (45 total, includes 2 media read tools)
-    │                    #   device_reads.py / liveviews.py / access.py add 28 read tools
-    └── site_manager/    # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
+├── clients/                 # API clients (httpx async)
+│   ├── base.py              # BaseUniFiClient with retry/auth/error mapping
+│   ├── network.py           # Legacy Network controller client (/proxy/network/api/s/{site}/)
+│   ├── network_integration.py  # Network Integration client (/proxy/network/integration/v1/, read-only)
+│   ├── protect.py           # Protect API client
+│   └── site_manager.py      # Site Manager API client
+└── tools/                   # MCP tool definitions
+    ├── network/             # legacy controller tools: 26 read + 39 write
+    ├── network_integration/ # Network Integration read tools: 28 read (tagged {"network_integration"})
+    ├── protect/             # 37 read + 8 write tools (45 total, includes 2 media read tools)
+    │                        #   device_reads.py / liveviews.py / access.py add 28 read tools
+    └── site_manager/        # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
+
+Per-API tool counts: Network 54 read + 39 write tools (93 total); Protect 9 read
++ 8 write tools (17 total); Site Manager 3 read-only tools. The Network 54 read
+splits into 26 legacy-controller reads + 28 Network Integration reads. The 28
+Network Integration tools are named `unifi_network_*`, so they fold into the
+`network` counting namespace; their `{"network_integration"}` tag exists only
+for graceful degradation. The 47 write tools stay readonly-gated.
 
 ## Conventions
 
