@@ -77,7 +77,7 @@ src/unifi_mcp/
     ├── network/         # 26 read + 39 write tools (65 total)
     ├── protect/         # 37 read + 8 write tools (45 total, includes 2 media read tools)
     │                    #   device_reads.py / liveviews.py / access.py add 28 read tools
-    └── site_manager/    # 3 read-only tools
+    └── site_manager/    # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
 
 ## Conventions

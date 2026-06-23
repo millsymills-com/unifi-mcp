@@ -33,6 +33,30 @@ def register_site_manager_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"site_manager"})
     @tool_handler()
+    async def unifi_site_manager_get_host(ctx: Context, host_id: str) -> dict[str, Any]:
+        """Get a single host's detail record from UniFi Site Manager.
+
+        Returns the full record for one controller — including its reported
+        state and user data — where ``unifi_site_manager_list_hosts`` only
+        lists. Bearer tokens and other secret keys are redacted before the
+        response leaves this tool — see ``unifi_mcp._redaction`` (#146, #203).
+
+        Args:
+            ctx: FastMCP request context — supplied by the framework.
+            host_id: The host (controller) ID to fetch, as returned in the
+                ``id`` field of ``unifi_site_manager_list_hosts``.
+
+        Returns:
+            The Site Manager API response with sensitive fields redacted,
+            shaped as ``{"data": {...}, "httpStatusCode": 200}``, where
+            ``data`` is a single host record with ``id``, ``hostName``,
+            ``reportedState``, ``userData``, and ``hardwareId``.
+        """
+        validate_id(host_id, field="host_id")
+        return redact_secrets(await get_server_context(ctx).clients["site_manager"].get_host(host_id))
+
+    @mcp.tool(tags={"site_manager"})
+    @tool_handler()
     async def unifi_site_manager_list_sites(ctx: Context) -> dict[str, Any]:
         """List all sites across all hosts in UniFi Site Manager.
 
