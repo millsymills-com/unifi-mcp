@@ -85,6 +85,10 @@ class TestRendererSemantics:
         assert render_type({"type": "string", "enum": ["a", "b"]}) == '"a" | "b"'
         assert render_type({"enum": [1, 2]}) == "1 | 2"
 
+    def test_empty_enum_falls_back_to_type(self):
+        assert render_type({"enum": []}) == "any"
+        assert render_type({"enum": [], "type": "string"}) == "string"
+
     def test_untyped_param_is_any(self):
         assert render_type({}) == "any"
 
