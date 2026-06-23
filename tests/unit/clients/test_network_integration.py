@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import httpx
 import pytest
 import respx
@@ -166,7 +168,7 @@ class TestValidateConnection:
         assert c._resolved_site == SITE_UUID
 
     @respx.mock
-    async def test_auto_discovery_picks_default(self):
+    async def test_auto_discovery_picks_default(self, caplog):
         respx.get(f"{PREFIX}sites").mock(
             return_value=httpx.Response(
                 200,
@@ -174,8 +176,10 @@ class TestValidateConnection:
             )
         )
         c = _make_client(site=None)
-        assert await c.validate_connection() is True
+        with caplog.at_level(logging.INFO, logger="unifi_mcp.clients.network_integration"):
+            assert await c.validate_connection() is True
         assert c._resolved_site == "the-default"
+        assert any("the-default" in r.getMessage() and r.levelno == logging.INFO for r in caplog.records)
 
     @respx.mock
     async def test_auto_discovery_falls_back_to_first(self):
