@@ -282,6 +282,28 @@ class NetworkIntegrationClient(BaseUniFiClient):
         result: dict[str, Any] = await self.delete(self._site_path(f"dns/policies/{self._segment(dns_policy_id)}"))
         return result
 
+    # ── Write methods: firewall zones ───────────────────────────────────
+
+    async def create_firewall_zone(self, name: str, network_ids: list[str]) -> dict[str, Any]:
+        """Create a zone-based firewall zone."""
+        result: dict[str, Any] = await self.post(
+            self._site_path("firewall/zones"), json={"name": name, "networkIds": network_ids}
+        )
+        return result
+
+    async def update_firewall_zone(self, zone_id: str, name: str, network_ids: list[str]) -> dict[str, Any]:
+        """Update a firewall zone (full-object PUT)."""
+        result: dict[str, Any] = await self.put(
+            self._site_path(f"firewall/zones/{self._segment(zone_id)}"),
+            json={"name": name, "networkIds": network_ids},
+        )
+        return result
+
+    async def delete_firewall_zone(self, zone_id: str) -> dict[str, Any]:
+        """Delete a firewall zone by id."""
+        result: dict[str, Any] = await self.delete(self._site_path(f"firewall/zones/{self._segment(zone_id)}"))
+        return result
+
     # ── Lifecycle ───────────────────────────────────────────────────────
 
     @staticmethod

@@ -81,7 +81,7 @@ class TestAllTaggedNetworkIntegration:
     async def test_write_tools_tagged_and_named(self, server):
         tools = await server.list_tools()
         writes = [t for t in tools if "network_integration" in set(t.tags) and "write" in set(t.tags)]
-        assert len(writes) == 7
+        assert len(writes) == 10
         for t in writes:
             assert t.name.startswith("unifi_network_")
 
@@ -290,4 +290,53 @@ class TestDnsWrites:
     async def test_delete_dns_policy_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_dns_policy")
+        assert tool.annotations.destructiveHint is True
+
+
+class TestFirewallZoneWrites:
+    async def test_create_firewall_zone_happy_path(self, server):
+        client = AsyncMock()
+        client.create_firewall_zone.return_value = {"id": "z-new"}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_create_firewall_zone", ctx, name="iot", network_ids=["net-1"])
+        client.create_firewall_zone.assert_awaited_once_with("iot", ["net-1"])
+
+    async def test_create_firewall_zone_blocked_in_readonly(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config(), client)
+        with pytest.raises(ToolError, match="read-only mode"):
+            await _call(server, "unifi_network_create_firewall_zone", ctx, name="iot", network_ids=[])
+        client.create_firewall_zone.assert_not_called()
+
+    async def test_update_firewall_zone_validates_id(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="zone_id: invalid id format"):
+            await _call(server, "unifi_network_update_firewall_zone", ctx, zone_id="../x", name="n", network_ids=[])
+        client.update_firewall_zone.assert_not_called()
+
+    async def test_update_firewall_zone_happy_path(self, server):
+        client = AsyncMock()
+        client.update_firewall_zone.return_value = {"id": "z1"}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_update_firewall_zone", ctx, zone_id="z1", name="n", network_ids=["a"])
+        client.update_firewall_zone.assert_awaited_once_with("z1", "n", ["a"])
+
+    async def test_delete_firewall_zone_requires_confirm(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="confirm=True"):
+            await _call(server, "unifi_network_delete_firewall_zone", ctx, zone_id="z1")
+        client.delete_firewall_zone.assert_not_called()
+
+    async def test_delete_firewall_zone_with_confirm_calls_client(self, server):
+        client = AsyncMock()
+        client.delete_firewall_zone.return_value = {}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_delete_firewall_zone", ctx, zone_id="z1", confirm=True)
+        client.delete_firewall_zone.assert_awaited_once_with("z1")
+
+    async def test_delete_firewall_zone_marked_destructive(self, server):
+        tools = await server.list_tools()
+        tool = next(t for t in tools if t.name == "unifi_network_delete_firewall_zone")
         assert tool.annotations.destructiveHint is True

@@ -14,7 +14,7 @@ guarded here.
 from __future__ import annotations
 
 EXPECTED_NAMESPACE_SPLITS: dict[str, dict[str, int]] = {
-    "network": {"read": 54, "write": 46},
+    "network": {"read": 54, "write": 49},
     "protect": {"read": 37, "write": 8},
     "site_manager": {"read": 9, "write": 0},
 }

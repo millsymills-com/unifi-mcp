@@ -203,6 +203,34 @@ class TestDnsWriteMethods:
         assert route.call_count == 1
 
 
+class TestFirewallZoneWriteMethods:
+    @respx.mock
+    async def test_create_firewall_zone_posts_name_and_networks(self, client):
+        route = respx.post(f"{PREFIX}sites/{SITE_UUID}/firewall/zones").mock(
+            return_value=httpx.Response(200, json={"id": "z-new"})
+        )
+        await client.create_firewall_zone("iot", ["net-1", "net-2"])
+        assert route.called
+        body = route.calls[0].request.content
+        assert b"networkIds" in body
+        assert b"iot" in body
+
+    @respx.mock
+    async def test_update_firewall_zone_puts_with_id(self, client):
+        route = respx.put(f"{PREFIX}sites/{SITE_UUID}/firewall/zones/z-1").mock(
+            return_value=httpx.Response(200, json={"id": "z-1"})
+        )
+        await client.update_firewall_zone("z-1", "renamed", ["net-1"])
+        assert route.called
+        assert b"renamed" in route.calls[0].request.content
+
+    @respx.mock
+    async def test_delete_firewall_zone_returns_empty_on_204(self, client):
+        route = respx.delete(f"{PREFIX}sites/{SITE_UUID}/firewall/zones/z-1").mock(return_value=httpx.Response(204))
+        assert await client.delete_firewall_zone("z-1") == {}
+        assert route.call_count == 1
+
+
 class TestSitePathGuard:
     def test_site_path_raises_when_unresolved(self):
         c = _make_client()
