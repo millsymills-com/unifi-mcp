@@ -284,6 +284,7 @@ class NetworkIntegrationClient(BaseUniFiClient):
 
         if self._site is not None:
             self._resolved_site = self._site
+            logger.info("Network Integration bound to configured site id %s", self._resolved_site)
         else:
             entries = response.get("data") if isinstance(response, dict) else None
             resolved = self._pick_default_site(entries) if isinstance(entries, list) else None
@@ -294,5 +295,6 @@ class NetworkIntegrationClient(BaseUniFiClient):
                 logger.debug("Network Integration site resolution failed: empty site list")
                 return False
             self._resolved_site = resolved
+            logger.info("Network Integration auto-resolved default site id %s", self._resolved_site)
         self._last_validation_error = None
         return True
