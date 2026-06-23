@@ -79,7 +79,14 @@ class TestRendererSemantics:
 
     def test_array_and_enum_types(self):
         assert render_type({"type": "array", "items": {"type": "string"}}) == "array<string>"
-        assert render_type({"enum": ["a", "b"]}) == "enum"
+
+    def test_enum_renders_allowed_values(self):
+        assert render_type({"enum": ["5m", "1h"]}) == '"5m" | "1h"'
+        assert render_type({"type": "string", "enum": ["a", "b"]}) == '"a" | "b"'
+        assert render_type({"enum": [1, 2]}) == "1 | 2"
+
+    def test_untyped_param_is_any(self):
+        assert render_type({}) == "any"
 
     def test_no_params(self):
         assert render_signature({}) == NO_PARAMS
