@@ -75,7 +75,8 @@ src/unifi_mcp/
 │   └── site_manager.py  # Site Manager API client
 └── tools/               # MCP tool definitions
     ├── network/         # 26 read + 39 write tools (65 total)
-    ├── protect/         # 9 read + 8 write tools (17 total, includes 2 media read tools)
+    ├── protect/         # 37 read + 8 write tools (45 total, includes 2 media read tools)
+    │                    #   device_reads.py / liveviews.py / access.py add 28 read tools
     └── site_manager/    # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
 
