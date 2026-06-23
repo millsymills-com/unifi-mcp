@@ -5,6 +5,8 @@ server exposes. Every documented endpoint of each official API appears below wit
 exactly one disposition:
 
 - **Covered** — backed by one or more `unifi_*` tools (named).
+- **Covered (unverified)** — a tool exists, but the endpoint path is doc-derived
+  and not yet confirmed against live hardware (a wrong path 404s silently).
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
@@ -67,7 +69,7 @@ early-access rows).
 | Network — official Integration API (functional equivalent + direct reads) | 54 | 1 | 18 | 73 ops | **75%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
 | Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
-| Site Manager API | 9 | 0 | 0 | 9 | **100%** |
+| Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
 
 The "feature-complete" framing in the README is accurate for the **legacy Network
 controller workflows** the server was built around, and for the *core device classes*
@@ -88,11 +90,17 @@ Integration API and of Protect's full device catalog. See the per-API gap lists.
 | GET | `/v1/devices` | GA | **Covered** | `unifi_site_manager_list_devices` (optional `host_id` filter) |
 | GET | `/v1/isp-metrics/{type}` | GA | **Covered** | `unifi_site_manager_get_isp_metrics` (5m/1h windows) |
 | POST | `/v1/isp-metrics/{type}/query` | GA | **Covered** | `unifi_site_manager_query_isp_metrics` (pure selector query) |
-| GET | `/ea/sd-wan-configs` | EA | **Covered** | `unifi_site_manager_list_sdwan_configs` |
-| GET | `/ea/sd-wan-configs/{id}` | EA | **Covered** | `unifi_site_manager_get_sdwan_config` |
-| GET | `/ea/sd-wan-configs/{id}/status` | EA | **Covered** | `unifi_site_manager_get_sdwan_config_status` |
+| GET | `/ea/sd-wan-configs` | EA | **Covered (unverified)** | `unifi_site_manager_list_sdwan_configs` |
+| GET | `/ea/sd-wan-configs/{id}` | EA | **Covered (unverified)** | `unifi_site_manager_get_sdwan_config` |
+| GET | `/ea/sd-wan-configs/{id}/status` | EA | **Covered (unverified)** | `unifi_site_manager_get_sdwan_config_status` |
 
-GA coverage 6/6 (100%); overall 9/9 (100%).
+GA coverage 6/6 (100%, live-validated); EA sd-wan 3/3 **tooled but unverified**.
+**Covered (unverified)** means a tool exists but the `/ea/sd-wan-configs*` path
+spellings are taken from developer.ui.com docs and have **not** been confirmed
+against a controller with early access enabled — a wrong EA path 404s silently
+while the tool stays registered (same failure mode as `export_video`, #227).
+Verifying the three paths against live EA hardware would justify dropping the
+qualifier.
 
 ---
 
