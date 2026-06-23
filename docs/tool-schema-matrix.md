@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **85 MCP tools** (38 read, 47 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **113 MCP tools** (66 read, 47 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -14,9 +14,9 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 | API | Read | Write | Total |
 |---|---:|---:|---:|
 | Network API | 26 | 39 | 65 |
-| Protect API | 9 | 8 | 17 |
+| Protect API | 37 | 8 | 45 |
 | Site Manager API | 3 | 0 | 3 |
-| **All** | **38** | **47** | **85** |
+| **All** | **66** | **47** | **113** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -98,18 +98,46 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 65 tools.
 
 ## Protect API
 
-Backing surface: `/proxy/protect/integration/v1/`. 17 tools.
+Backing surface: `/proxy/protect/integration/v1/`. 45 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
 | `unifi_protect_export_video` | R | `camera_id: string, start: integer, end: integer` |
+| `unifi_protect_get_alarm_hub` | R | `alarm_hub_id: string` |
+| `unifi_protect_get_bridge` | R | `bridge_id: string` |
 | `unifi_protect_get_camera` | R | `camera_id: string` |
+| `unifi_protect_get_chime` | R | `chime_id: string` |
+| `unifi_protect_get_file_asset` | R | `file_type: string` |
+| `unifi_protect_get_fob` | R | `fob_id: string` |
+| `unifi_protect_get_light` | R | `light_id: string` |
+| `unifi_protect_get_link_station` | R | `link_station_id: string` |
+| `unifi_protect_get_liveview` | R | `liveview_id: string` |
+| `unifi_protect_get_meta_info` | R | — |
 | `unifi_protect_get_nvr` | R | — |
+| `unifi_protect_get_relay` | R | `relay_id: string` |
+| `unifi_protect_get_rtsps_stream` | R | `camera_id: string, qualities?: array<string> \| null = null` |
+| `unifi_protect_get_sensor` | R | `sensor_id: string` |
+| `unifi_protect_get_siren` | R | `siren_id: string` |
 | `unifi_protect_get_snapshot` | R | `camera_id: string, timestamp?: integer \| null = null` |
+| `unifi_protect_get_speaker` | R | `speaker_id: string` |
+| `unifi_protect_get_ulp_user` | R | `ulp_user_id: string` |
+| `unifi_protect_get_user` | R | `user_id: string` |
+| `unifi_protect_get_viewer` | R | `viewer_id: string` |
+| `unifi_protect_list_alarm_hubs` | R | — |
+| `unifi_protect_list_arm_profiles` | R | — |
+| `unifi_protect_list_bridges` | R | — |
 | `unifi_protect_list_cameras` | R | — |
 | `unifi_protect_list_chimes` | R | — |
+| `unifi_protect_list_fobs` | R | — |
 | `unifi_protect_list_lights` | R | — |
+| `unifi_protect_list_link_stations` | R | — |
+| `unifi_protect_list_liveviews` | R | — |
+| `unifi_protect_list_relays` | R | — |
 | `unifi_protect_list_sensors` | R | — |
+| `unifi_protect_list_sirens` | R | — |
+| `unifi_protect_list_speakers` | R | — |
+| `unifi_protect_list_ulp_users` | R | — |
+| `unifi_protect_list_users` | R | — |
 | `unifi_protect_list_viewers` | R | — |
 | `unifi_protect_set_light_mode` | W | `light_id: string, mode: string` |
 | `unifi_protect_set_recording_mode` | W | `camera_id: string, mode: string, pre_padding?: integer \| null = null, post_padding?: integer \| null = null` |

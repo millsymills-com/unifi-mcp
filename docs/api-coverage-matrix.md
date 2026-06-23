@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 85 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 113 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -8,8 +8,8 @@ exactly one disposition:
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
-Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 65, Protect 17,
-Site Manager 3 = 85).
+Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 65, Protect 45,
+Site Manager 3 = 113).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -61,7 +61,7 @@ early-access rows).
 |---|---:|---:|---:|---:|---:|
 | Network — official Integration API (functional equivalent) | 26 | 1 | 46 | 73 ops | **36%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
-| Protect — Integration API | 13 | 2 | 58 | 73 ops | **18%** |
+| Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 3 | 0 | 6 | 9 | **33%** |
 
 The "feature-complete" framing in the README is accurate for the **legacy Network
@@ -93,7 +93,7 @@ GA coverage 3/6 (50%); overall 3/9 (33%).
 
 ## 2. Protect Integration API (`/proxy/protect/integration/v1/`)
 
-17 of 17 tools map here. Paths are relative to the integration v1 base.
+45 of 45 tools map here. Paths are relative to the integration v1 base.
 
 ### Covered
 
@@ -104,15 +104,43 @@ GA coverage 3/6 (50%); overall 3/9 (33%).
 | PATCH | `cameras/{id}` | **Covered** | `unifi_protect_update_camera`, `unifi_protect_set_recording_mode`, `unifi_protect_set_smart_detection` |
 | GET | `cameras/{id}/snapshot` | **Covered** | `unifi_protect_get_snapshot` |
 | GET | `cameras/{id}/video/export` | **Covered** | `unifi_protect_export_video` — not present in the pinned 7.1.42 OpenAPI snapshot but live-verified working; likely undocumented or newer than the mirror. |
+| GET | `cameras/{id}/rtsps-stream` | **Covered** | `unifi_protect_get_rtsps_stream` — GET only; may 404/empty with no active stream (like `export_video`). |
 | GET | `nvrs` | **Covered** | `unifi_protect_get_nvr` |
 | GET | `chimes` | **Covered** | `unifi_protect_list_chimes` |
+| GET | `chimes/{id}` | **Covered** | `unifi_protect_get_chime` |
 | PATCH | `chimes/{id}` | **Covered** | `unifi_protect_update_chime` |
 | GET | `lights` | **Covered** | `unifi_protect_list_lights` |
+| GET | `lights/{id}` | **Covered** | `unifi_protect_get_light` |
 | PATCH | `lights/{id}` | **Covered** | `unifi_protect_update_light`, `unifi_protect_set_light_mode` |
 | GET | `sensors` | **Covered** | `unifi_protect_list_sensors` |
+| GET | `sensors/{id}` | **Covered** | `unifi_protect_get_sensor` |
 | PATCH | `sensors/{id}` | **Covered** | `unifi_protect_update_sensor` |
 | GET | `viewers` | **Covered** | `unifi_protect_list_viewers` |
+| GET | `viewers/{id}` | **Covered** | `unifi_protect_get_viewer` |
 | PATCH | `viewers/{id}` | **Covered** | `unifi_protect_set_viewer_liveview` |
+| GET | `speakers` | **Covered** | `unifi_protect_list_speakers` |
+| GET | `speakers/{id}` | **Covered** | `unifi_protect_get_speaker` |
+| GET | `sirens` | **Covered** | `unifi_protect_list_sirens` |
+| GET | `sirens/{id}` | **Covered** | `unifi_protect_get_siren` |
+| GET | `bridges` | **Covered** | `unifi_protect_list_bridges` |
+| GET | `bridges/{id}` | **Covered** | `unifi_protect_get_bridge` |
+| GET | `relays` | **Covered** | `unifi_protect_list_relays` |
+| GET | `relays/{id}` | **Covered** | `unifi_protect_get_relay` |
+| GET | `link-stations` | **Covered** | `unifi_protect_list_link_stations` |
+| GET | `link-stations/{id}` | **Covered** | `unifi_protect_get_link_station` |
+| GET | `fobs` | **Covered** | `unifi_protect_list_fobs` |
+| GET | `fobs/{id}` | **Covered** | `unifi_protect_get_fob` |
+| GET | `alarm-hubs` | **Covered** | `unifi_protect_list_alarm_hubs` |
+| GET | `alarm-hubs/{id}` | **Covered** | `unifi_protect_get_alarm_hub` |
+| GET | `liveviews` | **Covered** | `unifi_protect_list_liveviews` |
+| GET | `liveviews/{id}` | **Covered** | `unifi_protect_get_liveview` |
+| GET | `arm-profiles` | **Covered** | `unifi_protect_list_arm_profiles` |
+| GET | `users` | **Covered** | `unifi_protect_list_users` |
+| GET | `users/{id}` | **Covered** | `unifi_protect_get_user` |
+| GET | `ulp-users` | **Covered** | `unifi_protect_list_ulp_users` |
+| GET | `ulp-users/{id}` | **Covered** | `unifi_protect_get_ulp_user` |
+| GET | `meta/info` | **Covered** | `unifi_protect_get_meta_info` |
+| GET | `files/{fileType}` | **Covered** | `unifi_protect_get_file_asset` — content-type unverified; assumes JSON metadata, may move to `media.py` if raw bytes. |
 
 ### Excluded
 
@@ -123,28 +151,28 @@ GA coverage 3/6 (50%); overall 3/9 (33%).
 
 ### Gap
 
-Per-resource `GET {id}` detail endpoints we don't expose (the `list` tools return the
-same objects): `chimes/{id}`, `lights/{id}`, `sensors/{id}`, `viewers/{id}`.
+All remaining gaps are writes (`POST`/`PATCH`/`DELETE`) or excluded WS streams —
+every `GET`/read endpoint is now covered, so the read ceiling (56%) is reached.
 
 Camera actions: `POST cameras/{id}/disable-mic-permanently`, `POST cameras/{id}/ptz/goto/{slot}`,
 `POST cameras/{id}/ptz/patrol/start/{slot}`, `POST cameras/{id}/ptz/patrol/stop`,
-`GET/POST/DELETE cameras/{id}/rtsps-stream`, `POST cameras/{id}/talkback-session`.
+`POST/DELETE cameras/{id}/rtsps-stream` (GET is covered), `POST cameras/{id}/talkback-session`.
 
-Device classes with no tools at all (each has `GET`, `GET {id}`, `PATCH {id}` unless noted):
-`speakers` (+`POST {id}/test-sound`), `sirens` (+`play`/`stop`/`test-sound`),
-`bridges`, `relays` (+`POST {id}/outputs/{outputId}/activate`), `link-stations`,
-`fobs`, `alarm-hubs` (+`POST {id}/outputs/{outputId}/trigger`).
+Device-class writes (each device class exposes `PATCH {id}`, now the only gap after
+list/get were covered): `PATCH speakers/{id}` (+`POST {id}/test-sound`),
+`PATCH sirens/{id}` (+`play`/`stop`/`test-sound`), `PATCH bridges/{id}`,
+`PATCH relays/{id}` (+`POST {id}/outputs/{outputId}/activate`), `PATCH link-stations/{id}`,
+`PATCH fobs/{id}`, `PATCH alarm-hubs/{id}` (+`POST {id}/outputs/{outputId}/trigger`).
 
-Live views: `GET liveviews`, `POST liveviews`, `GET liveviews/{id}`, `PATCH liveviews/{id}`.
+Live views: `POST liveviews`, `PATCH liveviews/{id}` (GET/list covered).
 
-Alarm manager: `GET/POST arm-profiles`, `POST arm-profiles/enable`, `POST arm-profiles/disable`,
+Alarm manager: `POST arm-profiles`, `POST arm-profiles/enable`, `POST arm-profiles/disable`,
 `PATCH arm-profiles/settings`, `PATCH arm-profiles/{id}`, `DELETE arm-profiles/{id}`,
-`POST alarm-manager/webhook/{id}`.
+`POST alarm-manager/webhook/{id}` (the `GET arm-profiles` list is covered).
 
-Other: `GET meta/info` (app info), `GET/POST files/{fileType}` (device assets),
-`GET users`, `GET users/{id}`, `GET ulp-users`, `GET ulp-users/{id}`.
+Other: `POST files/{fileType}` (asset upload; the GET is covered).
 
-Covered 13/73 ops (18%); WebSocket subscriptions excluded.
+Covered 41/73 ops (56%); WebSocket subscriptions excluded.
 
 ---
 
