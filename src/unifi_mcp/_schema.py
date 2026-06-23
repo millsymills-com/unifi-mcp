@@ -47,7 +47,7 @@ def render_type(spec: dict[str, Any]) -> str:
     """Collapse a JSON Schema property spec into a compact type string."""
     if "anyOf" in spec:
         return " | ".join(render_type(member) for member in spec["anyOf"])
-    if "enum" in spec:
+    if spec.get("enum"):
         return " | ".join(json.dumps(value) for value in spec["enum"])
     schema_type = spec.get("type")
     if schema_type == "array":
