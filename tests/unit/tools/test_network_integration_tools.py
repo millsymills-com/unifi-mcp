@@ -40,6 +40,18 @@ def _config(max_items: int = 1000, max_offset: int = 100_000) -> UniFiConfig:
     )
 
 
+def _config_rw(max_items: int = 1000, max_offset: int = 100_000) -> UniFiConfig:
+    return UniFiConfig(
+        _env_file=None,
+        unifi_mode=UniFiMode.READWRITE,
+        unifi_network_api="k",
+        unifi_protect_api=None,
+        unifi_site_manager_api=None,
+        unifi_max_list_items=max_items,
+        unifi_max_list_offset=max_offset,
+    )
+
+
 def _ctx(config: UniFiConfig, client: AsyncMock) -> AsyncMock:
     ctx = AsyncMock()
     ctx.lifespan_context = _Lifespan(config=config, clients={"network_integration": client})
@@ -59,13 +71,19 @@ async def _call(server: FastMCP, tool_name: str, ctx: AsyncMock, **kwargs: Any) 
 
 
 class TestAllTaggedNetworkIntegration:
-    async def test_every_tool_tagged_and_not_write(self, server):
+    async def test_read_tools_tagged_and_named(self, server):
         tools = await server.list_tools()
-        ni = [t for t in tools if "network_integration" in set(t.tags)]
-        assert len(ni) == 28
-        for t in ni:
+        reads = [t for t in tools if "network_integration" in set(t.tags) and "write" not in set(t.tags)]
+        assert len(reads) == 28
+        for t in reads:
             assert t.name.startswith("unifi_network_")
-            assert "write" not in set(t.tags)
+
+    async def test_write_tools_tagged_and_named(self, server):
+        tools = await server.list_tools()
+        writes = [t for t in tools if "network_integration" in set(t.tags) and "write" in set(t.tags)]
+        assert len(writes) == 4
+        for t in writes:
+            assert t.name.startswith("unifi_network_")
 
 
 class TestPaginationCaps:
@@ -153,3 +171,74 @@ class TestErrorFunnel:
         ctx = _ctx(_config(), client)
         with pytest.raises(ToolError):
             await _call(server, "unifi_network_get_firewall_zone", ctx, zone_id="z1")
+
+
+class TestAclWrites:
+    async def test_create_acl_rule_happy_path(self, server):
+        client = AsyncMock()
+        client.create_acl_rule.return_value = {"id": "new", "x_secret": "s"}
+        ctx = _ctx(_config_rw(), client)
+        result = await _call(server, "unifi_network_create_acl_rule", ctx, data={"name": "iot", "type": "IPV4"})
+        client.create_acl_rule.assert_awaited_once_with({"name": "iot", "type": "IPV4"})
+        assert result["x_secret"] == _REDACTED
+
+    async def test_create_acl_rule_blocked_in_readonly(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config(), client)
+        with pytest.raises(ToolError, match="read-only mode"):
+            await _call(server, "unifi_network_create_acl_rule", ctx, data={"name": "iot"})
+        client.create_acl_rule.assert_not_called()
+
+    async def test_create_acl_rule_rejects_dangerous_key(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError):
+            await _call(server, "unifi_network_create_acl_rule", ctx, data={"roles": ["admin"]})
+        client.create_acl_rule.assert_not_called()
+
+    async def test_update_acl_rule_validates_id(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="acl_rule_id: invalid id format"):
+            await _call(server, "unifi_network_update_acl_rule", ctx, acl_rule_id="../x", data={"name": "y"})
+        client.update_acl_rule.assert_not_called()
+
+    async def test_update_acl_rule_happy_path(self, server):
+        client = AsyncMock()
+        client.update_acl_rule.return_value = {"id": "r1"}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_update_acl_rule", ctx, acl_rule_id="r1", data={"name": "y"})
+        client.update_acl_rule.assert_awaited_once_with("r1", {"name": "y"})
+
+    async def test_delete_acl_rule_requires_confirm(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="confirm=True"):
+            await _call(server, "unifi_network_delete_acl_rule", ctx, acl_rule_id="r1")
+        client.delete_acl_rule.assert_not_called()
+
+    async def test_delete_acl_rule_with_confirm_calls_client(self, server):
+        client = AsyncMock()
+        client.delete_acl_rule.return_value = {}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_delete_acl_rule", ctx, acl_rule_id="r1", confirm=True)
+        client.delete_acl_rule.assert_awaited_once_with("r1")
+
+    async def test_reorder_acl_rules_validates_each_id(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="ordered_acl_rule_ids: invalid id format"):
+            await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["ok", "../bad"])
+        client.update_acl_rules_ordering.assert_not_called()
+
+    async def test_reorder_acl_rules_happy_path(self, server):
+        client = AsyncMock()
+        client.update_acl_rules_ordering.return_value = {}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["a", "b"])
+        client.update_acl_rules_ordering.assert_awaited_once_with(["a", "b"])
+
+    async def test_delete_acl_rule_marked_destructive(self, server):
+        tools = await server.list_tools()
+        tool = next(t for t in tools if t.name == "unifi_network_delete_acl_rule")
+        assert tool.annotations.destructiveHint is True

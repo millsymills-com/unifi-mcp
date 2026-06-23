@@ -42,6 +42,7 @@ def _stub_live_validation(monkeypatch: pytest.MonkeyPatch) -> None:
 
     for target in (
         "unifi_mcp.clients.network.NetworkClient.validate_connection",
+        "unifi_mcp.clients.network_integration.NetworkIntegrationClient.validate_connection",
         "unifi_mcp.clients.protect.ProtectClient.validate_connection",
         "unifi_mcp.clients.site_manager.SiteManagerClient.validate_connection",
     ):

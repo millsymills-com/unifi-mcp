@@ -1,6 +1,6 @@
 """Network Integration API client for UniFi controllers.
 
-Read-only client for the official Integration API at
+Read and write client for the official Integration API at
 ``/proxy/network/integration/v1/`` (UUID site ids, ``X-API-Key``). This is a
 distinct surface from the legacy :class:`~unifi_mcp.clients.network.NetworkClient`,
 which targets ``/proxy/network/api/s/{site}/``. See #408.
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkIntegrationClient(BaseUniFiClient):
-    """Read-only client for the UniFi Network Integration API.
+    """Read and write client for the UniFi Network Integration API.
 
     Communicates with the controller's Integration proxy at
     ``/proxy/network/integration/v1/``. The site id is a UUID resolved once at
@@ -236,6 +236,30 @@ class NetworkIntegrationClient(BaseUniFiClient):
         """List RADIUS profiles (paginated envelope)."""
         result: dict[str, Any] = await self.get(
             self._site_path("radius/profiles"), params={"offset": offset, "limit": limit}
+        )
+        return result
+
+    # ── Write methods: ACL ──────────────────────────────────────────────
+
+    async def create_acl_rule(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create an L2/L3 ACL rule."""
+        result: dict[str, Any] = await self.post(self._site_path("acl-rules"), json=data)
+        return result
+
+    async def update_acl_rule(self, acl_rule_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing ACL rule (full-object PUT)."""
+        result: dict[str, Any] = await self.put(self._site_path(f"acl-rules/{self._segment(acl_rule_id)}"), json=data)
+        return result
+
+    async def delete_acl_rule(self, acl_rule_id: str) -> dict[str, Any]:
+        """Delete an ACL rule by id."""
+        result: dict[str, Any] = await self.delete(self._site_path(f"acl-rules/{self._segment(acl_rule_id)}"))
+        return result
+
+    async def update_acl_rules_ordering(self, ordered_acl_rule_ids: list[str]) -> dict[str, Any]:
+        """Replace the site-wide ACL-rule ordering with the supplied id sequence."""
+        result: dict[str, Any] = await self.put(
+            self._site_path("acl-rules/ordering"), json={"orderedAclRuleIds": ordered_acl_rule_ids}
         )
         return result
 

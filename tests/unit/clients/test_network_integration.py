@@ -140,6 +140,43 @@ class TestSiteIdInjection:
         assert route.called
 
 
+class TestAclWriteMethods:
+    @respx.mock
+    async def test_create_acl_rule_posts_to_site(self, client):
+        route = respx.post(f"{PREFIX}sites/{SITE_UUID}/acl-rules").mock(
+            return_value=httpx.Response(200, json={"id": "new"})
+        )
+        result = await client.create_acl_rule({"name": "block-iot", "type": "IPV4"})
+        assert route.called
+        assert route.calls[0].request.url.path == f"/proxy/network/integration/v1/sites/{SITE_UUID}/acl-rules"
+        assert b"block-iot" in route.calls[0].request.content
+        assert result == {"id": "new"}
+
+    @respx.mock
+    async def test_update_acl_rule_puts_with_id(self, client):
+        route = respx.put(f"{PREFIX}sites/{SITE_UUID}/acl-rules/rule-7").mock(
+            return_value=httpx.Response(200, json={"id": "rule-7"})
+        )
+        await client.update_acl_rule("rule-7", {"name": "renamed"})
+        assert route.called
+        assert b"renamed" in route.calls[0].request.content
+
+    @respx.mock
+    async def test_delete_acl_rule_returns_empty_on_204(self, client):
+        route = respx.delete(f"{PREFIX}sites/{SITE_UUID}/acl-rules/rule-7").mock(return_value=httpx.Response(204))
+        assert await client.delete_acl_rule("rule-7") == {}
+        assert route.call_count == 1
+
+    @respx.mock
+    async def test_reorder_acl_rules_sends_ordered_ids(self, client):
+        route = respx.put(f"{PREFIX}sites/{SITE_UUID}/acl-rules/ordering").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        await client.update_acl_rules_ordering(["a", "b", "c"])
+        assert route.called
+        assert b"orderedAclRuleIds" in route.calls[0].request.content
+
+
 class TestSitePathGuard:
     def test_site_path_raises_when_unresolved(self):
         c = _make_client()
