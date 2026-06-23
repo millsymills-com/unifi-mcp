@@ -7,7 +7,7 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 ## Legend
 
 - **Mode** — `R` read-only · `W` write (tagged `write`, hidden unless `UNIFI_MODE=readwrite`).
-- **Parameters** — the tool's input schema, excluding the framework-supplied `Context`. Each parameter is `name: type` (required) or `name?: type` (optional), with `` = <default>`` when the schema carries one. `—` means the tool takes no arguments. `|` denotes a union (e.g. `string | null` is an optional/nullable value); `array<T>` and `object` mirror the JSON Schema type.
+- **Parameters** — the tool's input schema, excluding the framework-supplied `Context`. Each parameter is `name: type` (required) or `name?: type` (optional), with `` = <default>`` when the schema carries one. `—` means the tool takes no arguments. `|` denotes a union (e.g. `string | null` is an optional/nullable value); `array<T>` and `object` mirror the JSON Schema type. An enum renders its allowed values as quoted literals joined by `|` (e.g. `"5m" | "1h"`); `any` marks a parameter with no declared type.
 
 ## Counts
 
