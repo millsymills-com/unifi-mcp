@@ -177,6 +177,32 @@ class TestAclWriteMethods:
         assert b"orderedAclRuleIds" in route.calls[0].request.content
 
 
+class TestDnsWriteMethods:
+    @respx.mock
+    async def test_create_dns_policy_posts_to_site(self, client):
+        route = respx.post(f"{PREFIX}sites/{SITE_UUID}/dns/policies").mock(
+            return_value=httpx.Response(200, json={"id": "new"})
+        )
+        await client.create_dns_policy({"type": "A_RECORD", "enabled": True})
+        assert route.called
+        assert b"A_RECORD" in route.calls[0].request.content
+
+    @respx.mock
+    async def test_update_dns_policy_puts_with_id(self, client):
+        route = respx.put(f"{PREFIX}sites/{SITE_UUID}/dns/policies/p-1").mock(
+            return_value=httpx.Response(200, json={"id": "p-1"})
+        )
+        await client.update_dns_policy("p-1", {"enabled": False})
+        assert route.called
+        assert b"enabled" in route.calls[0].request.content
+
+    @respx.mock
+    async def test_delete_dns_policy_returns_empty_on_204(self, client):
+        route = respx.delete(f"{PREFIX}sites/{SITE_UUID}/dns/policies/p-1").mock(return_value=httpx.Response(204))
+        assert await client.delete_dns_policy("p-1") == {}
+        assert route.call_count == 1
+
+
 class TestSitePathGuard:
     def test_site_path_raises_when_unresolved(self):
         c = _make_client()

@@ -263,6 +263,25 @@ class NetworkIntegrationClient(BaseUniFiClient):
         )
         return result
 
+    # ── Write methods: DNS policies ─────────────────────────────────────
+
+    async def create_dns_policy(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create a DNS policy."""
+        result: dict[str, Any] = await self.post(self._site_path("dns/policies"), json=data)
+        return result
+
+    async def update_dns_policy(self, dns_policy_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing DNS policy (full-object PUT)."""
+        result: dict[str, Any] = await self.put(
+            self._site_path(f"dns/policies/{self._segment(dns_policy_id)}"), json=data
+        )
+        return result
+
+    async def delete_dns_policy(self, dns_policy_id: str) -> dict[str, Any]:
+        """Delete a DNS policy by id."""
+        result: dict[str, Any] = await self.delete(self._site_path(f"dns/policies/{self._segment(dns_policy_id)}"))
+        return result
+
     # ── Lifecycle ───────────────────────────────────────────────────────
 
     @staticmethod

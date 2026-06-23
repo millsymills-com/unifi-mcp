@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 151 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 154 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -10,9 +10,9 @@ exactly one disposition:
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
-Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 97, Protect 45,
-Site Manager 9 = 151). The Network 97 splits into 65 legacy-controller tools
-(§3a) and 32 Network Integration tools (28 read + 4 write, §3b).
+Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 100, Protect 45,
+Site Manager 9 = 154). The Network 100 splits into 65 legacy-controller tools
+(§3a) and 35 Network Integration tools (28 read + 7 write, §3b).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -59,14 +59,14 @@ early-access rows).
 > firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
 > The Network section below therefore has two tables: (3a) the legacy paths we call,
 > mapping the 65 legacy Network tools; and (3b) the official Integration API, with the
-> 28 read tools and the ACL write group named, and the remaining writes left as
+> 28 read tools and the ACL + DNS write groups named, and the remaining writes left as
 > functional-equivalent or gap rows.
 
 ## Coverage summary
 
 | API | Covered | Excluded | Gap | Documented total | Coverage |
 |---|---:|---:|---:|---:|---:|
-| Network — official Integration API (functional equivalent + direct reads) | 58 | 1 | 14 | 73 ops | **81%** |
+| Network — official Integration API (functional equivalent + direct reads) | 61 | 1 | 11 | 73 ops | **85%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
 | Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
@@ -267,8 +267,8 @@ on a `cmd` body field.
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
 We now call this surface via `NetworkIntegrationClient` (28 read tools plus the
-ACL write group, all `unifi_network_*`, tagged `{"network_integration"}`; write
-tools also carry `{"write"}`). "Covered" rows are
+ACL and DNS write groups, all `unifi_network_*`, tagged `{"network_integration"}`;
+write tools also carry `{"write"}`). "Covered" rows are
 backed either by a direct Integration tool (named) or — for resources the legacy
 controller already serves — by a **functional-equivalent** legacy tool. The site
 UUID is resolved once at startup and injected by the client, so the per-site
@@ -314,10 +314,10 @@ tools take no `siteId` argument.
 | PUT | `/v1/sites/{siteId}/firewall/zones/{firewallZoneId}` | **Gap** | Update firewall zone. |
 | DELETE | `/v1/sites/{siteId}/firewall/zones/{firewallZoneId}` | **Gap** | Delete firewall zone. |
 | GET | `/v1/sites/{siteId}/dns/policies` | **Covered** | `unifi_network_list_dns_policies` |
-| POST | `/v1/sites/{siteId}/dns/policies` | **Gap** | Create DNS policy. |
+| POST | `/v1/sites/{siteId}/dns/policies` | **Covered** | `unifi_network_create_dns_policy` |
 | GET | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_get_dns_policy` |
-| PUT | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Gap** | Update DNS policy. |
-| DELETE | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Gap** | Delete DNS policy. |
+| PUT | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_update_dns_policy` |
+| DELETE | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_delete_dns_policy` |
 | GET | `/v1/sites/{siteId}/networks` | **Covered** | `unifi_network_list_networks` (legacy `rest/networkconf`) |
 | POST | `/v1/sites/{siteId}/networks` | **Covered** | `unifi_network_create_network` |
 | GET | `/v1/sites/{siteId}/networks/{networkId}` | **Covered** | `unifi_network_get_network` |
