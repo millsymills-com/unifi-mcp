@@ -11,6 +11,10 @@ exactly one disposition:
 Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 65, Protect 17,
 Site Manager 3 = 85).
 
+For the *input-schema* surface of each tool (parameters, types, defaults), see the
+machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
+tools to endpoints, that one maps tools to their arguments.
+
 ## Snapshot
 
 | API | Upstream version pinned | Base path our client uses | Enumeration source |
