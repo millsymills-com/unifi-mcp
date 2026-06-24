@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from unifi_mcp.clients.protect import ProtectClient
 from unifi_mcp.config import UniFiConfig, UniFiMode
@@ -116,3 +121,62 @@ class TestCameraClientEndpoints:
         assert b"smartDetectSettings" in body
         assert b"person" in body
         assert b"vehicle" in body
+
+
+@dataclass
+class _FakeLifespan:
+    config: UniFiConfig
+    clients: dict[str, Any] = field(default_factory=dict)
+
+
+def _protect_ctx(client: AsyncMock) -> AsyncMock:
+    ctx = AsyncMock()
+    ctx.lifespan_context = _FakeLifespan(config=_full_config(UniFiMode.READWRITE), clients={"protect": client})
+    return ctx
+
+
+class TestSetRecordingModeConfirmGate:
+    """``mode="never"`` suppresses evidence and is gated behind ``confirm=True`` (#441)."""
+
+    async def test_set_recording_mode_is_destructive_with_confirm_param(self, mcp_with_cameras):
+        tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
+        assert tool.annotations is not None
+        assert tool.annotations.destructiveHint is True
+        assert "confirm" in (tool.parameters or {}).get("properties", {})
+
+    @pytest.mark.parametrize("confirm", [None, False])
+    async def test_never_without_confirm_raises_before_client(self, mcp_with_cameras, confirm):
+        client = AsyncMock()
+        ctx = _protect_ctx(client)
+        tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
+        kwargs = {} if confirm is None else {"confirm": confirm}
+        with pytest.raises(ToolError, match=r"Invalid request:.*confirm=True"):
+            await tool.fn(ctx, "cam-1", "never", **kwargs)
+        client.set_recording_mode.assert_not_awaited()
+
+    async def test_never_with_confirm_calls_client(self, mcp_with_cameras):
+        client = AsyncMock()
+        client.set_recording_mode.return_value = {}
+        ctx = _protect_ctx(client)
+        tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
+        result = await tool.fn(ctx, "cam-1", "never", confirm=True)
+        assert result == {}
+        client.set_recording_mode.assert_awaited_once()
+
+    @pytest.mark.parametrize("mode", ["always", "motion", "schedule"])
+    async def test_non_never_modes_skip_confirm(self, mcp_with_cameras, mode):
+        client = AsyncMock()
+        client.set_recording_mode.return_value = {}
+        ctx = _protect_ctx(client)
+        tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
+        result = await tool.fn(ctx, "cam-1", mode)
+        assert result == {}
+        client.set_recording_mode.assert_awaited_once()
+
+    async def test_bad_mode_rejected_before_client(self, mcp_with_cameras):
+        client = AsyncMock()
+        ctx = _protect_ctx(client)
+        tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
+        with pytest.raises(ToolError, match=r"Invalid request:.*mode"):
+            await tool.fn(ctx, "cam-1", "bogus")
+        client.set_recording_mode.assert_not_awaited()

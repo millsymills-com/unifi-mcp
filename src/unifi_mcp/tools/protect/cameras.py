@@ -6,6 +6,7 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
+from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     build_named_arg_body,
     get_server_context,
@@ -31,6 +32,11 @@ _CAMERA_FIELD_PATHS: dict[str, tuple[str, ...]] = {
     "osd_settings_is_logo_enabled": ("osdSettings", "isLogoEnabled"),
     "osd_settings_is_debug_enabled": ("osdSettings", "isDebugEnabled"),
 }
+
+# Recording modes accepted by the Protect controller. ``"never"`` disables all
+# recording — an evidence-suppression primitive — so it is gated behind
+# ``confirm=True`` per ADR-0001.
+_RECORDING_MODES = ("always", "motion", "never", "schedule")
 
 
 def register_camera_tools(mcp: FastMCP) -> None:
@@ -122,7 +128,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
         reject_dangerous_keys(body, tool_name="unifi_protect_update_camera")
         return redact_secrets(await get_server_context(ctx).clients["protect"].update_camera(camera_id, body))
 
-    @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
     async def unifi_protect_set_recording_mode(
         ctx: Context,
@@ -130,21 +136,37 @@ def register_camera_tools(mcp: FastMCP) -> None:
         mode: str,
         pre_padding: int | None = None,
         post_padding: int | None = None,
+        confirm: bool = False,
     ) -> dict[str, Any]:
         """Set the recording mode for a camera.
+
+        ``mode="never"`` disables all recording: footage during the disabled
+        window is unrecoverable, so it requires ``confirm=True``. The other
+        modes apply without a confirm gate.
 
         Args:
             camera_id: The camera ID.
             mode: Recording mode — "always", "motion", "never", "schedule".
             pre_padding: Pre-event recording padding in seconds (optional).
             post_padding: Post-event recording padding in seconds (optional).
+            confirm: Must be ``True`` to set ``mode="never"``; ignored for the
+                other modes.
 
         Returns:
             The controller acknowledgement. Integration v1 returns an empty
             object on success, so expect ``{}``; re-read with
             ``unifi_protect_get_camera`` to confirm the change applied.
+
+        Raises:
+            ToolError: If write mode is disabled, ``camera_id`` is malformed,
+                ``mode`` is not one of the allowed values, or ``mode="never"``
+                is requested without ``confirm=True``.
         """
         validate_id(camera_id, field="camera_id")
+        if mode not in _RECORDING_MODES:
+            raise UniFiBadRequestError(f"mode must be one of {_RECORDING_MODES}, got {mode!r}")
+        if mode == "never" and not confirm:
+            raise UniFiBadRequestError("disabling recording (mode=never) is destructive; pass confirm=True")
         return redact_secrets(
             await get_server_context(ctx)
             .clients["protect"]
