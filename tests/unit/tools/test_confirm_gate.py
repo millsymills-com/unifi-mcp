@@ -9,6 +9,10 @@ Two guards:
 2. ``TestLegacyConfirmGuards`` drives every legacy-network destructive tool
    through its handler and asserts that omitting ``confirm`` raises before the
    client is ever called.
+3. ``TestConfirmSchemaCoercion`` drives a gated tool through the validated
+   ``Tool.run`` path so the FastMCP/pydantic schema layer actually coerces and
+   validates ``confirm`` — the invariant the ``if not confirm:`` guard relies on
+   but which ``tool.fn`` direct calls bypass (#435).
 """
 
 from __future__ import annotations
@@ -20,6 +24,8 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.context import Context, set_context
+from pydantic import ValidationError
 
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
@@ -151,3 +157,65 @@ class TestLegacyConfirmGuards:
         result = await tool.fn(ctx, **kwargs, confirm=True)
         assert result == {"ok": True}
         getattr(client, client_method).assert_awaited_once()
+
+
+async def _run_validated(register_fn: Any, tool_name: str, client: AsyncMock, arguments: dict[str, Any]) -> Any:
+    """Invoke ``tool_name`` through the validated ``Tool.run`` path.
+
+    ``Tool.run`` is the path FastMCP uses for real requests: it validates
+    ``arguments`` against the tool's pydantic schema (coercing ``confirm``)
+    and resolves the injected ``Context`` via ``get_context()``. The handler
+    reads its clients/config from ``ctx.lifespan_context``, which surfaces the
+    server's cached lifespan result, so we seed ``_lifespan_result`` with the
+    fake instead of standing up a real lifespan.
+    """
+    server = FastMCP(name="t")
+    register_fn(server)
+    server._lifespan_result = _FakeLifespan(config=_config(), clients={"network": client})
+    tool = await server.get_tool(tool_name)
+    with set_context(Context(server)):
+        return await tool.run(arguments)
+
+
+class TestConfirmSchemaCoercion:
+    """``confirm`` is coerced/validated by the schema layer on the real call path (#435)."""
+
+    @pytest.mark.parametrize("confirm", ["true", 1, True])
+    async def test_truthy_input_coerces_and_passes_gate(self, confirm):
+        client = AsyncMock()
+        client.block_client.return_value = {"ok": True}
+        result = await _run_validated(
+            register_client_tools,
+            "unifi_network_block_client",
+            client,
+            {"mac": VALID_MAC, "confirm": confirm},
+        )
+        assert result.structured_content == {"ok": True}
+        client.block_client.assert_awaited_once()
+
+    @pytest.mark.parametrize(
+        "arguments",
+        [
+            {"mac": VALID_MAC},
+            {"mac": VALID_MAC, "confirm": False},
+            {"mac": VALID_MAC, "confirm": 0},
+            {"mac": VALID_MAC, "confirm": "false"},
+        ],
+    )
+    async def test_falsy_or_omitted_refuses_before_client(self, arguments):
+        client = AsyncMock()
+        with pytest.raises(ToolError, match=r"Invalid request:.*confirm=True"):
+            await _run_validated(register_client_tools, "unifi_network_block_client", client, arguments)
+        client.block_client.assert_not_awaited()
+
+    @pytest.mark.parametrize("confirm", [2, "maybe"])
+    async def test_non_coercible_input_rejected_by_schema(self, confirm):
+        client = AsyncMock()
+        with pytest.raises(ValidationError):
+            await _run_validated(
+                register_client_tools,
+                "unifi_network_block_client",
+                client,
+                {"mac": VALID_MAC, "confirm": confirm},
+            )
+        client.block_client.assert_not_awaited()
