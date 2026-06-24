@@ -1659,7 +1659,9 @@ class TestDestructive:
         port_idx_raw = os.environ.get("UNIFI_MCP_TEST_PORT_IDX", "").strip()
         if not target_mac or not port_idx_raw:
             pytest.skip("UNIFI_MCP_TEST_TARGET_MAC and UNIFI_MCP_TEST_PORT_IDX must be set")
-        assert target_mac not in protected_macs, f"{target_mac} is in protected_macs; refusing to power-cycle"
+        assert _normalize_mac(target_mac) not in protected_macs, (
+            f"{target_mac} is in protected_macs; refusing to power-cycle"
+        )
         try:
             port_idx = int(port_idx_raw)
         except ValueError:
@@ -1806,7 +1808,7 @@ class TestRiskyDeviceLifecycle:
         mac = _risky_target_mac()
         if not mac:
             pytest.skip("UNIFI_MCP_TEST_RISKY_TARGET_MAC or UNIFI_MCP_TEST_TARGET_MAC must be set")
-        assert mac not in protected_macs, f"{mac} is in protected_macs; refusing to cycle"
+        assert _normalize_mac(mac) not in protected_macs, f"{mac} is in protected_macs; refusing to cycle"
 
         devices = _unwrap_list(await _invoke(live_client, "unifi_network_list_devices"))
         target = next((d for d in devices if (d.get("mac") or "").lower() == mac.lower()), None)
@@ -1895,7 +1897,7 @@ class TestRiskyDeviceLifecycle:
         mac = _risky_target_mac()
         if not mac:
             pytest.skip("UNIFI_MCP_TEST_RISKY_TARGET_MAC or UNIFI_MCP_TEST_TARGET_MAC must be set")
-        assert mac not in protected_macs, f"{mac} is in protected_macs; refusing to upgrade"
+        assert _normalize_mac(mac) not in protected_macs, f"{mac} is in protected_macs; refusing to upgrade"
 
         devices = _unwrap_list(await _invoke(live_client, "unifi_network_list_devices"))
         target = next((d for d in devices if (d.get("mac") or "").lower() == mac.lower()), None)
