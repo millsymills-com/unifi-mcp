@@ -115,7 +115,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_locate_device` | W | `mac: string` |
 | `unifi_network_power_cycle_port` | W | `mac: string, port_idx: integer` |
 | `unifi_network_provision_device` | W | `mac: string` |
-| `unifi_network_reorder_acl_rules` | W | `ordered_acl_rule_ids: array<string>` |
+| `unifi_network_reorder_acl_rules` | W | `ordered_acl_rule_ids: array<string>, confirm?: boolean = false` |
 | `unifi_network_reset_dpi` | W | — |
 | `unifi_network_restart_device` | W | `mac: string` |
 | `unifi_network_run_speedtest` | W | — |

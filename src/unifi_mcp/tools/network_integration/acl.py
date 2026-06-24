@@ -152,25 +152,32 @@ def register_acl_tools(mcp: FastMCP) -> None:
             raise UniFiBadRequestError("delete is irreversible; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network_integration"].delete_acl_rule(acl_rule_id))
 
-    @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": False})
+    @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_reorder_acl_rules(ctx: Context, ordered_acl_rule_ids: list[str]) -> dict[str, Any]:
+    async def unifi_network_reorder_acl_rules(
+        ctx: Context, ordered_acl_rule_ids: list[str], confirm: bool = False
+    ) -> dict[str, Any]:
         """Replace the site-wide ACL-rule ordering (Network Integration API).
 
         Full-replacement: pass the COMPLETE current id set in the desired order.
-        Any omitted rule loses its enforcement position. Pairs with the read
-        tool ``unifi_network_get_acl_rules_ordering``.
+        Any omitted rule loses its enforcement position, so this is destructive;
+        pass ``confirm=True`` to proceed. Pairs with the read tool
+        ``unifi_network_get_acl_rules_ordering``.
 
         Args:
             ctx: FastMCP request context.
             ordered_acl_rule_ids: Every ACL rule id, in the new priority order.
+            confirm: Must be ``True`` to apply the full-replacement ordering.
 
         Returns:
             The upstream API response with sensitive fields redacted.
 
         Raises:
-            ToolError: If write mode is disabled, the id list is empty, or any id is malformed.
+            ToolError: If write mode is disabled, ``confirm`` is not ``True``, the id
+                list is empty, or any id is malformed.
         """
+        if not confirm:
+            raise UniFiBadRequestError("reorder replaces the full ACL ordering; pass confirm=True")
         if not ordered_acl_rule_ids:
             raise UniFiBadRequestError("ordered_acl_rule_ids must be non-empty; an empty list wipes all ACL ordering")
         for rule_id in ordered_acl_rule_ids:
