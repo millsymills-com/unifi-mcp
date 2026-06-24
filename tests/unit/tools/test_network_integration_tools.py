@@ -81,7 +81,7 @@ class TestAllTaggedNetworkIntegration:
     async def test_write_tools_tagged_and_named(self, server):
         tools = await server.list_tools()
         writes = [t for t in tools if "network_integration" in set(t.tags) and "write" in set(t.tags)]
-        assert len(writes) == 4
+        assert len(writes) == 7
         for t in writes:
             assert t.name.startswith("unifi_network_")
 
@@ -248,4 +248,53 @@ class TestAclWrites:
     async def test_delete_acl_rule_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_acl_rule")
+        assert tool.annotations.destructiveHint is True
+
+
+class TestDnsWrites:
+    async def test_create_dns_policy_happy_path(self, server):
+        client = AsyncMock()
+        client.create_dns_policy.return_value = {"id": "new"}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_create_dns_policy", ctx, data={"type": "A_RECORD", "enabled": True})
+        client.create_dns_policy.assert_awaited_once_with({"type": "A_RECORD", "enabled": True})
+
+    async def test_create_dns_policy_blocked_in_readonly(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config(), client)
+        with pytest.raises(ToolError, match="read-only mode"):
+            await _call(server, "unifi_network_create_dns_policy", ctx, data={"type": "A_RECORD"})
+        client.create_dns_policy.assert_not_called()
+
+    async def test_create_dns_policy_rejects_dangerous_key(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError):
+            await _call(server, "unifi_network_create_dns_policy", ctx, data={"permissions": "x"})
+        client.create_dns_policy.assert_not_called()
+
+    async def test_update_dns_policy_validates_id(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="dns_policy_id: invalid id format"):
+            await _call(server, "unifi_network_update_dns_policy", ctx, dns_policy_id="../x", data={"enabled": False})
+        client.update_dns_policy.assert_not_called()
+
+    async def test_delete_dns_policy_requires_confirm(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="confirm=True"):
+            await _call(server, "unifi_network_delete_dns_policy", ctx, dns_policy_id="p1")
+        client.delete_dns_policy.assert_not_called()
+
+    async def test_delete_dns_policy_with_confirm_calls_client(self, server):
+        client = AsyncMock()
+        client.delete_dns_policy.return_value = {}
+        ctx = _ctx(_config_rw(), client)
+        await _call(server, "unifi_network_delete_dns_policy", ctx, dns_policy_id="p1", confirm=True)
+        client.delete_dns_policy.assert_awaited_once_with("p1")
+
+    async def test_delete_dns_policy_marked_destructive(self, server):
+        tools = await server.list_tools()
+        tool = next(t for t in tools if t.name == "unifi_network_delete_dns_policy")
         assert tool.annotations.destructiveHint is True
