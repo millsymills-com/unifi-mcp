@@ -8,6 +8,8 @@ import os
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -169,19 +171,32 @@ class BaseUniFiClient(ABC):
 
     @staticmethod
     def _parse_retry_after(header_value: str | None) -> int | None:
-        """Parse a Retry-After header value in seconds.
+        """Parse a Retry-After header value into seconds.
 
-        Handles the integer-seconds form (`Retry-After: 30`). The HTTP-date
-        form is rare on JSON APIs and not parsed here; unparseable values
-        return None.
+        Handles both RFC-7231 forms: the integer-seconds form
+        (``Retry-After: 30``) and the HTTP-date form
+        (``Retry-After: Wed, 21 Oct 2026 07:28:00 GMT``), the latter computed
+        as seconds until that instant relative to the current UTC time. A date
+        already in the past clamps to 0. Values that match neither form return
+        None so the caller can apply its own fallback.
         """
         if header_value is None:
             return None
+        stripped = header_value.strip()
         try:
-            seconds = int(header_value.strip())
+            return max(int(stripped), 0)
+        except ValueError:
+            pass
+        try:
+            target = parsedate_to_datetime(stripped)
         except (TypeError, ValueError):
             return None
-        return max(seconds, 0)
+        if target is None:
+            return None
+        if target.tzinfo is None:
+            target = target.replace(tzinfo=UTC)
+        delta = (target - datetime.now(UTC)).total_seconds()
+        return max(int(delta), 0)
 
     def _extract_error_body(self, response: httpx.Response) -> str:
         """Return a short, actionable error description from a response body.
@@ -322,6 +337,67 @@ class BaseUniFiClient(ABC):
             raise UniFiServerError(f"HTTP {status}: {body}", status_code=status)
         raise UniFiError(f"HTTP {status}: {body}", status_code=status)
 
+    def _effective_timeout(self, **kwargs: Any) -> float:
+        """Return the per-request timeout the 429 wall-clock budget tracks.
+
+        A caller may override ``timeout`` per call (e.g. ``create_backup``
+        passes ``timeout=300.0``); the budget must follow that override rather
+        than the instance default so the 429 fence agrees with the effective
+        request timeout. A numeric override is used directly; an
+        ``httpx.Timeout`` object's read phase is used when present; anything
+        else falls back to the instance default.
+        """
+        override = kwargs.get("timeout")
+        if isinstance(override, (int, float)):
+            return float(override)
+        if isinstance(override, httpx.Timeout) and override.read is not None:
+            return float(override.read)
+        return float(self._timeout)
+
+    async def _sleep_for_rate_limit(
+        self,
+        exc: UniFiRateLimitError,
+        *,
+        method_upper: str,
+        path: str,
+        attempts: int,
+        start: float,
+        total_budget: float,
+    ) -> None:
+        """Sleep for the 429 Retry-After delay or re-raise to surface the 429.
+
+        Shared by the non-streaming ``_request`` loop and the streaming
+        ``get_raw`` loop so both honor Retry-After identically. Re-raises the
+        passed exception when the method is non-idempotent, the per-call
+        ``max_retries`` is exhausted, or the wall-clock budget would be
+        exceeded. Otherwise sleeps and returns; the caller increments its own
+        attempt counter and retries.
+        """
+        if method_upper not in ("GET", "HEAD") or attempts >= self._max_retries:
+            raise exc
+        loop = asyncio.get_running_loop()
+        sleep_seconds = min(exc.retry_after or 1, _MAX_RETRY_AFTER_SECONDS)
+        elapsed = loop.time() - start
+        if elapsed + sleep_seconds > total_budget:
+            logger.warning(
+                "Rate-limit retry budget exhausted on %s %s (elapsed=%.1fs + sleep=%ds > budget=%.1fs); surfacing 429.",
+                method_upper,
+                path,
+                elapsed,
+                sleep_seconds,
+                total_budget,
+            )
+            raise exc
+        logger.warning(
+            "Rate limited (429) on %s %s; sleeping %ds before retry %d/%d",
+            method_upper,
+            path,
+            sleep_seconds,
+            attempts + 1,
+            self._max_retries,
+        )
+        await asyncio.sleep(sleep_seconds)
+
     async def _request(self, method: str, path: str, *, prefix: str | None = None, **kwargs: Any) -> Any:
         """Execute an HTTP request with retry on transient errors.
 
@@ -351,7 +427,7 @@ class BaseUniFiClient(ABC):
 
         loop = asyncio.get_running_loop()
         start = loop.time()
-        total_budget = float(self._timeout * _TOTAL_ELAPSED_TIMEOUT_MULTIPLIER)
+        total_budget = self._effective_timeout(**kwargs) * _TOTAL_ELAPSED_TIMEOUT_MULTIPLIER
 
         @retry(
             stop=stop_after_attempt(self._max_retries),
@@ -375,36 +451,15 @@ class BaseUniFiClient(ABC):
             try:
                 self._raise_for_status(response)
             except UniFiRateLimitError as exc:
-                # Honor Retry-After on idempotent methods only; a POST/PUT/DELETE
-                # that returned 429 may have partially processed, and a retry
-                # could cause double-execution.
-                if method_upper not in ("GET", "HEAD"):
-                    raise
-                if rate_limit_attempts >= self._max_retries:
-                    raise
-                sleep_seconds = min(exc.retry_after or 1, _MAX_RETRY_AFTER_SECONDS)
-                elapsed = loop.time() - start
-                if elapsed + sleep_seconds > total_budget:
-                    logger.warning(
-                        "Rate-limit retry budget exhausted on %s %s "
-                        "(elapsed=%.1fs + sleep=%ds > budget=%.1fs); surfacing 429.",
-                        method_upper,
-                        path,
-                        elapsed,
-                        sleep_seconds,
-                        total_budget,
-                    )
-                    raise
-                rate_limit_attempts += 1
-                logger.warning(
-                    "Rate limited (429) on %s %s; sleeping %ds before retry %d/%d",
-                    method_upper,
-                    path,
-                    sleep_seconds,
-                    rate_limit_attempts,
-                    self._max_retries,
+                await self._sleep_for_rate_limit(
+                    exc,
+                    method_upper=method_upper,
+                    path=path,
+                    attempts=rate_limit_attempts,
+                    start=start,
+                    total_budget=total_budget,
                 )
-                await asyncio.sleep(sleep_seconds)
+                rate_limit_attempts += 1
                 continue
 
             return response
@@ -472,24 +527,24 @@ class BaseUniFiClient(ABC):
             return {}
         return self._parse_json(response)
 
-    async def get_raw(self, path: str, *, max_bytes: int | None = None, **kwargs: Any) -> bytes:
+    async def get_raw(self, path: str, *, max_bytes: int, **kwargs: Any) -> bytes:
         """HTTP GET returning raw bytes (for media endpoints).
 
-        When ``max_bytes`` is set the response is streamed and aborted as soon
+        ``max_bytes`` is required: the response is streamed and aborted as soon
         as the accumulated payload exceeds the cap, raising ``UniFiError``
         instead of silently consuming unbounded memory.
 
-        Both branches share the same transient-error retry semantics as
-        ``_request``: ``ConnectError`` and ``TimeoutException`` are retried
-        (bounded by ``max_retries``), status-code errors are mapped to typed
-        UniFi exceptions.
+        Shares ``_request``'s retry semantics: ``ConnectError`` and
+        ``TimeoutException`` are retried by tenacity (bounded by
+        ``max_retries``); a 429 is honored via the same Retry-After loop as the
+        non-streaming path (idempotent GET only, bounded by ``max_retries`` and
+        the wall-clock budget); other status-code errors map to typed UniFi
+        exceptions.
         """
-        if max_bytes is None:
-            response = await self._request("GET", path, **kwargs)
-            result: bytes = response.content
-            return result
-
         url = self._url(path)
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        total_budget = self._effective_timeout(**kwargs) * _TOTAL_ELAPSED_TIMEOUT_MULTIPLIER
         retry_on: tuple[type[BaseException], ...] = (httpx.ConnectError, httpx.TimeoutException)
 
         @retry(
@@ -502,8 +557,9 @@ class BaseUniFiClient(ABC):
             """Stream one request attempt, enforcing max_bytes mid-stream.
 
             Transport errors raised in here bubble out of the context manager
-            and are caught by tenacity for retry. Mapped UniFi errors bubble
-            unchanged (they aren't in ``retry_on``).
+            and are caught by tenacity for retry. Mapped UniFi errors
+            (including ``UniFiRateLimitError``) bubble unchanged — they aren't
+            in ``retry_on`` — to the outer 429-aware loop.
 
             Defensive copy of ``kwargs`` per attempt: httpx is free to mutate
             mutable values (a streaming-body iterator would be exhausted on
@@ -529,12 +585,24 @@ class BaseUniFiClient(ABC):
                     chunks.append(chunk)
                 return b"".join(chunks)
 
-        try:
-            return await _stream_once()
-        except httpx.TimeoutException as exc:
-            raise UniFiTimeoutError(str(exc)) from exc
-        except httpx.ConnectError as exc:
-            raise UniFiConnectionError(str(exc)) from exc
+        rate_limit_attempts = 0
+        while True:
+            try:
+                return await _stream_once()
+            except UniFiRateLimitError as exc:
+                await self._sleep_for_rate_limit(
+                    exc,
+                    method_upper="GET",
+                    path=path,
+                    attempts=rate_limit_attempts,
+                    start=start,
+                    total_budget=total_budget,
+                )
+                rate_limit_attempts += 1
+            except httpx.TimeoutException as exc:
+                raise UniFiTimeoutError(str(exc)) from exc
+            except httpx.ConnectError as exc:
+                raise UniFiConnectionError(str(exc)) from exc
 
     # ── Lifecycle ───────────────────────────────────────────────────────
 
