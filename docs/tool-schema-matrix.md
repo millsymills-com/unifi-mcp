@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **154 MCP tools** (100 read, 54 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **157 MCP tools** (100 read, 57 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -13,10 +13,10 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 
 | API | Read | Write | Total |
 |---|---:|---:|---:|
-| Network API | 54 | 46 | 100 |
+| Network API | 54 | 49 | 103 |
 | Protect API | 37 | 8 | 45 |
 | Site Manager API | 9 | 0 | 9 |
-| **All** | **100** | **54** | **154** |
+| **All** | **100** | **57** | **157** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -24,7 +24,7 @@ Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendere
 
 ## Network API
 
-Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 100 tools.
+Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 103 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
@@ -37,6 +37,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 100 tools.
 | `unifi_network_create_dns_policy` | W | `data: object` |
 | `unifi_network_create_firewall_group` | W | `name: string, group_type: string, group_members: array<string>` |
 | `unifi_network_create_firewall_rule` | W | `name: string, ruleset: string, action?: string = "drop", enabled?: boolean = true, protocol?: string = "all", src_address?: string \| null = null, dst_address?: string \| null = null, data?: object \| null = null` |
+| `unifi_network_create_firewall_zone` | W | `name: string, network_ids: array<string>` |
 | `unifi_network_create_network` | W | `name: string, purpose?: string = "corporate", subnet?: string \| null = null, vlan?: integer \| null = null, dhcpd_enabled?: boolean = true` |
 | `unifi_network_create_port_forward` | W | `name: string, dst_port: string, fwd: string, fwd_port: string, proto?: string = "tcp_udp", enabled?: boolean = true` |
 | `unifi_network_create_port_profile` | W | `data: object` |
@@ -46,6 +47,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 100 tools.
 | `unifi_network_delete_dns_policy` | W | `dns_policy_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_firewall_group` | W | `group_id: string` |
 | `unifi_network_delete_firewall_rule` | W | `rule_id: string` |
+| `unifi_network_delete_firewall_zone` | W | `zone_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_network` | W | `network_id: string` |
 | `unifi_network_delete_port_forward` | W | `port_forward_id: string` |
 | `unifi_network_delete_port_profile` | W | `profile_id: string` |
@@ -121,6 +123,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 100 tools.
 | `unifi_network_update_dns_policy` | W | `dns_policy_id: string, data: object` |
 | `unifi_network_update_firewall_group` | W | `group_id: string, data: object` |
 | `unifi_network_update_firewall_rule` | W | `rule_id: string, data: object` |
+| `unifi_network_update_firewall_zone` | W | `zone_id: string, name: string, network_ids: array<string>` |
 | `unifi_network_update_network` | W | `network_id: string, data: object` |
 | `unifi_network_update_port_forward` | W | `port_forward_id: string, data: object` |
 | `unifi_network_update_port_profile` | W | `profile_id: string, data: object` |

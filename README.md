@@ -12,7 +12,7 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 
 Stage: S3
 
-Actively maintained. 154 tools spanning all three UniFi APIs — complete for the
+Actively maintained. 157 tools spanning all three UniFi APIs — complete for the
 core Network controller workflows it targets, with documented gaps against the
 official Network/Protect/Site Manager API surfaces. See the
 [API coverage matrix](docs/api-coverage-matrix.md) for the endpoint-by-endpoint
@@ -21,7 +21,7 @@ breakdown. Installed from source, not published to PyPI. See
 
 ## Features
 
-- **154 MCP tools** covering UniFi Network (100), Protect (45), and Site Manager (9) APIs, all under the `unifi_*` namespace
+- **157 MCP tools** covering UniFi Network (103), Protect (45), and Site Manager (9) APIs, all under the `unifi_*` namespace
 - **Read/write mode separation**: write tools invisible in readonly mode
 - **Graceful per-API degradation**: only registers tools for configured APIs
 - **Typed, linted, tested**: strict `ty`, `ruff`, `pytest` with CI on Python 3.13
@@ -29,7 +29,7 @@ breakdown. Installed from source, not published to PyPI. See
 ## Write safety
 
 The server starts in **readonly mode** by default and only exposes read tools.
-The 54 write tools are invisible until you explicitly set
+The 57 write tools are invisible until you explicitly set
 `UNIFI_MODE=readwrite`.
 
 > [!WARNING]
