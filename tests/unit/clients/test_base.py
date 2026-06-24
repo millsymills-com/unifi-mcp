@@ -862,9 +862,41 @@ class TestRateLimitRetry:
         assert client._parse_retry_after(None) is None
         assert client._parse_retry_after("") is None
         assert client._parse_retry_after("not-a-number") is None
-        assert client._parse_retry_after("Wed, 21 Oct 2026 07:28:00 GMT") is None  # HTTP-date form unsupported
         assert client._parse_retry_after("  5  ") == 5
         assert client._parse_retry_after("-3") == 0  # clamped non-negative
+
+    def test_parse_retry_after_http_date_future(self, client, monkeypatch):
+        """The RFC-7231 HTTP-date form yields seconds-until that date."""
+        import datetime as _dt
+
+        fixed_now = _dt.datetime(2026, 10, 21, 7, 28, 0, tzinfo=_dt.UTC)
+
+        class _FixedDateTime(_dt.datetime):
+            @classmethod
+            def now(cls, tz=None):  # type: ignore[override]
+                return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+        monkeypatch.setattr("unifi_mcp.clients.base.datetime", _FixedDateTime)
+        # 90 seconds after the fixed "now".
+        assert client._parse_retry_after("Wed, 21 Oct 2026 07:29:30 GMT") == 90
+
+    def test_parse_retry_after_http_date_past_clamped_to_zero(self, client, monkeypatch):
+        """A date already in the past clamps to 0 rather than going negative."""
+        import datetime as _dt
+
+        fixed_now = _dt.datetime(2026, 10, 21, 7, 28, 0, tzinfo=_dt.UTC)
+
+        class _FixedDateTime(_dt.datetime):
+            @classmethod
+            def now(cls, tz=None):  # type: ignore[override]
+                return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+        monkeypatch.setattr("unifi_mcp.clients.base.datetime", _FixedDateTime)
+        assert client._parse_retry_after("Wed, 21 Oct 2026 07:27:00 GMT") == 0
+
+    def test_parse_retry_after_garbage_date_returns_none(self, client):
+        """A header that is neither integer nor parseable date returns None."""
+        assert client._parse_retry_after("Wed, 99 Foo 2026") is None
 
 
 class TestPathPrefix:
@@ -883,11 +915,37 @@ class TestPathPrefix:
 
 
 class TestGetRaw:
+    async def test_get_raw_requires_max_bytes(self, client):
+        """``max_bytes`` is required: the unbounded read path is gone."""
+        with pytest.raises(TypeError):
+            await client.get_raw("snap")  # type: ignore[call-arg]
+
     @respx.mock
     async def test_get_raw_returns_bytes(self, client):
         respx.get(f"{BASE_URL}/snap").mock(return_value=httpx.Response(200, content=b"\xff\xd8\xff\xe0"))
-        result = await client.get_raw("snap")
+        result = await client.get_raw("snap", max_bytes=1024)
         assert result == b"\xff\xd8\xff\xe0"
+
+    @respx.mock
+    async def test_get_raw_streaming_retries_429_honoring_retry_after(self, client, monkeypatch):
+        """A 429 on the streamed media path retries after the Retry-After
+        sleep, matching the non-streaming GET path (#443)."""
+        slept: list[float] = []
+
+        async def fake_sleep(seconds: float) -> None:
+            slept.append(seconds)
+
+        monkeypatch.setattr("unifi_mcp.clients.base.asyncio.sleep", fake_sleep)
+
+        route = respx.get(f"{BASE_URL}/clip")
+        route.side_effect = [
+            httpx.Response(429, text="rate limited", headers={"Retry-After": "3"}),
+            httpx.Response(200, content=b"\xff\xd8\xff\xe0ok"),
+        ]
+        result = await client.get_raw("clip", max_bytes=1024)
+        assert result == b"\xff\xd8\xff\xe0ok"
+        assert slept == [3]
+        assert route.call_count == 2
 
     @respx.mock
     async def test_get_raw_with_max_bytes_under_cap_returns_full_body(self, client):
@@ -1089,6 +1147,48 @@ class TestTotalElapsedBudget:
         # First sleep (20s) is inside the 25s budget; second sleep would push
         # elapsed to 40s and is refused — the call raises instead.
         assert slept == [20]
+
+    @respx.mock
+    async def test_budget_derives_from_per_call_timeout_override(self, monkeypatch):
+        """A per-call ``timeout`` override (not the instance default) sets the
+        429 wall-clock budget. The fixture default would be 5*5=25s; a 60s
+        per-call override widens the budget to 300s so a 200s Retry-After
+        sleep is honored instead of being refused."""
+        client = _ConcreteClient(base_url=BASE_URL, api_key="k", timeout=5, max_retries=10)
+        slept: list[float] = []
+
+        import asyncio as _aio
+
+        real_loop = _aio.get_running_loop()
+        fake_now = 0.0
+
+        def fake_time() -> float:
+            return fake_now
+
+        async def fake_sleep(seconds: float) -> None:
+            nonlocal fake_now
+            slept.append(seconds)
+            fake_now += seconds
+
+        monkeypatch.setattr(real_loop, "time", fake_time)
+        monkeypatch.setattr("unifi_mcp.clients.base.asyncio.sleep", fake_sleep)
+
+        route = respx.get(f"{BASE_URL}/test")
+        route.side_effect = [
+            httpx.Response(429, text="rate limited", headers={"Retry-After": "20"}),
+            httpx.Response(200, json={"ok": True}),
+        ]
+        # With the instance-default budget (25s) a 20s sleep fits, so this case
+        # alone wouldn't distinguish. Use two stacked 429s instead.
+        route.side_effect = [
+            httpx.Response(429, text="rate limited", headers={"Retry-After": "20"}),
+            httpx.Response(429, text="rate limited", headers={"Retry-After": "20"}),
+            httpx.Response(200, json={"ok": True}),
+        ]
+        assert await client.get("test", timeout=60.0) == {"ok": True}
+        # Both 20s sleeps fit inside the 300s per-call budget; default 25s
+        # budget would have refused the second.
+        assert slept == [20, 20]
 
     @respx.mock
     async def test_single_legitimate_retry_fits_inside_budget(self, monkeypatch):

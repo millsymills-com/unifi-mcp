@@ -38,7 +38,7 @@ async def test_get_snapshot_returns_jpeg(protect_live_client):
         pytest.skip("No cameras connected to the NVR")
     camera_id = cameras[0].get("id")
     assert camera_id, "First camera entry missing id"
-    snapshot = await protect_live_client.get_snapshot(camera_id)
+    snapshot = await protect_live_client.get_snapshot(camera_id, max_bytes=50 * 1024 * 1024)
     # JPEG magic bytes.
     assert snapshot.startswith(b"\xff\xd8\xff"), "Snapshot is not a JPEG"
     assert len(snapshot) > 1024, "Snapshot suspiciously small"
@@ -63,7 +63,7 @@ async def test_export_video_returns_data(protect_live_client):
     end_ms = int(time.time() * 1000) - 5_000
     start_ms = end_ms - 5_000
 
-    data = await protect_live_client.export_video(camera_id, start=start_ms, end=end_ms)
+    data = await protect_live_client.export_video(camera_id, start=start_ms, end=end_ms, max_bytes=500 * 1024 * 1024)
     assert isinstance(data, bytes), f"Expected bytes, got {type(data).__name__}"
     if len(data) == 0:
         pytest.skip("Export returned 0 bytes — likely no recording yet for the new camera")
@@ -84,4 +84,6 @@ async def test_export_video_reversed_window_raises(protect_live_client):
 
     now_ms = int(time.time() * 1000)
     with pytest.raises((UniFiError, httpx.HTTPError)):
-        await protect_live_client.export_video(camera_id, start=now_ms, end=now_ms - 60_000)
+        await protect_live_client.export_video(
+            camera_id, start=now_ms, end=now_ms - 60_000, max_bytes=500 * 1024 * 1024
+        )
