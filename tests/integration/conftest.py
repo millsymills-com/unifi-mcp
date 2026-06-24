@@ -212,8 +212,12 @@ async def protected_macs(network_live_client_session: NetworkClient) -> frozense
             "your gateway, uplinked switch, and uplinked AP, then rerun."
         )
         pytest.fail(msg)
+    normalized = [_normalize_mac(item) for item in raw]
+    if not all(normalized):
+        bad = [item for item, norm in zip(raw, normalized, strict=True) if not norm]
+        pytest.fail(f"UNIFI_MCP_TEST_PROTECTED_MACS contains unparseable MAC(s): {bad}. Refusing to run.")
     LOG.warning("Protected MACs (will not be touched): %s", ", ".join(raw))
-    return frozenset(raw)
+    return frozenset(normalized)
 
 
 @pytest.fixture(scope="session")
@@ -226,7 +230,7 @@ def test_target_mac(protected_macs: frozenset[str]) -> str:
     target = os.environ.get("UNIFI_MCP_TEST_TARGET_MAC", "").strip().lower()
     if not target:
         pytest.skip("UNIFI_MCP_TEST_TARGET_MAC unset; skipping device-action tests")
-    if target in protected_macs:
+    if _normalize_mac(target) in protected_macs:
         pytest.fail(f"UNIFI_MCP_TEST_TARGET_MAC={target} overlaps protected_macs. Refusing to run.")
     return target
 

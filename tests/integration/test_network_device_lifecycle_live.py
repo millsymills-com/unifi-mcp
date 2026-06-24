@@ -30,6 +30,8 @@ import os
 
 import pytest
 
+from tests.integration.conftest import _normalize_mac
+
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.integration
@@ -110,7 +112,7 @@ class TestForgetAdoptCycle:
         mac = _risky_target_mac()
         if not mac:
             pytest.skip("UNIFI_MCP_TEST_TARGET_MAC or UNIFI_MCP_TEST_RISKY_TARGET_MAC unset")
-        assert mac not in protected_macs, f"{mac} is in protected_macs; refusing to cycle"
+        assert _normalize_mac(mac) not in protected_macs, f"{mac} is in protected_macs; refusing to cycle"
 
         devices_before = await network_live_client.list_devices()
         target = _find_device(devices_before, mac)
@@ -189,7 +191,7 @@ class TestUpgradeDevice:
         mac = _risky_target_mac()
         if not mac:
             pytest.skip("UNIFI_MCP_TEST_TARGET_MAC or UNIFI_MCP_TEST_RISKY_TARGET_MAC unset")
-        assert mac not in protected_macs
+        assert _normalize_mac(mac) not in protected_macs
 
         devices = await network_live_client.list_devices()
         target = _find_device(devices, mac)
