@@ -197,21 +197,25 @@ class UniFiConfig(BaseSettings):
 
     @model_validator(mode="after")
     def _audit_tls_posture(self) -> UniFiConfig:
-        """Warn at startup when an API key is sent over unverified TLS.
+        """Audit the startup TLS posture per service that ships an API key.
 
-        Three log lines per affected service:
+        For each service with ``verify_ssl=False`` and no pin:
 
-        1. Unconditional WARN when ``verify_ssl=False`` and no pin is set —
-           the API key is shipped over a connection with no identity check.
-        2. Additional WARN when the host resolves to a non-private IP — the
-           MITM exposure isn't limited to a hostile LAN.
-        3. Soft WARN if DNS resolution fails so we don't crash startup; the
-           operator still gets a visible note that the safety check didn't run.
+        1. Unconditional WARN — the API key is shipped over a connection with
+           no identity check.
+        2. If the host resolves to a non-private/non-loopback address, the
+           key would cross an untrusted path, so this **refuses to start**
+           (see ``_audit_service_tls``) rather than only warning. A private,
+           loopback, or link-local host stays permissible (WARN only) for the
+           common home-controller case.
+        3. Soft WARN if DNS resolution fails so we don't crash startup on a
+           resolver hiccup; the operator still gets a visible note that the
+           safety check didn't run.
 
-        Pinning (``*_cert_fingerprint``) suppresses both 1 and 2 because the
-        pin provides identity even with chain/hostname verification disabled.
-        Services without an API key are skipped — their tools never register,
-        so the warning would be noise.
+        Pinning (``*_cert_fingerprint``) suppresses all of the above because
+        the pin provides identity even with chain/hostname verification
+        disabled. Services without an API key are skipped — their tools never
+        register, so the audit would be noise.
         """
         if self.unifi_network_api is not None:
             self._audit_service_tls(
@@ -231,7 +235,12 @@ class UniFiConfig(BaseSettings):
 
     @staticmethod
     def _audit_service_tls(service: str, *, host: str, verify_ssl: bool, fingerprint: str | None) -> None:
-        """Emit the TLS-posture WARNs for one service. See ``_audit_tls_posture``."""
+        """Audit one service's TLS posture, failing closed for public hosts.
+
+        See ``_audit_tls_posture``. Raises ``ValueError`` (surfaced as a
+        ``ValidationError`` by the model validator) when ``host`` resolves to
+        any non-private address without ``verify_ssl`` or a pin.
+        """
         if verify_ssl or fingerprint is not None:
             return
         logger.warning(
@@ -249,16 +258,13 @@ class UniFiConfig(BaseSettings):
                 exc,
             )
             return
-        if not (resolved.is_private or resolved.is_loopback or resolved.is_link_local):
-            logger.warning(
-                "verify_ssl=False with non-private host %s (resolved to %s) for %s — "
-                "X-API-Key exposed to MITM. Set UNIFI_%s_VERIFY_SSL=true or pin the "
-                "cert via UNIFI_%s_CERT_FINGERPRINT.",
-                host,
-                resolved,
-                service,
-                service.upper(),
-                service.upper(),
+        non_private = _first_non_private(resolved)
+        if non_private is not None:
+            raise ValueError(
+                f"refusing to start: verify_ssl=False with non-private {service} host {host!r} "
+                f"(resolves to {non_private}) would send the X-API-Key over unverified TLS, exposing "
+                f"it to a network-path attacker. Set UNIFI_{service.upper()}_VERIFY_SSL=true, pin the "
+                f"cert via UNIFI_{service.upper()}_CERT_FINGERPRINT, or use a private/loopback host."
             )
 
     @property
@@ -330,25 +336,47 @@ def get_config() -> UniFiConfig:
     return UniFiConfig()
 
 
-def _resolve_host(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
-    """Resolve ``host`` to an IP address with a bounded DNS timeout.
+def _first_non_private(
+    addresses: list[ipaddress.IPv4Address | ipaddress.IPv6Address],
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Return the first address that is routable off the local network.
+
+    Private, loopback, and link-local addresses are treated as local. A host
+    is considered non-private if *any* of its resolved addresses is — an
+    attacker only needs one path to the key.
+    """
+    for address in addresses:
+        if not (address.is_private or address.is_loopback or address.is_link_local):
+            return address
+    return None
+
+
+def _resolve_host(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    """Resolve ``host`` to all of its IP addresses with a bounded DNS timeout.
 
     Numeric hosts (IPv4 or IPv6 literals) short-circuit DNS entirely. For
-    names, ``socket.gethostbyname`` runs on a worker thread bounded by
+    names, ``socket.getaddrinfo`` runs on a worker thread bounded by
     ``_DNS_LOOKUP_TIMEOUT_S`` so a slow or unreachable resolver can't hang
-    startup. Bounding via thread (rather than ``socket.setdefaulttimeout``)
-    avoids mutating process-global socket state. Raises ``OSError`` (incl.
-    ``socket.gaierror``) on lookup failure or timeout, or ``ValueError`` if
-    the result isn't a valid IP literal.
+    startup. ``getaddrinfo`` (not ``gethostbyname``) returns every A and AAAA
+    record, so a name that resolves to both private and public addresses, or
+    to IPv6 only, can't dodge the non-private check. Bounding via thread
+    (rather than ``socket.setdefaulttimeout``) avoids mutating process-global
+    socket state. Raises ``OSError`` (incl. ``socket.gaierror``) on lookup
+    failure or timeout, or ``ValueError`` if a result isn't a valid IP literal.
     """
     try:
-        return ipaddress.ip_address(host)
+        return [ipaddress.ip_address(host)]
     except ValueError:
         pass
     with concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="unifi-dns") as pool:
-        future = pool.submit(socket.gethostbyname, host)
+        future = pool.submit(socket.getaddrinfo, host, None, type=socket.SOCK_STREAM)
         try:
-            resolved = future.result(timeout=_DNS_LOOKUP_TIMEOUT_S)
+            infos = future.result(timeout=_DNS_LOOKUP_TIMEOUT_S)
         except concurrent.futures.TimeoutError as exc:
             raise OSError(f"DNS lookup for {host!r} exceeded {_DNS_LOOKUP_TIMEOUT_S}s timeout") from exc
-    return ipaddress.ip_address(resolved)
+    resolved: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    for info in infos:
+        address = ipaddress.ip_address(info[4][0])
+        if address not in resolved:
+            resolved.append(address)
+    return resolved
