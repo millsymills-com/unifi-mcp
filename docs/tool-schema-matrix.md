@@ -181,7 +181,7 @@ Backing surface: `/proxy/protect/integration/v1/`. 45 tools.
 | `unifi_protect_list_users` | R | — |
 | `unifi_protect_list_viewers` | R | — |
 | `unifi_protect_set_light_mode` | W | `light_id: string, mode: string` |
-| `unifi_protect_set_recording_mode` | W | `camera_id: string, mode: string, pre_padding?: integer \| null = null, post_padding?: integer \| null = null` |
+| `unifi_protect_set_recording_mode` | W | `camera_id: string, mode: string, pre_padding?: integer \| null = null, post_padding?: integer \| null = null, confirm?: boolean = false` |
 | `unifi_protect_set_smart_detection` | W | `camera_id: string, object_types: array<string>` |
 | `unifi_protect_set_viewer_liveview` | W | `viewer_id: string, liveview_id: string` |
 | `unifi_protect_update_camera` | W | `camera_id: string, name?: string \| null = null, led_settings_is_enabled?: boolean \| null = null, osd_settings_is_name_enabled?: boolean \| null = null, osd_settings_is_date_enabled?: boolean \| null = null, osd_settings_is_logo_enabled?: boolean \| null = null, osd_settings_is_debug_enabled?: boolean \| null = null` |
