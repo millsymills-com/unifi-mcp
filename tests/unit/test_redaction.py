@@ -97,6 +97,78 @@ class TestRedactSecretsKeyMatching:
         assert out[key] == REDACTED
 
 
+class TestRedactSecretsCookieAndAuthKeys:
+    """#442 — cookie / authorization / session / credential key names redact."""
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "cookie",
+            "Cookie",
+            "set_cookie",
+            "set-cookie",
+            "Set-Cookie",
+            "authorization",
+            "Authorization",
+            "credential",
+            "credentials",
+            "session",
+            "sessionid",
+            "sessionId",
+            "csrf",
+            "CSRF",
+            "jwt",
+            "JWT",
+        ],
+    )
+    def test_cookie_and_auth_keys_redacted(self, key):
+        out = redact_secrets({key: "v"})
+        assert out[key] == REDACTED
+
+    def test_non_credential_session_lookalikes_pass_through(self):
+        payload = {"sessionCount": 3, "lastSeen": "2026-06-24"}
+        assert redact_secrets(payload) == payload
+
+
+class TestRedactSecretsCredentialUrlValues:
+    """#442 — URL values carrying a credential redact regardless of key name."""
+
+    @pytest.mark.parametrize(
+        "key",
+        ["rtspsUrl", "url", "streamUrl", "href"],
+    )
+    def test_rtsps_url_with_token_query_redacted(self, key):
+        out = redact_secrets({key: "rtsps://10.0.0.1:7441/abc?token=deadbeef"})
+        assert out[key] == REDACTED
+
+    def test_url_with_password_query_param_redacted(self):
+        out = redact_secrets({"url": "https://host/stream?password=hunter2"})
+        assert out["url"] == REDACTED
+
+    def test_url_with_userinfo_credentials_redacted(self):
+        out = redact_secrets({"endpoint": "rtsp://admin:s3cret@10.0.0.1:554/live"})
+        assert out["endpoint"] == REDACTED
+
+    def test_credentialed_url_in_nested_list_redacted(self):
+        payload = {"streams": [{"quality": "high", "url": "rtsps://h/s?token=abc"}]}
+        out = redact_secrets(payload)
+        assert out["streams"][0]["url"] == REDACTED
+        assert out["streams"][0]["quality"] == "high"
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "https://ui.com/docs",
+            "rtsps://10.0.0.1:7441/abcdef",
+            "https://host/path?q=search&page=2",
+            "not a url at all",
+        ],
+    )
+    def test_ordinary_urls_pass_through(self, value):
+        out = redact_secrets({"url": value})
+        assert out["url"] == value
+
+
 class TestRedactSecretsProperties:
     def test_does_not_mutate_input(self):
         original = {"x_passphrase": "pw", "nested": {"token": "t"}}
