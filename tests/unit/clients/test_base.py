@@ -948,6 +948,25 @@ class TestGetRaw:
         assert route.call_count == 2
 
     @respx.mock
+    async def test_get_raw_streaming_429_exhausts_retries_and_surfaces_rate_limit_error(self, client, monkeypatch):
+        """Stacked 429s past ``max_retries`` on the streamed media path re-raise
+        ``UniFiRateLimitError``, bounded to ``1 + max_retries`` attempts — the
+        streaming mirror of the non-streaming exhaustion path (#443)."""
+        from unifi_mcp.errors import UniFiRateLimitError
+
+        async def fake_sleep(seconds: float) -> None:
+            pass
+
+        monkeypatch.setattr("unifi_mcp.clients.base.asyncio.sleep", fake_sleep)
+
+        route = respx.get(f"{BASE_URL}/clip").mock(
+            return_value=httpx.Response(429, text="rate limited", headers={"Retry-After": "1"})
+        )
+        with pytest.raises(UniFiRateLimitError, match="429"):
+            await client.get_raw("clip", max_bytes=1024)
+        assert route.call_count == 1 + client._max_retries
+
+    @respx.mock
     async def test_get_raw_with_max_bytes_under_cap_returns_full_body(self, client):
         payload = b"x" * 1024
         respx.get(f"{BASE_URL}/clip").mock(return_value=httpx.Response(200, content=payload))
