@@ -58,7 +58,7 @@ class TestGetSnapshot:
         route = respx.get(f"{API_PREFIX}cameras/cam-1/snapshot").mock(
             return_value=httpx.Response(200, content=snapshot_data)
         )
-        result = await client.get_snapshot("cam-1")
+        result = await client.get_snapshot("cam-1", max_bytes=1024)
         assert route.called
         assert result == snapshot_data
 
@@ -68,7 +68,7 @@ class TestGetSnapshot:
         route = respx.get(f"{API_PREFIX}cameras/cam-1/snapshot").mock(
             return_value=httpx.Response(200, content=snapshot_data)
         )
-        result = await client.get_snapshot("cam-1", timestamp=1700000000000)
+        result = await client.get_snapshot("cam-1", timestamp=1700000000000, max_bytes=1024)
         assert route.called
         request = route.calls[0].request
         assert "ts=1700000000000" in str(request.url)

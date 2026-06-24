@@ -30,6 +30,8 @@ import os
 
 import pytest
 
+from tests.integration.conftest import _normalize_mac
+
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.integration
@@ -91,6 +93,9 @@ async def _wait_for_pending_then_adopt(client, mac: str, deadline: float) -> boo
     return False
 
 
+@pytest.mark.live_write
+@pytest.mark.slow
+@pytest.mark.write_gated
 @pytest.mark.skipif(
     not _enabled("LIVE_TEST_FORGET_ADOPT"),
     reason="Set LIVE_TEST_FORGET_ADOPT=1 to run the forget→adopt cycle (irreversible if cleanup fails)",
@@ -103,11 +108,11 @@ class TestForgetAdoptCycle:
     can manually recover.
     """
 
-    async def test_forget_adopt_cycle(self, network_live_client, protected_macs, cleanup_register):
+    async def test_forget_adopt_cycle(self, network_live_client, protected_macs, cleanup_register, touched_devices):
         mac = _risky_target_mac()
         if not mac:
             pytest.skip("UNIFI_MCP_TEST_TARGET_MAC or UNIFI_MCP_TEST_RISKY_TARGET_MAC unset")
-        assert mac not in protected_macs, f"{mac} is in protected_macs; refusing to cycle"
+        assert _normalize_mac(mac) not in protected_macs, f"{mac} is in protected_macs; refusing to cycle"
 
         devices_before = await network_live_client.list_devices()
         target = _find_device(devices_before, mac)
@@ -123,6 +128,7 @@ class TestForgetAdoptCycle:
             target.get("model"),
         )
 
+        touched_devices.claim(mac, "forget")
         forget_response = await network_live_client.forget_device(mac)
         assert isinstance(forget_response, dict), "forget_device must return a dict"
         cleanup_register(network_live_client.adopt_device, mac)
@@ -165,6 +171,9 @@ class TestForgetAdoptCycle:
             raise
 
 
+@pytest.mark.live_write
+@pytest.mark.slow
+@pytest.mark.write_gated
 @pytest.mark.skipif(
     not _enabled("LIVE_TEST_UPGRADE"),
     reason="Set LIVE_TEST_UPGRADE=1 to run upgrade_device smoke test (~5min, risk of soft-brick)",
@@ -178,11 +187,11 @@ class TestUpgradeDevice:
     and do not wait for the upgrade to complete.
     """
 
-    async def test_upgrade_device(self, network_live_client, protected_macs):
+    async def test_upgrade_device(self, network_live_client, protected_macs, touched_devices):
         mac = _risky_target_mac()
         if not mac:
             pytest.skip("UNIFI_MCP_TEST_TARGET_MAC or UNIFI_MCP_TEST_RISKY_TARGET_MAC unset")
-        assert mac not in protected_macs
+        assert _normalize_mac(mac) not in protected_macs
 
         devices = await network_live_client.list_devices()
         target = _find_device(devices, mac)
@@ -197,5 +206,6 @@ class TestUpgradeDevice:
             target.get("version"),
         )
 
+        touched_devices.claim(mac, "upgrade")
         response = await network_live_client.upgrade_device(mac)
         assert isinstance(response, dict), "upgrade_device must return a dict"

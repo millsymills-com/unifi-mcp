@@ -58,7 +58,7 @@ class TestMediaClientEndpoints:
         route = respx.get(f"{PROTECT_PREFIX}/cameras/cam-1/snapshot").mock(
             return_value=httpx.Response(200, content=b"\xff\xd8\xff\xe0"),
         )
-        result = await protect_client_local.get_snapshot("cam-1")
+        result = await protect_client_local.get_snapshot("cam-1", max_bytes=1024)
         assert result == b"\xff\xd8\xff\xe0"
         # No ts param by default
         assert "ts" not in route.calls[0].request.url.params
@@ -68,7 +68,7 @@ class TestMediaClientEndpoints:
         route = respx.get(f"{PROTECT_PREFIX}/cameras/cam-1/snapshot").mock(
             return_value=httpx.Response(200, content=b"\xff\xd8"),
         )
-        await protect_client_local.get_snapshot("cam-1", timestamp=1700000000000)
+        await protect_client_local.get_snapshot("cam-1", timestamp=1700000000000, max_bytes=1024)
         assert route.calls[0].request.url.params["ts"] == "1700000000000"
 
     @respx.mock
@@ -77,7 +77,7 @@ class TestMediaClientEndpoints:
         route = respx.get(f"{PROTECT_PREFIX}/cameras/cam-1/video/export").mock(
             return_value=httpx.Response(200, content=b"mp4-bytes"),
         )
-        result = await protect_client_local.export_video("cam-1", start=1000, end=2000)
+        result = await protect_client_local.export_video("cam-1", start=1000, end=2000, max_bytes=1_000_000)
         assert result == b"mp4-bytes"
         params = route.calls[0].request.url.params
         assert params["start"] == "1000"
