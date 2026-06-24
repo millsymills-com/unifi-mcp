@@ -6,7 +6,7 @@ The latest minor release receives security fixes. Older minors are not supported
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.3.x   | :white_check_mark: |
+| 0.4.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
