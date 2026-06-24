@@ -125,7 +125,7 @@ class TestLegacyConfirmGuards:
         client = AsyncMock()
         ctx = _ctx(client)
         tool = await server.get_tool(tool_name)
-        with pytest.raises(ToolError, match="confirm=True"):
+        with pytest.raises(ToolError, match=r"Invalid request:.*confirm=True"):
             await tool.fn(ctx, **kwargs)
         getattr(client, client_method).assert_not_awaited()
 
@@ -136,7 +136,7 @@ class TestLegacyConfirmGuards:
         client = AsyncMock()
         ctx = _ctx(client)
         tool = await server.get_tool(tool_name)
-        with pytest.raises(ToolError, match="confirm=True"):
+        with pytest.raises(ToolError, match=r"Invalid request:.*confirm=True"):
             await tool.fn(ctx, **kwargs, confirm=False)
         getattr(client, client_method).assert_not_awaited()
 
