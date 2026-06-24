@@ -225,7 +225,7 @@ class TestAssignHandlerPlumbing:
         client.assign_port_profile.return_value = {"ok": True}
         ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
         tool = await server.get_tool("unifi_network_assign_port_profile")
-        result = await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff", port_idx=7, profile_id="p-7")
+        result = await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff", port_idx=7, profile_id="p-7", confirm=True)
         assert result == {"ok": True}
         client.assign_port_profile.assert_awaited_once_with("aa:bb:cc:dd:ee:ff", 7, "p-7")
 
@@ -306,6 +306,6 @@ class TestDeletePortProfileHandler:
         client.delete_port_profile.return_value = {"ok": True}
         ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
         tool = await mcp_with_profiles.get_tool("unifi_network_delete_port_profile")
-        result = await tool.fn(ctx, profile_id="p-1")
+        result = await tool.fn(ctx, profile_id="p-1", confirm=True)
         assert result == {"ok": True}
         client.delete_port_profile.assert_awaited_once_with("p-1")

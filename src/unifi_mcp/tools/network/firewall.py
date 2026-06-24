@@ -6,6 +6,7 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
+from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
     get_server_context,
@@ -150,16 +151,25 @@ def register_firewall_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_delete_firewall_rule(ctx: Context, rule_id: str) -> dict[str, Any]:
+    async def unifi_network_delete_firewall_rule(ctx: Context, rule_id: str, confirm: bool = False) -> dict[str, Any]:
         """Delete a firewall rule.
+
+        Irreversible. Pass ``confirm=True`` to proceed.
 
         Args:
             rule_id: The firewall rule ID to delete.
+            confirm: Must be ``True`` to perform the deletion.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``rule_id`` is malformed, or
+                ``confirm`` is not ``True``.
         """
         validate_id(rule_id, field="rule_id")
+        if not confirm:
+            raise UniFiBadRequestError("deleting the firewall rule is irreversible; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].delete_firewall_rule(rule_id))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
@@ -205,14 +215,23 @@ def register_firewall_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_delete_firewall_group(ctx: Context, group_id: str) -> dict[str, Any]:
+    async def unifi_network_delete_firewall_group(ctx: Context, group_id: str, confirm: bool = False) -> dict[str, Any]:
         """Delete a firewall group.
+
+        Irreversible. Pass ``confirm=True`` to proceed.
 
         Args:
             group_id: The firewall group ID to delete.
+            confirm: Must be ``True`` to perform the deletion.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``group_id`` is malformed, or
+                ``confirm`` is not ``True``.
         """
         validate_id(group_id, field="group_id")
+        if not confirm:
+            raise UniFiBadRequestError("deleting the firewall group is irreversible; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].delete_firewall_group(group_id))

@@ -50,14 +50,21 @@ def register_client_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_block_client(ctx: Context, mac: str) -> dict[str, Any]:
+    async def unifi_network_block_client(ctx: Context, mac: str, confirm: bool = False) -> dict[str, Any]:
         """Block a client from connecting to the network.
+
+        Disconnects the client and bars it from reconnecting. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the client to block.
+            confirm: Must be ``True`` to perform the block.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``mac`` is malformed, or
+                ``confirm`` is not ``True``.
 
         NOTE: not atomic. A ``list_all_clients`` pre-check ensures the MAC is
         known to the controller, then ``cmd/stamgr`` issues the block as a
@@ -66,6 +73,8 @@ def register_client_tools(mcp: FastMCP) -> None:
         offers no compare-and-set primitive (#151).
         """
         validate_mac(mac, field="mac")
+        if not confirm:
+            raise UniFiBadRequestError("blocking disconnects the client; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].block_client(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})

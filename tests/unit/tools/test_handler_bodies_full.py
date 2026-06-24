@@ -77,7 +77,13 @@ NETWORK_HAPPY_PATHS = [
     ),
     (register_stats_tools, "unifi_network_get_sysinfo", "get_sysinfo", {}, None),
     # devices
-    (register_device_tools, "unifi_network_adopt_device", "adopt_device", {"mac": "aa:bb:cc:dd:ee:ff"}, None),
+    (
+        register_device_tools,
+        "unifi_network_adopt_device",
+        "adopt_device",
+        {"mac": "aa:bb:cc:dd:ee:ff", "confirm": True},
+        None,
+    ),
     (register_device_tools, "unifi_network_locate_device", "locate_device", {"mac": "aa:bb:cc:dd:ee:ff"}, None),
     (register_device_tools, "unifi_network_unlocate_device", "unlocate_device", {"mac": "aa:bb:cc:dd:ee:ff"}, None),
     (register_device_tools, "unifi_network_provision_device", "provision_device", {"mac": "aa:bb:cc:dd:ee:ff"}, None),
@@ -108,7 +114,13 @@ NETWORK_HAPPY_PATHS = [
         {"rule_id": "r-1", "data": {}},
         None,
     ),
-    (register_firewall_tools, "unifi_network_delete_firewall_rule", "delete_firewall_rule", {"rule_id": "r-1"}, None),
+    (
+        register_firewall_tools,
+        "unifi_network_delete_firewall_rule",
+        "delete_firewall_rule",
+        {"rule_id": "r-1", "confirm": True},
+        None,
+    ),
     (
         register_firewall_tools,
         "unifi_network_create_firewall_group",
@@ -127,7 +139,7 @@ NETWORK_HAPPY_PATHS = [
         register_firewall_tools,
         "unifi_network_delete_firewall_group",
         "delete_firewall_group",
-        {"group_id": "g-1"},
+        {"group_id": "g-1", "confirm": True},
         None,
     ),
     # networks
@@ -147,7 +159,13 @@ NETWORK_HAPPY_PATHS = [
         {"network_id": "n-1", "data": {}},
         None,
     ),
-    (register_network_config_tools, "unifi_network_delete_network", "delete_network", {"network_id": "n-1"}, None),
+    (
+        register_network_config_tools,
+        "unifi_network_delete_network",
+        "delete_network",
+        {"network_id": "n-1", "confirm": True},
+        None,
+    ),
     # port forward
     (register_port_forward_tools, "unifi_network_list_port_forwards", "list_port_forwards", {}, None),
     (
@@ -175,7 +193,7 @@ NETWORK_HAPPY_PATHS = [
         register_port_forward_tools,
         "unifi_network_delete_port_forward",
         "delete_port_forward",
-        {"port_forward_id": "pf-1"},
+        {"port_forward_id": "pf-1", "confirm": True},
         None,
     ),
     # routing
@@ -189,7 +207,13 @@ NETWORK_HAPPY_PATHS = [
         None,
     ),
     (register_routing_tools, "unifi_network_update_route", "update_route", {"route_id": "r-1", "data": {}}, None),
-    (register_routing_tools, "unifi_network_delete_route", "delete_route", {"route_id": "r-1"}, None),
+    (
+        register_routing_tools,
+        "unifi_network_delete_route",
+        "delete_route",
+        {"route_id": "r-1", "confirm": True},
+        None,
+    ),
     # system
     (register_system_tools, "unifi_network_get_settings", "get_settings", {}, None),
     (
@@ -205,11 +229,11 @@ NETWORK_HAPPY_PATHS = [
         register_system_tools,
         "unifi_network_power_cycle_port",
         "power_cycle_port",
-        {"mac": "aa:bb:cc:dd:ee:ff", "port_idx": 3},
+        {"mac": "aa:bb:cc:dd:ee:ff", "port_idx": 3, "confirm": True},
         None,
     ),
     (register_system_tools, "unifi_network_unauthorize_guest", "unauthorize_guest", {"mac": "aa:bb:cc:dd:ee:ff"}, None),
-    (register_system_tools, "unifi_network_reset_dpi", "reset_dpi", {}, None),
+    (register_system_tools, "unifi_network_reset_dpi", "reset_dpi", {"confirm": True}, None),
 ]
 
 

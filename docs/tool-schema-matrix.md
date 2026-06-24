@@ -28,10 +28,10 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
-| `unifi_network_adopt_device` | W | `mac: string` |
-| `unifi_network_assign_port_profile` | W | `mac: string, port_idx: integer, profile_id: string` |
+| `unifi_network_adopt_device` | W | `mac: string, confirm?: boolean = false` |
+| `unifi_network_assign_port_profile` | W | `mac: string, port_idx: integer, profile_id: string, confirm?: boolean = false` |
 | `unifi_network_authorize_guest` | W | `mac: string, minutes?: integer = 60` |
-| `unifi_network_block_client` | W | `mac: string` |
+| `unifi_network_block_client` | W | `mac: string, confirm?: boolean = false` |
 | `unifi_network_create_acl_rule` | W | `data: object` |
 | `unifi_network_create_backup` | W | — |
 | `unifi_network_create_dns_policy` | W | `data: object` |
@@ -46,17 +46,17 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_create_wlan` | W | `name: string, security?: string = "wpapsk", wpa_mode?: string = "wpa2", x_passphrase?: string = "", enabled?: boolean = true` |
 | `unifi_network_delete_acl_rule` | W | `acl_rule_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_dns_policy` | W | `dns_policy_id: string, confirm?: boolean = false` |
-| `unifi_network_delete_firewall_group` | W | `group_id: string` |
-| `unifi_network_delete_firewall_rule` | W | `rule_id: string` |
+| `unifi_network_delete_firewall_group` | W | `group_id: string, confirm?: boolean = false` |
+| `unifi_network_delete_firewall_rule` | W | `rule_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_firewall_zone` | W | `zone_id: string, confirm?: boolean = false` |
-| `unifi_network_delete_network` | W | `network_id: string` |
-| `unifi_network_delete_port_forward` | W | `port_forward_id: string` |
-| `unifi_network_delete_port_profile` | W | `profile_id: string` |
-| `unifi_network_delete_route` | W | `route_id: string` |
+| `unifi_network_delete_network` | W | `network_id: string, confirm?: boolean = false` |
+| `unifi_network_delete_port_forward` | W | `port_forward_id: string, confirm?: boolean = false` |
+| `unifi_network_delete_port_profile` | W | `profile_id: string, confirm?: boolean = false` |
+| `unifi_network_delete_route` | W | `route_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_voucher` | W | `voucher_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_vouchers` | W | `voucher_filter: string, confirm?: boolean = false` |
-| `unifi_network_delete_wlan` | W | `wlan_id: string` |
-| `unifi_network_forget_device` | W | `mac: string` |
+| `unifi_network_delete_wlan` | W | `wlan_id: string, confirm?: boolean = false` |
+| `unifi_network_forget_device` | W | `mac: string, confirm?: boolean = false` |
 | `unifi_network_get_acl_rule` | R | `acl_rule_id: string` |
 | `unifi_network_get_acl_rules_ordering` | R | — |
 | `unifi_network_get_client` | R | `mac: string` |
@@ -113,11 +113,11 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_list_wans` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_wlans` | R | — |
 | `unifi_network_locate_device` | W | `mac: string` |
-| `unifi_network_power_cycle_port` | W | `mac: string, port_idx: integer` |
+| `unifi_network_power_cycle_port` | W | `mac: string, port_idx: integer, confirm?: boolean = false` |
 | `unifi_network_provision_device` | W | `mac: string` |
 | `unifi_network_reorder_acl_rules` | W | `ordered_acl_rule_ids: array<string>, confirm?: boolean = false` |
-| `unifi_network_reset_dpi` | W | — |
-| `unifi_network_restart_device` | W | `mac: string` |
+| `unifi_network_reset_dpi` | W | `confirm?: boolean = false` |
+| `unifi_network_restart_device` | W | `mac: string, confirm?: boolean = false` |
 | `unifi_network_run_speedtest` | W | — |
 | `unifi_network_unauthorize_guest` | W | `mac: string` |
 | `unifi_network_unblock_client` | W | `mac: string` |
@@ -133,7 +133,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_update_route` | W | `route_id: string, data: object` |
 | `unifi_network_update_settings` | W | `ntp_server_1?: string \| null = null, ntp_server_2?: string \| null = null, mgmt_led_enabled?: boolean \| null = null` |
 | `unifi_network_update_wlan` | W | `wlan_id: string, data: object` |
-| `unifi_network_upgrade_device` | W | `mac: string` |
+| `unifi_network_upgrade_device` | W | `mac: string, confirm?: boolean = false` |
 
 ---
 

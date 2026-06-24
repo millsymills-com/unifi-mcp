@@ -160,33 +160,53 @@ def register_system_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_upgrade_device(ctx: Context, mac: str) -> dict[str, Any]:
+    async def unifi_network_upgrade_device(ctx: Context, mac: str, confirm: bool = False) -> dict[str, Any]:
         """Upgrade a device to the latest firmware.
+
+        Interrupts the device while it flashes and reboots. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the device to upgrade.
+            confirm: Must be ``True`` to perform the upgrade.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``mac`` is malformed, or
+                ``confirm`` is not ``True``.
         """
         validate_mac(mac, field="mac")
+        if not confirm:
+            raise UniFiBadRequestError("upgrading interrupts the device; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].upgrade_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_power_cycle_port(ctx: Context, mac: str, port_idx: int) -> dict[str, Any]:
+    async def unifi_network_power_cycle_port(
+        ctx: Context, mac: str, port_idx: int, confirm: bool = False
+    ) -> dict[str, Any]:
         """Power cycle a PoE port on a switch.
+
+        Interrupts power to the attached device. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the switch.
             port_idx: Port index to power cycle. Bounded to ``1..52``; values
                 outside this range raise ``UniFiBadRequestError``.
+            confirm: Must be ``True`` to perform the power cycle.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``mac``/``port_idx`` are invalid,
+                or ``confirm`` is not ``True``.
         """
         validate_mac(mac, field="mac")
         _validate_port_idx(port_idx)
+        if not confirm:
+            raise UniFiBadRequestError("power-cycling interrupts the port; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].power_cycle_port(mac, port_idx))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
@@ -209,13 +229,21 @@ def register_system_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_reset_dpi(ctx: Context) -> dict[str, Any]:
+    async def unifi_network_reset_dpi(ctx: Context, confirm: bool = False) -> dict[str, Any]:
         """Reset all DPI (Deep Packet Inspection) counters.
+
+        Irreversibly clears accumulated DPI statistics. Pass ``confirm=True`` to proceed.
 
         Args:
             ctx: FastMCP request context.
+            confirm: Must be ``True`` to perform the reset.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled or ``confirm`` is not ``True``.
         """
+        if not confirm:
+            raise UniFiBadRequestError("resetting clears all DPI counters; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].reset_dpi())

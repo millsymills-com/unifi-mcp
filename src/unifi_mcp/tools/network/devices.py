@@ -6,7 +6,7 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiNotFoundError
+from unifi_mcp.errors import UniFiBadRequestError, UniFiNotFoundError
 from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler, validate_mac
 
 
@@ -38,28 +38,44 @@ def register_device_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_restart_device(ctx: Context, mac: str) -> dict[str, Any]:
+    async def unifi_network_restart_device(ctx: Context, mac: str, confirm: bool = False) -> dict[str, Any]:
         """Restart an adopted network device.
+
+        Interrupts service while the device reboots. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the device to restart.
+            confirm: Must be ``True`` to perform the restart.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``mac`` is malformed, or
+                ``confirm`` is not ``True``.
         """
         validate_mac(mac, field="mac")
+        if not confirm:
+            raise UniFiBadRequestError("restarting the device interrupts service; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].restart_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_adopt_device(ctx: Context, mac: str) -> dict[str, Any]:
+    async def unifi_network_adopt_device(ctx: Context, mac: str, confirm: bool = False) -> dict[str, Any]:
         """Adopt a new device into the network.
+
+        Changes device state. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the device to adopt.
+            confirm: Must be ``True`` to perform the adoption.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``mac`` is malformed, or
+                ``confirm`` is not ``True``.
 
         NOTE: not atomic. A ``list_devices`` pre-check runs before the
         ``cmd/devmgr`` adopt POST so already-adopted devices surface a typed
@@ -70,6 +86,8 @@ def register_device_tools(mcp: FastMCP) -> None:
         primitive (#151).
         """
         validate_mac(mac, field="mac")
+        if not confirm:
+            raise UniFiBadRequestError("adopting changes device state; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].adopt_device(mac))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
@@ -116,18 +134,23 @@ def register_device_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_forget_device(ctx: Context, mac: str) -> dict[str, Any]:
+    async def unifi_network_forget_device(ctx: Context, mac: str, confirm: bool = False) -> dict[str, Any]:
         """Forget (unadopt) a previously-adopted device.
 
         The device reverts to the unadopted state and can be re-adopted later.
         Any in-flight clients on that device lose connectivity during the
-        transition, so this is marked destructive.
+        transition, so this is marked destructive. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the adopted device.
+            confirm: Must be ``True`` to perform the unadoption.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``mac`` is malformed, or
+                ``confirm`` is not ``True``.
 
         NOTE: not atomic. A ``list_devices`` pre-check runs before the
         ``cmd/sitemgr`` forget POST, so a concurrent forget/re-adopt between
@@ -135,4 +158,6 @@ def register_device_tools(mcp: FastMCP) -> None:
         primitive (#151).
         """
         validate_mac(mac, field="mac")
+        if not confirm:
+            raise UniFiBadRequestError("forgetting unadopts the device; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].forget_device(mac))
