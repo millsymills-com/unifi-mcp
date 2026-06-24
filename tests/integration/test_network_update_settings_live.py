@@ -108,6 +108,8 @@ _FIELD_CASES: tuple[tuple[str, str, str, Any, Any], ...] = (
 )
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
 @pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestUpdateSettingsRoundTrip:
     """Round-trip every named scalar through the live controller.
