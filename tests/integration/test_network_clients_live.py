@@ -30,12 +30,22 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 import pytest
 
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.integration
+
+
+def _writes_enabled() -> bool:
+    return os.environ.get("UNIFI_MODE", "readonly").lower() == "readwrite" and os.environ.get(
+        "LIVE_TEST_WRITES", ""
+    ).strip() in {"1", "true", "yes"}
+
+
+WRITE_GATE_REASON = "Set UNIFI_MODE=readwrite and LIVE_TEST_WRITES=1 to run write tests"
 
 
 _BLOCK_APPLY_DELAY_S = 2.0
@@ -62,6 +72,9 @@ def _find_known(all_response: dict, mac: str) -> dict | None:
     )
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestBlockUnblockCycle:
     """Live block → verify → unblock → verify cycle.
 
@@ -129,6 +142,9 @@ class TestBlockUnblockCycle:
                 LOG.warning("Cleanup unblock_client(%s) failed: %s", mac, exc)
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestAuthorizeUnauthorizeCycle:
     """Live authorize_guest → verify → unauthorize_guest → verify cycle.
 
@@ -197,6 +213,9 @@ _KICK_RECONNECT_TIMEOUT_S = 30.0
 _KICK_POLL_INTERVAL_S = 1.5
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestKickClient:
     """Live kick_client smoke test.
 

@@ -8,6 +8,7 @@ Created port-forward is enabled=False so even if cleanup fails, the rule is iner
 
 from __future__ import annotations
 
+import os
 import uuid
 
 import pytest
@@ -15,6 +16,18 @@ import pytest
 pytestmark = pytest.mark.integration
 
 
+def _writes_enabled() -> bool:
+    return os.environ.get("UNIFI_MODE", "readonly").lower() == "readwrite" and os.environ.get(
+        "LIVE_TEST_WRITES", ""
+    ).strip() in {"1", "true", "yes"}
+
+
+WRITE_GATE_REASON = "Set UNIFI_MODE=readwrite and LIVE_TEST_WRITES=1 to run write tests"
+
+
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 async def test_port_forward_crud_roundtrip(
     network_live_client,
     mcptest_prefix,

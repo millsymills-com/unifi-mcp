@@ -15,6 +15,7 @@ from __future__ import annotations
 import inspect
 import logging
 import os
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -211,8 +212,12 @@ async def protected_macs(network_live_client_session: NetworkClient) -> frozense
             "your gateway, uplinked switch, and uplinked AP, then rerun."
         )
         pytest.fail(msg)
+    normalized = [_normalize_mac(item) for item in raw]
+    if not all(normalized):
+        bad = [item for item, norm in zip(raw, normalized, strict=True) if not norm]
+        pytest.fail(f"UNIFI_MCP_TEST_PROTECTED_MACS contains unparseable MAC(s): {bad}. Refusing to run.")
     LOG.warning("Protected MACs (will not be touched): %s", ", ".join(raw))
-    return frozenset(raw)
+    return frozenset(normalized)
 
 
 @pytest.fixture(scope="session")
@@ -225,7 +230,7 @@ def test_target_mac(protected_macs: frozenset[str]) -> str:
     target = os.environ.get("UNIFI_MCP_TEST_TARGET_MAC", "").strip().lower()
     if not target:
         pytest.skip("UNIFI_MCP_TEST_TARGET_MAC unset; skipping device-action tests")
-    if target in protected_macs:
+    if _normalize_mac(target) in protected_macs:
         pytest.fail(f"UNIFI_MCP_TEST_TARGET_MAC={target} overlaps protected_macs. Refusing to run.")
     return target
 
@@ -437,14 +442,94 @@ def _is_write_gated(item: pytest.Item) -> bool:
     return item.get_closest_marker("write_gated") is not None
 
 
+# #438: the write_gated marker is a structural signal a test *opts into*. A
+# destructive test that forgets *both* markers (write_gated and live_write)
+# evades the marker-only guard entirely — the exact gap that left ten legacy
+# test_network_*_live.py files churning controller state with no abort-hook
+# protection. To catch that class, we also scan each test's source for calls to
+# known destructive client methods. A test that mutates the controller but
+# carries no live_write marker fails collection rather than silently running an
+# unguarded write on the next live sweep (#271).
+_DESTRUCTIVE_METHODS: frozenset[str] = frozenset(
+    {
+        "forget_device",
+        "adopt_device",
+        "upgrade_device",
+        "provision_device",
+        "restart_device",
+        "power_cycle_port",
+        "reset_dpi",
+        "assign_port_profile",
+        "block_client",
+        "unblock_client",
+        "kick_client",
+        "authorize_guest",
+        "unauthorize_guest",
+        "update_settings",
+        "run_speedtest",
+        "create_backup",
+    }
+)
+
+# create_*/delete_*/update_* client calls mutate config (networks, WLANs, routes,
+# firewall rules/groups, port forwards/profiles). Matched on the `.method(`
+# call shape so a substring in a variable name or comment can't trip the guard.
+_DESTRUCTIVE_PREFIX_RE = re.compile(r"\.((?:create|delete|update)_[a-z_]+)\s*\(")
+_DESTRUCTIVE_METHOD_RE = re.compile(
+    r"\.(" + "|".join(sorted(_DESTRUCTIVE_METHODS)) + r")\s*\(",
+)
+
+# stdlib/test-harness helpers that share the create_/update_ prefix but never
+# touch a UniFi controller. Excluding them keeps the prefix scan from flagging
+# read-only async plumbing (e.g. ``asyncio.create_task``).
+_PREFIX_FALSE_POSITIVES: frozenset[str] = frozenset(
+    {"create_task", "create_subprocess_exec", "create_subprocess_shell", "create_server", "create_connection"}
+)
+
+
+def _destructive_calls_in_source(source: str) -> set[str]:
+    """Names of destructive client methods called in a test's source.
+
+    Matches ``.method(`` call shapes against the destructive method allowlist
+    and the ``create_/delete_/update_`` CRUD prefixes, dropping stdlib helpers
+    that share those prefixes. Returns an empty set for read-only tests, so a
+    caller can treat a non-empty result as "this test mutates controller state".
+
+    Args:
+        source: The ``inspect.getsource`` text of a test function.
+
+    Returns:
+        The set of destructive method names referenced in ``source``.
+    """
+    found = {m.group(1) for m in _DESTRUCTIVE_METHOD_RE.finditer(source)}
+    found |= {m.group(1) for m in _DESTRUCTIVE_PREFIX_RE.finditer(source)}
+    return found - _PREFIX_FALSE_POSITIVES
+
+
+def _unguarded_destructive(item: pytest.Item) -> bool:
+    """True if ``item`` calls a destructive client method but lacks live_write.
+
+    Falls back to the marker-only signal when the source is unavailable (e.g.
+    a synthetic item), so the existing write_gated guard still applies.
+    """
+    if item.get_closest_marker("live_write") is not None:
+        return False
+    func = getattr(item, "function", None)
+    if func is None:
+        return _is_write_gated(item)
+    try:
+        source = inspect.getsource(func)
+    except (OSError, TypeError):
+        return _is_write_gated(item)
+    return bool(_destructive_calls_in_source(source)) or _is_write_gated(item)
+
+
 # `items` is filled by name from pytest's (session, config, items) hookspec; the
 # leading args are intentionally omitted since the guard needs only the items.
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    unguarded = [
-        item.nodeid for item in items if _is_write_gated(item) and item.get_closest_marker("live_write") is None
-    ]
+    unguarded = [item.nodeid for item in items if _unguarded_destructive(item)]
     if unguarded:
         raise pytest.UsageError(
-            "write-gated tests are missing the live_write marker, so the #271 abort "
-            "hook cannot protect them: " + ", ".join(unguarded)
+            "destructive/write-gated tests are missing the live_write marker, so the #271 "
+            "abort hook cannot protect them: " + ", ".join(unguarded)
         )
