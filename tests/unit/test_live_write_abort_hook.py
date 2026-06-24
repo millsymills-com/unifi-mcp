@@ -3,8 +3,9 @@
 The integration suite is excluded from CI, so neither the
 ``pytest_collection_modifyitems`` guard (Part B) nor the
 ``pytest_runtest_makereport`` abort hook (Part A) ever runs there. These tests
-exercise both: the collection guard directly against the pytest item protocol,
-and the abort hook via ``pytester`` sub-sessions that load the real hook.
+exercise both: the collection guard directly against the pytest item protocol
+(marker signal and the #438 destructive-source scan), and the abort hook via
+``pytester`` sub-sessions that load the real hook.
 """
 
 from __future__ import annotations
@@ -14,7 +15,12 @@ from typing import cast
 
 import pytest
 
-from tests.integration.conftest import _is_write_gated, pytest_collection_modifyitems
+from tests.integration.conftest import (
+    _destructive_calls_in_source,
+    _is_write_gated,
+    _unguarded_destructive,
+    pytest_collection_modifyitems,
+)
 
 pytest_plugins = ["pytester"]
 
@@ -96,6 +102,91 @@ def test_guard_ignores_non_write_gated_tests() -> None:
         _item("t::plain"),
     ]
     pytest_collection_modifyitems(items=items)  # must not raise
+
+
+# ── #438: source-scanning detector ─────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "await client.forget_device(mac)",
+        "await network_live_client.upgrade_device(mac)",
+        "resp = await c.restart_device(m)",
+        "await c.reset_dpi()",
+        "await c.power_cycle_port(mac, 1)",
+        "await c.create_network({'name': n})",
+        "await client.delete_firewall_group(group_id)",
+        "await client.update_wlan(wid, {'name': n})",
+        "await c.block_client(mac)",
+        "await c.authorize_guest(mac, minutes=1)",
+    ],
+)
+def test_detector_flags_destructive_calls(source: str) -> None:
+    assert _destructive_calls_in_source(source), f"expected destructive call in: {source!r}"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "await client.list_devices()",
+        "await client.get_firewall_group(group_id)",
+        "server = create_server()",  # bare call, no leading dot
+        "# create_network is mentioned only in a comment",
+        "creating_backup = True  # variable name, not a call",
+    ],
+)
+def test_detector_ignores_read_only_source(source: str) -> None:
+    assert not _destructive_calls_in_source(source), f"false positive in: {source!r}"
+
+
+class _SourceMarker:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _SourceItem:
+    """Item stub whose ``.function`` source the detector can inspect."""
+
+    def __init__(self, nodeid: str, func: object, *markers: _SourceMarker) -> None:
+        self.nodeid = nodeid
+        self.function = func
+        self._markers = markers
+
+    def get_closest_marker(self, name: str) -> _SourceMarker | None:
+        return next((m for m in self._markers if m.name == name), None)
+
+
+async def _destructive_test_body(client: object) -> None:
+    await client.forget_device("aa:bb:cc:dd:ee:ff")  # type: ignore[attr-defined]
+
+
+async def _read_only_test_body(client: object) -> None:
+    await client.list_devices()  # type: ignore[attr-defined]
+
+
+def test_unguarded_destructive_flags_source_without_marker() -> None:
+    item = cast("pytest.Item", _SourceItem("t::a", _destructive_test_body))
+    assert _unguarded_destructive(item)
+
+
+def test_unguarded_destructive_clears_with_live_write_marker() -> None:
+    item = cast(
+        "pytest.Item",
+        _SourceItem("t::a", _destructive_test_body, _SourceMarker("live_write")),
+    )
+    assert not _unguarded_destructive(item)
+
+
+def test_unguarded_destructive_ignores_read_only_source() -> None:
+    item = cast("pytest.Item", _SourceItem("t::a", _read_only_test_body))
+    assert not _unguarded_destructive(item)
+
+
+def test_guard_raises_for_destructive_source_without_marker() -> None:
+    item = cast("pytest.Item", _SourceItem("t::forget", _destructive_test_body))
+    with pytest.raises(pytest.UsageError, match="missing the live_write marker"):
+        pytest_collection_modifyitems(items=[item])
 
 
 def _run_hook_case(pytester: pytest.Pytester, test_body: str) -> pytest.RunResult:
