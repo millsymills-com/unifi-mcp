@@ -1,10 +1,12 @@
-"""Network Integration API read tools (#409).
+"""Network Integration API read and write tools (#409, #423).
 
-28 read-only tools over the official ``/proxy/network/integration/v1/`` surface,
-consuming :class:`~unifi_mcp.clients.network_integration.NetworkIntegrationClient`.
-Every tool is named ``unifi_network_*`` (folding into the existing ``network``
-counting namespace) and tagged ``{"network_integration"}`` for graceful
-degradation — none is tagged ``{"write"}``.
+28 read tools plus the write tools over the official
+``/proxy/network/integration/v1/`` surface, consuming
+:class:`~unifi_mcp.clients.network_integration.NetworkIntegrationClient`. Every
+tool is named ``unifi_network_*`` (folding into the existing ``network``
+counting namespace). Read tools are tagged ``{"network_integration"}``; write
+tools are tagged ``{"write", "network_integration"}`` so they are hidden in
+readonly mode and degrade with the NI backend.
 """
 
 from __future__ import annotations

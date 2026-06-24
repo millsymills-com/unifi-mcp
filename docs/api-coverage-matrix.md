@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 147 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 151 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -10,9 +10,9 @@ exactly one disposition:
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
-Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 93, Protect 45,
-Site Manager 9 = 147). The Network 93 splits into 65 legacy-controller tools
-(§3a) and 28 Network Integration read tools (§3b).
+Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 97, Protect 45,
+Site Manager 9 = 151). The Network 97 splits into 65 legacy-controller tools
+(§3a) and 32 Network Integration tools (28 read + 4 write, §3b).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -59,14 +59,14 @@ early-access rows).
 > firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
 > The Network section below therefore has two tables: (3a) the legacy paths we call,
 > mapping the 65 legacy Network tools; and (3b) the official Integration API, with the
-> 28 new read tools named and the remaining writes left as functional-equivalent or gap
-> rows.
+> 28 read tools and the ACL write group named, and the remaining writes left as
+> functional-equivalent or gap rows.
 
 ## Coverage summary
 
 | API | Covered | Excluded | Gap | Documented total | Coverage |
 |---|---:|---:|---:|---:|---:|
-| Network — official Integration API (functional equivalent + direct reads) | 54 | 1 | 18 | 73 ops | **75%** |
+| Network — official Integration API (functional equivalent + direct reads) | 58 | 1 | 14 | 73 ops | **81%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
 | Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
@@ -266,8 +266,9 @@ on a `cmd` body field.
 
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
-We now call this surface for reads via `NetworkIntegrationClient` (28 read tools,
-all `unifi_network_*`, tagged `{"network_integration"}`). "Covered" rows are
+We now call this surface via `NetworkIntegrationClient` (28 read tools plus the
+ACL write group, all `unifi_network_*`, tagged `{"network_integration"}`; write
+tools also carry `{"write"}`). "Covered" rows are
 backed either by a direct Integration tool (named) or — for resources the legacy
 controller already serves — by a **functional-equivalent** legacy tool. The site
 UUID is resolved once at startup and injected by the client, so the per-site
@@ -293,12 +294,12 @@ tools take no `siteId` argument.
 | POST | `/v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions` | **Covered** | `unifi_network_power_cycle_port` (legacy `cmd/devmgr power-cycle`) |
 | GET | `/v1/sites/{siteId}/device-tags` | **Covered** | `unifi_network_list_device_tags` |
 | GET | `/v1/sites/{siteId}/acl-rules` | **Covered** | `unifi_network_list_acl_rules` |
-| POST | `/v1/sites/{siteId}/acl-rules` | **Gap** | Create ACL rule. |
+| POST | `/v1/sites/{siteId}/acl-rules` | **Covered** | `unifi_network_create_acl_rule` |
 | GET | `/v1/sites/{siteId}/acl-rules/ordering` | **Covered** | `unifi_network_get_acl_rules_ordering` |
-| PUT | `/v1/sites/{siteId}/acl-rules/ordering` | **Gap** | Reorder ACL rules. |
+| PUT | `/v1/sites/{siteId}/acl-rules/ordering` | **Covered** | `unifi_network_reorder_acl_rules` |
 | GET | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Covered** | `unifi_network_get_acl_rule` |
-| PUT | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Gap** | Update ACL rule. |
-| DELETE | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Gap** | Delete ACL rule. |
+| PUT | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Covered** | `unifi_network_update_acl_rule` |
+| DELETE | `/v1/sites/{siteId}/acl-rules/{aclRuleId}` | **Covered** | `unifi_network_delete_acl_rule` |
 | GET | `/v1/sites/{siteId}/firewall/policies` | **Covered** | `unifi_network_list_firewall_rules` (legacy `rest/firewallrule`) |
 | POST | `/v1/sites/{siteId}/firewall/policies` | **Covered** | `unifi_network_create_firewall_rule` |
 | GET | `/v1/sites/{siteId}/firewall/policies/ordering` | **Covered** | `unifi_network_get_firewall_policies_ordering` |
