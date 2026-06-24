@@ -37,7 +37,7 @@ uv build
 
 # Run the server (after `uv sync`)
 uv run unifi-mcp                       # readonly mode (default, safe)
-UNIFI_MODE=readwrite uv run unifi-mcp  # exposes the 57 write tools
+UNIFI_MODE=readwrite uv run unifi-mcp  # exposes the 60 write tools
 ```
 
 ## Live Integration Tests — Hardware Safety
@@ -76,20 +76,20 @@ src/unifi_mcp/
 │   └── site_manager.py      # Site Manager API client
 └── tools/                   # MCP tool definitions
     ├── network/             # legacy controller tools: 26 read + 39 write
-    ├── network_integration/ # Network Integration tools: 28 read + 10 write (tagged {"network_integration"})
+    ├── network_integration/ # Network Integration tools: 28 read + 13 write (tagged {"network_integration"})
     ├── protect/             # 37 read + 8 write tools (45 total, includes 2 media read tools)
     │                        #   device_reads.py / liveviews.py / access.py add 28 read tools
     └── site_manager/        # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
 
-Per-API tool counts: Network 54 read + 49 write tools (103 total); Protect 9 read
+Per-API tool counts: Network 54 read + 52 write tools (106 total); Protect 9 read
 + 8 write tools (17 total); Site Manager 3 read-only tools. The Network 54 read
 splits into 26 legacy-controller reads + 28 Network Integration reads; the
-Network write 49 splits into 39 legacy-controller writes + 10 Network Integration
-writes (ACL + DNS + firewall-zones groups). The Network Integration tools are
-named `unifi_network_*`, so they fold into the `network` counting namespace; their
-`{"network_integration"}` tag also drives graceful degradation. The 57 write
-tools stay readonly-gated.
+Network write 52 splits into 39 legacy-controller writes + 13 Network Integration
+writes (ACL + DNS + firewall-zones + vouchers groups). The Network Integration
+tools are named `unifi_network_*`, so they fold into the `network` counting
+namespace; their `{"network_integration"}` tag also drives graceful degradation.
+The 60 write tools stay readonly-gated.
 
 ## Conventions
 

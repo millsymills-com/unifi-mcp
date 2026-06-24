@@ -304,6 +304,43 @@ class NetworkIntegrationClient(BaseUniFiClient):
         result: dict[str, Any] = await self.delete(self._site_path(f"firewall/zones/{self._segment(zone_id)}"))
         return result
 
+    # ── Write methods: hotspot vouchers ─────────────────────────────────
+
+    async def create_vouchers(
+        self,
+        *,
+        name: str,
+        time_limit_minutes: int,
+        count: int = 1,
+        authorized_guest_limit: int | None = None,
+        data_usage_limit_mbytes: int | None = None,
+        rx_rate_limit_kbps: int | None = None,
+        tx_rate_limit_kbps: int | None = None,
+    ) -> dict[str, Any]:
+        """Generate one or more guest-hotspot vouchers."""
+        body: dict[str, Any] = {"name": name, "timeLimitMinutes": time_limit_minutes, "count": count}
+        optional = {
+            "authorizedGuestLimit": authorized_guest_limit,
+            "dataUsageLimitMBytes": data_usage_limit_mbytes,
+            "rxRateLimitKbps": rx_rate_limit_kbps,
+            "txRateLimitKbps": tx_rate_limit_kbps,
+        }
+        body.update({k: v for k, v in optional.items() if v is not None})
+        result: dict[str, Any] = await self.post(self._site_path("hotspot/vouchers"), json=body)
+        return result
+
+    async def delete_vouchers(self, *, voucher_filter: str) -> dict[str, Any]:
+        """Delete vouchers matching a filter expression (bulk)."""
+        result: dict[str, Any] = await self.delete(
+            self._site_path("hotspot/vouchers"), params={"filter": voucher_filter}
+        )
+        return result
+
+    async def delete_voucher(self, voucher_id: str) -> dict[str, Any]:
+        """Delete a single voucher by id."""
+        result: dict[str, Any] = await self.delete(self._site_path(f"hotspot/vouchers/{self._segment(voucher_id)}"))
+        return result
+
     # ── Lifecycle ───────────────────────────────────────────────────────
 
     @staticmethod
