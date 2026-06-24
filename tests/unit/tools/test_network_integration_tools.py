@@ -224,30 +224,44 @@ class TestAclWrites:
         await _call(server, "unifi_network_delete_acl_rule", ctx, acl_rule_id="r1", confirm=True)
         client.delete_acl_rule.assert_awaited_once_with("r1")
 
+    async def test_reorder_acl_rules_requires_confirm(self, server):
+        client = AsyncMock()
+        ctx = _ctx(_config_rw(), client)
+        with pytest.raises(ToolError, match="pass confirm=True"):
+            await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["a", "b"])
+        client.update_acl_rules_ordering.assert_not_called()
+
     async def test_reorder_acl_rules_validates_each_id(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError, match="ordered_acl_rule_ids: invalid id format"):
-            await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["ok", "../bad"])
+            await _call(
+                server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["ok", "../bad"], confirm=True
+            )
         client.update_acl_rules_ordering.assert_not_called()
 
     async def test_reorder_acl_rules_rejects_empty_list(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError, match="must be non-empty"):
-            await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=[])
+            await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=[], confirm=True)
         client.update_acl_rules_ordering.assert_not_called()
 
     async def test_reorder_acl_rules_happy_path(self, server):
         client = AsyncMock()
         client.update_acl_rules_ordering.return_value = {}
         ctx = _ctx(_config_rw(), client)
-        await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["a", "b"])
+        await _call(server, "unifi_network_reorder_acl_rules", ctx, ordered_acl_rule_ids=["a", "b"], confirm=True)
         client.update_acl_rules_ordering.assert_awaited_once_with(["a", "b"])
 
     async def test_delete_acl_rule_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_acl_rule")
+        assert tool.annotations.destructiveHint is True
+
+    async def test_reorder_acl_rules_marked_destructive(self, server):
+        tools = await server.list_tools()
+        tool = next(t for t in tools if t.name == "unifi_network_reorder_acl_rules")
         assert tool.annotations.destructiveHint is True
 
 
