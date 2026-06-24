@@ -1,6 +1,6 @@
 # ADR-0001: Destructive write-tool safety conventions
 
-- **Status**: Accepted
+- **Status**: Accepted (legacy backport completed 2026-06-24, see Update)
 - **Date**: 2026-06-23
 
 ## Context
@@ -28,20 +28,23 @@ start erroring), so it cannot be done silently.
 ## Decision
 
 1. **`confirm=True` is the standard for destructive write tools going forward.**
-   Any new write tool that deletes, or performs a full-replacement that can drop
-   or detach existing state, MUST require `confirm=True` and SHOULD set
-   `destructiveHint: True`.
+   Any write tool marked `destructiveHint: True` MUST require `confirm=True` and
+   raise `UniFiBadRequestError` otherwise. The two are now a single invariant —
+   `destructiveHint: True` iff a `confirm` boolean parameter exists — asserted
+   server-wide by `tests/unit/tools/test_confirm_gate.py`. This applies to
+   deletes, to full-replacements that drop or detach state, and to disruptive
+   operations (device restart/adopt/forget/upgrade, port power-cycle, DPI reset,
+   port-profile assignment, client block).
 
 2. **`unifi_network_reorder_acl_rules` is brought into conformance** (this ADR's
    accompanying change): it now requires `confirm=True`, sets
    `destructiveHint: True`, and keeps the non-empty-list guard. This is safe to
    change now because the tool has not shipped in a tagged release.
 
-3. **Legacy-network deletes are NOT retrofitted in place.** Adding `confirm` to
-   them is a breaking interface change; it is deferred to a deliberate,
-   versioned change (tracked in #432) rather than applied implicitly here. Until
-   then the divergence is intentional and documented: legacy deletes predate the
-   convention.
+3. **Legacy-network destructive tools are retrofitted (see Update).** Originally
+   this ADR deferred the change as a breaking interface change tracked in #432.
+   That backport has since landed: all 15 `destructiveHint: True` legacy-network
+   tools now carry the `confirm` gate, shipped as the breaking `0.4.0` release.
 
 4. **Full-replacement updates** (`unifi_network_update_firewall_zone`,
    `unifi_network_update_dns_policy`) are NOT marked destructive. They are
@@ -54,8 +57,19 @@ start erroring), so it cannot be done silently.
 
 - New write tools have one clear rule to follow; the next NI write group (traffic
   matching lists, firewall policies) inherits it.
-- The legacy/NI delete asymmetry persists until #432's backport lands, but it is
-  now a recorded decision rather than silent drift.
-- Backporting `confirm` to legacy deletes (#432, option A) remains available as a
-  future breaking change with a version bump; this ADR would be updated to mark
-  the divergence resolved.
+- The legacy/NI delete asymmetry is resolved: the gate is uniform across both
+  write surfaces and enforced by a single invariant test.
+
+## Update (2026-06-24)
+
+The legacy backport in decision 3 landed. `confirm=True` was added to all 15
+`destructiveHint: True` legacy-network tools — the 7 deletes plus
+`restart_device`, `adopt_device`, `forget_device`, `upgrade_device`,
+`power_cycle_port`, `reset_dpi`, `assign_port_profile`, and `block_client`. This
+is a breaking change to those tool contracts, shipped as `0.4.0` (#432).
+
+The convention from decision 1 was widened in the process: rather than gating only
+deletes and state-dropping replacements, the gate now tracks `destructiveHint`
+exactly, so the rule is a single testable biconditional with no fuzzy boundary.
+`tests/unit/tools/test_confirm_gate.py` fails if any future tool sets
+`destructiveHint: True` without a `confirm` parameter, or vice versa.

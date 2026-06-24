@@ -6,6 +6,7 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
+from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
     get_server_context,
@@ -105,14 +106,23 @@ def register_routing_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_delete_route(ctx: Context, route_id: str) -> dict[str, Any]:
+    async def unifi_network_delete_route(ctx: Context, route_id: str, confirm: bool = False) -> dict[str, Any]:
         """Delete a static route.
+
+        Irreversible. Pass ``confirm=True`` to proceed.
 
         Args:
             route_id: The route ID to delete.
+            confirm: Must be ``True`` to perform the deletion.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``route_id`` is malformed, or
+                ``confirm`` is not ``True``.
         """
         validate_id(route_id, field="route_id")
+        if not confirm:
+            raise UniFiBadRequestError("deleting the route is irreversible; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].delete_route(route_id))

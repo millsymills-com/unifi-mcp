@@ -6,6 +6,7 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
+from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
     get_server_context,
@@ -100,14 +101,25 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_delete_port_forward(ctx: Context, port_forward_id: str) -> dict[str, Any]:
+    async def unifi_network_delete_port_forward(
+        ctx: Context, port_forward_id: str, confirm: bool = False
+    ) -> dict[str, Any]:
         """Delete a port forwarding rule.
+
+        Irreversible. Pass ``confirm=True`` to proceed.
 
         Args:
             port_forward_id: The port forward rule ID to delete.
+            confirm: Must be ``True`` to perform the deletion.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``port_forward_id`` is malformed,
+                or ``confirm`` is not ``True``.
         """
         validate_id(port_forward_id, field="port_forward_id")
+        if not confirm:
+            raise UniFiBadRequestError("deleting the port-forward rule is irreversible; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].delete_port_forward(port_forward_id))

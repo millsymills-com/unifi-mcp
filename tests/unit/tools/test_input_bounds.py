@@ -105,7 +105,7 @@ class TestPowerCyclePortIdxBound:
         client = AsyncMock()
         client.power_cycle_port.return_value = {}
         ctx = _ctx(client)
-        await _call(server, "unifi_network_power_cycle_port", ctx, mac=VALID_MAC, port_idx=port_idx)
+        await _call(server, "unifi_network_power_cycle_port", ctx, mac=VALID_MAC, port_idx=port_idx, confirm=True)
         client.power_cycle_port.assert_awaited_once_with(VALID_MAC, port_idx)
 
     @pytest.mark.parametrize("port_idx", [0, -1, 53, 10_000])
@@ -137,6 +137,7 @@ class TestAssignPortProfilePortIdxBound:
             mac=VALID_MAC,
             port_idx=12,
             profile_id="p-1",
+            confirm=True,
         )
         client.assign_port_profile.assert_awaited_once_with(VALID_MAC, 12, "p-1")
 

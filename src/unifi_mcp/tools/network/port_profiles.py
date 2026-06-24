@@ -93,43 +93,57 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
-    async def unifi_network_delete_port_profile(ctx: Context, profile_id: str) -> dict[str, Any]:
+    async def unifi_network_delete_port_profile(ctx: Context, profile_id: str, confirm: bool = False) -> dict[str, Any]:
         """Delete a switch port profile.
 
         Every switch port currently bound to this profile falls back to the
         default profile, which may reset VLAN tagging and PoE mode — treat
-        this as destructive on any production site.
+        this as destructive on any production site. Pass ``confirm=True`` to
+        proceed.
 
         Args:
             profile_id: The port-profile ID to delete.
+            confirm: Must be ``True`` to perform the deletion.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, ``profile_id`` is malformed, or
+                ``confirm`` is not ``True``.
         """
         validate_id(profile_id, field="profile_id")
+        if not confirm:
+            raise UniFiBadRequestError("deleting the port profile is irreversible; pass confirm=True")
         return redact_secrets(await get_server_context(ctx).clients["network"].delete_port_profile(profile_id))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
     async def unifi_network_assign_port_profile(
-        ctx: Context, mac: str, port_idx: int, profile_id: str
+        ctx: Context, mac: str, port_idx: int, profile_id: str, confirm: bool = False
     ) -> dict[str, Any]:
         """Assign a port profile to a specific switch port.
+
+        Can drop clients on that port if the new profile changes their link
+        config. Pass ``confirm=True`` to proceed.
 
         Args:
             mac: MAC address of the switch.
             port_idx: 1-based port number on the switch. Bounded to ``1..52``;
                 values outside this range raise ``UniFiBadRequestError``.
             profile_id: The port-profile ID to apply.
+            confirm: Must be ``True`` to apply the profile.
 
         Returns:
             The upstream API response.
 
+        Raises:
+            ToolError: If write mode is disabled, ``mac``/``port_idx``/``profile_id``
+                are invalid, or ``confirm`` is not ``True``.
+
         Note:
             Splices a ``port_overrides`` entry onto the device so the named
             port adopts the profile's VLAN / PoE / storm-control config.
-            Destructive — can drop clients on that port if the new profile
-            changes their link config.
         """
         validate_mac(mac, field="mac")
         validate_id(profile_id, field="profile_id")
@@ -137,6 +151,8 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
             raise UniFiBadRequestError(
                 f"port_idx must be between {_PORT_IDX_MIN} and {_PORT_IDX_MAX} (got {port_idx!r})"
             )
+        if not confirm:
+            raise UniFiBadRequestError("reassigning the port profile can drop clients; pass confirm=True")
         return redact_secrets(
             await get_server_context(ctx).clients["network"].assign_port_profile(mac, port_idx, profile_id)
         )

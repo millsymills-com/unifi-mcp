@@ -199,6 +199,6 @@ class TestForgetDeviceHandler:
         client.forget_device.return_value = {"ok": True}
         ctx = _ctx(_full_config(UniFiMode.READWRITE), network=client)
         tool = await mcp_with_devices.get_tool("unifi_network_forget_device")
-        result = await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff")
+        result = await tool.fn(ctx, mac="aa:bb:cc:dd:ee:ff", confirm=True)
         assert result == {"ok": True}
         client.forget_device.assert_awaited_once_with("aa:bb:cc:dd:ee:ff")

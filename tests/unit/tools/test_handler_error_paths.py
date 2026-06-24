@@ -75,8 +75,20 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
     (register_stats_tools, "unifi_network_get_dpi_stats", "get_dpi_stats", "network", {}),
     (register_stats_tools, "unifi_network_get_sysinfo", "get_sysinfo", "network", {}),
     # Network devices (one write per verb covers the except branch)
-    (register_device_tools, "unifi_network_restart_device", "restart_device", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
-    (register_device_tools, "unifi_network_adopt_device", "adopt_device", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
+    (
+        register_device_tools,
+        "unifi_network_restart_device",
+        "restart_device",
+        "network",
+        {"mac": "aa:bb:cc:dd:ee:ff", "confirm": True},
+    ),
+    (
+        register_device_tools,
+        "unifi_network_adopt_device",
+        "adopt_device",
+        "network",
+        {"mac": "aa:bb:cc:dd:ee:ff", "confirm": True},
+    ),
     (register_device_tools, "unifi_network_locate_device", "locate_device", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
     (
         register_device_tools,
@@ -93,7 +105,13 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         {"mac": "aa:bb:cc:dd:ee:ff"},
     ),
     # Network clients
-    (register_client_tools, "unifi_network_block_client", "block_client", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
+    (
+        register_client_tools,
+        "unifi_network_block_client",
+        "block_client",
+        "network",
+        {"mac": "aa:bb:cc:dd:ee:ff", "confirm": True},
+    ),
     (register_client_tools, "unifi_network_unblock_client", "unblock_client", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
     (register_client_tools, "unifi_network_kick_client", "kick_client", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
     (
@@ -108,7 +126,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
     (register_wlan_tools, "unifi_network_get_wlan", "get_wlan", "network", {"wlan_id": "w-1"}),
     (register_wlan_tools, "unifi_network_create_wlan", "create_wlan", "network", {"name": "n"}),
     (register_wlan_tools, "unifi_network_update_wlan", "update_wlan", "network", {"wlan_id": "w-1", "data": {}}),
-    (register_wlan_tools, "unifi_network_delete_wlan", "delete_wlan", "network", {"wlan_id": "w-1"}),
+    (register_wlan_tools, "unifi_network_delete_wlan", "delete_wlan", "network", {"wlan_id": "w-1", "confirm": True}),
     # Firewall
     (register_firewall_tools, "unifi_network_list_firewall_rules", "list_firewall_rules", "network", {}),
     (register_firewall_tools, "unifi_network_get_firewall_rule", "get_firewall_rule", "network", {"rule_id": "r"}),
@@ -133,7 +151,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_delete_firewall_rule",
         "delete_firewall_rule",
         "network",
-        {"rule_id": "r"},
+        {"rule_id": "r", "confirm": True},
     ),
     (
         register_firewall_tools,
@@ -154,7 +172,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_delete_firewall_group",
         "delete_firewall_group",
         "network",
-        {"group_id": "g"},
+        {"group_id": "g", "confirm": True},
     ),
     # Networks
     (register_network_config_tools, "unifi_network_list_networks", "list_networks", "network", {}),
@@ -173,7 +191,13 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "network",
         {"network_id": "n", "data": {}},
     ),
-    (register_network_config_tools, "unifi_network_delete_network", "delete_network", "network", {"network_id": "n"}),
+    (
+        register_network_config_tools,
+        "unifi_network_delete_network",
+        "delete_network",
+        "network",
+        {"network_id": "n", "confirm": True},
+    ),
     # Port forward
     (register_port_forward_tools, "unifi_network_list_port_forwards", "list_port_forwards", "network", {}),
     (
@@ -202,7 +226,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_delete_port_forward",
         "delete_port_forward",
         "network",
-        {"port_forward_id": "pf"},
+        {"port_forward_id": "pf", "confirm": True},
     ),
     # Routing
     (register_routing_tools, "unifi_network_list_routes", "list_routes", "network", {}),
@@ -215,7 +239,13 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         {"name": "r", "network": "10.0.0.0/24", "gateway_ip": "10.0.0.1"},
     ),
     (register_routing_tools, "unifi_network_update_route", "update_route", "network", {"route_id": "r", "data": {}}),
-    (register_routing_tools, "unifi_network_delete_route", "delete_route", "network", {"route_id": "r"}),
+    (
+        register_routing_tools,
+        "unifi_network_delete_route",
+        "delete_route",
+        "network",
+        {"route_id": "r", "confirm": True},
+    ),
     # System
     (register_system_tools, "unifi_network_get_settings", "get_settings", "network", {}),
     (
@@ -227,13 +257,19 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
     ),
     (register_system_tools, "unifi_network_run_speedtest", "run_speedtest", "network", {}),
     (register_system_tools, "unifi_network_create_backup", "create_backup", "network", {}),
-    (register_system_tools, "unifi_network_upgrade_device", "upgrade_device", "network", {"mac": "aa:bb:cc:dd:ee:ff"}),
+    (
+        register_system_tools,
+        "unifi_network_upgrade_device",
+        "upgrade_device",
+        "network",
+        {"mac": "aa:bb:cc:dd:ee:ff", "confirm": True},
+    ),
     (
         register_system_tools,
         "unifi_network_power_cycle_port",
         "power_cycle_port",
         "network",
-        {"mac": "aa:bb:cc:dd:ee:ff", "port_idx": 1},
+        {"mac": "aa:bb:cc:dd:ee:ff", "port_idx": 1, "confirm": True},
     ),
     (
         register_system_tools,
@@ -242,7 +278,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "network",
         {"mac": "aa:bb:cc:dd:ee:ff"},
     ),
-    (register_system_tools, "unifi_network_reset_dpi", "reset_dpi", "network", {}),
+    (register_system_tools, "unifi_network_reset_dpi", "reset_dpi", "network", {"confirm": True}),
     # Protect
     (register_camera_tools, "unifi_protect_list_cameras", "list_cameras", "protect", {}),
     (register_camera_tools, "unifi_protect_get_camera", "get_camera", "protect", {"camera_id": "c"}),

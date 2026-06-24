@@ -139,7 +139,7 @@ class TestNetworkDeviceHandlers:
         client = AsyncMock()
         client.restart_device.return_value = {"meta": {"rc": "ok"}}
         ctx = _fake_ctx(_readwrite_config(), network=client)
-        result = await _call(server, "unifi_network_restart_device", ctx, mac="aa:bb:cc:dd:ee:ff")
+        result = await _call(server, "unifi_network_restart_device", ctx, mac="aa:bb:cc:dd:ee:ff", confirm=True)
         assert result == {"meta": {"rc": "ok"}}
 
 
@@ -219,8 +219,18 @@ class TestNetworkWlanHandlers:
 @pytest.mark.parametrize(
     ("register_fn", "write_tool", "client_method", "kwargs"),
     [
-        (register_firewall_tools, "unifi_network_delete_firewall_rule", "delete_firewall_rule", {"rule_id": "r-1"}),
-        (register_system_tools, "unifi_network_upgrade_device", "upgrade_device", {"mac": "aa:bb:cc:dd:ee:ff"}),
+        (
+            register_firewall_tools,
+            "unifi_network_delete_firewall_rule",
+            "delete_firewall_rule",
+            {"rule_id": "r-1", "confirm": True},
+        ),
+        (
+            register_system_tools,
+            "unifi_network_upgrade_device",
+            "upgrade_device",
+            {"mac": "aa:bb:cc:dd:ee:ff", "confirm": True},
+        ),
     ],
 )
 async def test_write_tool_readonly_blocks_and_readwrite_delegates(register_fn, write_tool, client_method, kwargs):
