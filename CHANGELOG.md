@@ -4,20 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- **BREAKING:** every destructive legacy-network write tool now requires
-  `confirm=True` and raises `UniFiBadRequestError` otherwise, matching the
-  Network Integration deletes. This covers the 7 deletes (`delete_firewall_rule`,
-  `delete_firewall_group`, `delete_port_forward`, `delete_wlan`, `delete_network`,
-  `delete_route`, `delete_port_profile`) plus `restart_device`, `adopt_device`,
-  `forget_device`, `upgrade_device`, `power_cycle_port`, `reset_dpi`,
-  `assign_port_profile`, and `block_client`. Agents calling these tools must add
-  `confirm=True`. The invariant — `destructiveHint: True` iff a `confirm` param
-  exists — is now asserted server-wide. Resolves the asymmetry recorded in
-  ADR-0001 (#432).
+## [0.4.0] - 2026-06-24
 
 ### Added
 
@@ -34,6 +21,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **BREAKING:** every destructive legacy-network write tool now requires
+  `confirm=True` and raises `UniFiBadRequestError` otherwise, matching the
+  Network Integration deletes. This covers the 7 deletes (`delete_firewall_rule`,
+  `delete_firewall_group`, `delete_port_forward`, `delete_wlan`, `delete_network`,
+  `delete_route`, `delete_port_profile`) plus `restart_device`, `adopt_device`,
+  `forget_device`, `upgrade_device`, `power_cycle_port`, `reset_dpi`,
+  `assign_port_profile`, and `block_client`. Agents calling these tools must add
+  `confirm=True`. The invariant — `destructiveHint: True` iff a `confirm` param
+  exists — is now asserted server-wide. Resolves the asymmetry recorded in
+  ADR-0001 (#432).
 - Protect PATCH write tools now document that integration v1 returns an empty
   ack (`{}`) on success and that callers should re-read to confirm the change;
   the accessory tools (light/chime/sensor/viewer) carry an explicit "field

@@ -130,6 +130,17 @@ class TestLegacyConfirmGuards:
         getattr(client, client_method).assert_not_awaited()
 
     @pytest.mark.parametrize(("register_fn", "tool_name", "client_method", "kwargs"), LEGACY_DESTRUCTIVE)
+    async def test_explicit_confirm_false_raises_before_client(self, register_fn, tool_name, client_method, kwargs):
+        server = FastMCP(name="t")
+        register_fn(server)
+        client = AsyncMock()
+        ctx = _ctx(client)
+        tool = await server.get_tool(tool_name)
+        with pytest.raises(ToolError, match="confirm=True"):
+            await tool.fn(ctx, **kwargs, confirm=False)
+        getattr(client, client_method).assert_not_awaited()
+
+    @pytest.mark.parametrize(("register_fn", "tool_name", "client_method", "kwargs"), LEGACY_DESTRUCTIVE)
     async def test_with_confirm_calls_client(self, register_fn, tool_name, client_method, kwargs):
         server = FastMCP(name="t")
         register_fn(server)
