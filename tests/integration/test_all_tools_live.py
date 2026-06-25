@@ -38,7 +38,7 @@ from _pytest.outcomes import OutcomeException
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
-from tests.integration.conftest import _normalize_mac, live_test_device_macs
+from tests.integration.conftest import WRITE_GATE_REASON, _normalize_mac, _writes_enabled, live_test_device_macs
 from unifi_mcp.server import create_server, server_lifespan
 
 pytestmark = pytest.mark.integration
@@ -49,12 +49,6 @@ pytestmark = pytest.mark.integration
 
 def _any_api_configured() -> bool:
     return any(os.environ.get(k) for k in ("UNIFI_NETWORK_API", "UNIFI_PROTECT_API", "UNIFI_SITE_MANAGER_API"))
-
-
-def _writes_enabled() -> bool:
-    return os.environ.get("UNIFI_MODE", "readonly").lower() == "readwrite" and os.environ.get(
-        "LIVE_TEST_WRITES", ""
-    ).strip() in {"1", "true", "yes"}
 
 
 def _destructive_enabled() -> bool:
@@ -424,8 +418,6 @@ async def _allowlisted_camera_id(client: Client) -> str:
 
 # ── Write-tool audit (opt-in via LIVE_TEST_WRITES=1) ───────────────────────
 
-
-WRITE_GATE_REASON = "Set UNIFI_MODE=readwrite and LIVE_TEST_WRITES=1 to run write tests"
 
 # #271 behavioural read-backs widened to 15s polls to reduce controller
 # pressure during cumulative live sweeps. Provision timeout raised to 45s
