@@ -79,6 +79,8 @@ _NORMALIZED_SUFFIXES: tuple[str, ...] = ("password", "secret", "authkey", "token
 
 
 # Query-param names that carry a credential when present in a URL value.
+# ``key`` is intentionally absent: it collides with benign params such as
+# ``?key=sortOrder`` (#455). Use ``apikey``/``api_key`` for genuine key params.
 _CREDENTIAL_QUERY_PARAMS: tuple[str, ...] = (
     "token",
     "password",
@@ -86,13 +88,20 @@ _CREDENTIAL_QUERY_PARAMS: tuple[str, ...] = (
     "secret",
     "apikey",
     "api_key",
-    "key",
     "auth",
 )
 
-# A URL with userinfo credentials (``scheme://user:pass@host``); the password
-# component is what we guard against, so a colon in the userinfo is required.
-_URL_USERINFO_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://[^/@\s]+:[^/@\s]+@", re.IGNORECASE)
+# A URL with userinfo (``scheme://userinfo@host``). The password after a colon
+# is the obvious case, but Protect stream URLs can carry a bare bearer token in
+# the username position (``rtsp://<token>@host``), so the colon is optional and
+# any userinfo is treated as credential-bearing (#455).
+_URL_USERINFO_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://[^/@\s]+@[^@/\s]", re.IGNORECASE)
+
+# An RTSP/RTSPS stream URL whose path segment is the bearer credential. UniFi
+# Protect ``cameras/{id}/rtsps-stream`` returns ``rtsps://host:7441/<alias>``
+# where ``<alias>`` *is* the secret — there is no ``?token=`` query param, so
+# the query-param matcher misses it. Any non-empty path makes it credentialed.
+_RTSP_STREAM_RE = re.compile(r"^rtsps?://[^/\s]+/\S+", re.IGNORECASE)
 
 # A ``?``/``&`` query param whose name is credential-bearing and which has a value.
 _URL_CREDENTIAL_QUERY_RE = re.compile(
@@ -104,15 +113,17 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
 def _is_credentialed_url(value: str) -> bool:
     """True when ``value`` is a URL carrying an inline credential.
 
-    Targets credential-bearing URL values (e.g. Protect RTSPS stream
-    descriptors with ``?token=…``) whose key name is generic (#442). Matches
-    either userinfo credentials (``scheme://user:pass@host``) or a
-    credential-bearing query param. Ordinary URLs without a credential are
-    left untouched.
+    Targets credential-bearing URL values whose key name is generic (#442).
+    Matches userinfo credentials (``scheme://user:pass@host`` or a bare
+    ``scheme://token@host``), a credential-bearing query param, or an
+    RTSP/RTSPS stream URL whose path segment is the bearer alias (#455).
+    Ordinary URLs without a credential are left untouched.
     """
     if "://" not in value:
         return False
     if _URL_USERINFO_RE.match(value):
+        return True
+    if _RTSP_STREAM_RE.match(value):
         return True
     return _URL_CREDENTIAL_QUERY_RE.search(value) is not None
 

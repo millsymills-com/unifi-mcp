@@ -149,17 +149,42 @@ class TestRedactSecretsCredentialUrlValues:
         out = redact_secrets({"endpoint": "rtsp://admin:s3cret@10.0.0.1:554/live"})
         assert out["endpoint"] == REDACTED
 
+    def test_url_with_bare_userinfo_token_redacted(self):
+        """#455 — a bearer token in the username position (no colon) redacts."""
+        out = redact_secrets({"endpoint": "rtsp://deadbeeftoken@10.0.0.1:554/live"})
+        assert out["endpoint"] == REDACTED
+
+    @pytest.mark.parametrize(
+        "key",
+        ["rtspsUrl", "url", "streamUrl", "href", "high", "medium"],
+    )
+    def test_rtsps_path_alias_stream_redacted(self, key):
+        """#455 — Protect rtsps-stream descriptors carry the credential in the
+        path alias, not a ``?token=`` query param; redact by stream-URL shape."""
+        out = redact_secrets({key: "rtsps://10.0.0.1:7441/aB3xY9?enableSrtp"})
+        assert out[key] == REDACTED
+
+    def test_rtsps_stream_descriptor_shape_redacted(self):
+        """The real ``cameras/{id}/rtsps-stream`` shape: quality -> stream URL."""
+        out = redact_secrets({"high": "rtsps://10.0.0.1:7441/aB3xY9", "medium": "rtsps://10.0.0.1:7441/cD4zW8"})
+        assert out == {"high": REDACTED, "medium": REDACTED}
+
     def test_credentialed_url_in_nested_list_redacted(self):
         payload = {"streams": [{"quality": "high", "url": "rtsps://h/s?token=abc"}]}
         out = redact_secrets(payload)
         assert out["streams"][0]["url"] == REDACTED
         assert out["streams"][0]["quality"] == "high"
 
+    def test_benign_key_query_param_passes_through(self):
+        """#455 — ``?key=`` is not a credential param; ``?key=sortOrder`` stays."""
+        out = redact_secrets({"url": "https://host/list?key=sortOrder"})
+        assert out["url"] == "https://host/list?key=sortOrder"
+
     @pytest.mark.parametrize(
         "value",
         [
             "https://ui.com/docs",
-            "rtsps://10.0.0.1:7441/abcdef",
+            "rtsps://10.0.0.1:7441/",
             "https://host/path?q=search&page=2",
             "not a url at all",
         ],
