@@ -208,7 +208,16 @@ send the key across an untrusted path, so the server **refuses to start**
 until you set `UNIFI_*_VERIFY_SSL=true`, pin the cert via
 `UNIFI_*_CERT_FINGERPRINT`, or point at a private/loopback host. The
 fail-closed check resolves every A and AAAA record and trips if any one is
-non-private.
+non-private. If a DNS-name host cannot be resolved at all, the server also
+fails closed, so an attacker who can force resolution to fail cannot skip the
+check.
+
+The check classifies the address resolved **at startup**; httpx re-resolves at
+connection time. An attacker who controls DNS can answer private at startup and
+public at connect (a TOCTOU / DNS-rebinding window). This is inherent to
+host-string configuration — the real defense against an active DNS attacker is
+`UNIFI_*_VERIFY_SSL=true` or a `UNIFI_*_CERT_FINGERPRINT` pin, not the
+startup classification.
 
 You have three options to satisfy the check safely.
 

@@ -407,25 +407,25 @@ class TestVerifySSLAudit:
         assert public == [], messages
         assert "10.0.0.1" in unconditional[0]
 
-    def test_dns_failure_soft_warns(self, caplog, monkeypatch):
-        """DNS failure must not crash startup; emit a soft WARN that the
-        non-private check was skipped."""
+    def test_dns_failure_for_name_fails_closed(self, monkeypatch):
+        """#454: a DNS-name host that cannot be resolved must fail closed, so an
+        attacker who forces resolution to fail can't skip the non-private check.
+        """
 
         def boom(*_args, **_kwargs):
             raise socket.gaierror("nodename nor servname provided")
 
         monkeypatch.setattr(socket, "getaddrinfo", boom)
-        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
+        with pytest.raises(ValidationError) as exc_info:
             UniFiConfig(
                 _env_file=None,
                 unifi_network_host="does-not-resolve.invalid",
                 unifi_network_api="k",
             )
-        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("verify_ssl=False for Network" in m for m in messages), messages
-        assert any("could not resolve" in m for m in messages), messages
-        # The public-IP WARN must NOT fire when resolution failed.
-        assert not any("non-private host" in m and "MITM" in m for m in messages), messages
+        msg = str(exc_info.value)
+        assert "could not resolve" in msg
+        assert "does-not-resolve.invalid" in msg
+        assert "UNIFI_NETWORK_VERIFY_SSL" in msg
 
     def test_loopback_treated_as_safe(self, caplog, monkeypatch):
         monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("127.0.0.1"))
@@ -570,20 +570,23 @@ class TestFailClosedNonPrivateTls:
         assert "UNIFI_PROTECT_VERIFY_SSL" in msg
         assert "UNIFI_PROTECT_CERT_FINGERPRINT" in msg
 
-    def test_dns_failure_does_not_block_startup(self, monkeypatch):
-        """A host that won't resolve can't be classified; fail open to a WARN
-        rather than blocking startup on a resolver hiccup."""
+    def test_ip_literal_host_unaffected_by_resolver_failure(self, caplog, monkeypatch):
+        """#454: an IP-literal host short-circuits DNS, so a broken resolver
+        cannot trip the fail-closed path — a private literal still starts."""
 
         def boom(*_args, **_kwargs):
             raise socket.gaierror("nodename nor servname provided")
 
         monkeypatch.setattr(socket, "getaddrinfo", boom)
-        config = UniFiConfig(
-            _env_file=None,
-            unifi_network_host="does-not-resolve.invalid",
-            unifi_network_api="k",
-        )
-        assert config.unifi_network_host == "does-not-resolve.invalid"
+        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
+            config = UniFiConfig(
+                _env_file=None,
+                unifi_network_host="10.0.0.1",
+                unifi_network_api="k",
+            )
+        assert config.unifi_network_host == "10.0.0.1"
+        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("verify_ssl=False for Network" in m for m in messages), messages
 
     def test_mixed_addresses_any_non_private_raises(self, monkeypatch):
         """(e) getaddrinfo returning a private AND a public address treats the

@@ -239,7 +239,10 @@ class UniFiConfig(BaseSettings):
 
         See ``_audit_tls_posture``. Raises ``ValueError`` (surfaced as a
         ``ValidationError`` by the model validator) when ``host`` resolves to
-        any non-private address without ``verify_ssl`` or a pin.
+        any non-private address without ``verify_ssl`` or a pin, and also when a
+        DNS *name* host cannot be resolved at all — so an attacker who can force
+        resolution to fail (SERVFAIL/timeout) cannot skip the check. IP-literal
+        hosts, which cannot fail to resolve, keep the warn-and-skip path.
         """
         if verify_ssl or fingerprint is not None:
             return
@@ -251,13 +254,21 @@ class UniFiConfig(BaseSettings):
         try:
             resolved = _resolve_host(host)
         except (OSError, ValueError) as exc:
-            logger.warning(
-                "could not resolve %s host %r for TLS safety check (%s); skipping non-private check",
-                service,
-                host,
-                exc,
-            )
-            return
+            if _is_ip_literal(host):
+                logger.warning(
+                    "could not classify %s host %r for TLS safety check (%s); skipping non-private check",
+                    service,
+                    host,
+                    exc,
+                )
+                return
+            raise ValueError(
+                f"refusing to start: could not resolve {service} host {host!r} ({exc}) to confirm it is "
+                f"private, and verify_ssl=False would send the X-API-Key over unverified TLS. Failing closed "
+                f"so a network-path attacker cannot skip the check by forcing resolution to fail. Set "
+                f"UNIFI_{service.upper()}_VERIFY_SSL=true, pin the cert via UNIFI_{service.upper()}_CERT_FINGERPRINT, "
+                f"or use a private/loopback host."
+            ) from exc
         non_private = _first_non_private(resolved)
         if non_private is not None:
             raise ValueError(
@@ -351,6 +362,15 @@ def _first_non_private(
     return None
 
 
+def _is_ip_literal(host: str) -> bool:
+    """True if ``host`` is a numeric IPv4/IPv6 literal rather than a DNS name."""
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
+
 def _resolve_host(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
     """Resolve ``host`` to all of its IP addresses with a bounded DNS timeout.
 
@@ -358,8 +378,12 @@ def _resolve_host(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Addre
     names, ``socket.getaddrinfo`` runs on a worker thread bounded by
     ``_DNS_LOOKUP_TIMEOUT_S`` so a slow or unreachable resolver can't hang
     startup. ``getaddrinfo`` (not ``gethostbyname``) returns every A and AAAA
-    record, so a name that resolves to both private and public addresses, or
-    to IPv6 only, can't dodge the non-private check. Bounding via thread
+    record the host stack will surface, so a name that resolves to both private
+    and public addresses can't dodge the non-private check. One caveat: AAAA
+    records are only returned when the host has IPv6 support, so on an
+    IPv4-only box an IPv6-only-public name could resolve to nothing and trip the
+    fail-closed path in ``_audit_service_tls`` rather than being classified.
+    Bounding via thread
     (rather than ``socket.setdefaulttimeout``) avoids mutating process-global
     socket state. Raises ``OSError`` (incl. ``socket.gaierror``) on lookup
     failure or timeout, or ``ValueError`` if a result isn't a valid IP literal.
