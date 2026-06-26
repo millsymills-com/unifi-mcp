@@ -11,9 +11,14 @@ import uuid
 
 import pytest
 
+from tests.integration.conftest import WRITE_GATE_REASON, _writes_enabled
+
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 async def test_wlan_crud_roundtrip(
     network_live_client,
     mcptest_prefix,

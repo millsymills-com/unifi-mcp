@@ -155,7 +155,7 @@ See [.env.example](.env.example) for all configuration options.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `UNIFI_MODE` | `readonly` | `readonly` or `readwrite`; see [Write safety](#write-safety) before enabling writes |
-| `UNIFI_NETWORK_HOST` | none | Hostname or IP of the UniFi Network controller |
+| `UNIFI_NETWORK_HOST` | `192.168.1.1` | Hostname or IP of the UniFi Network controller |
 | `UNIFI_PROTECT_HOST` | `UNIFI_NETWORK_HOST` | Hostname or IP of the Protect NVR; defaults to the Network host if not set |
 | `UNIFI_NETWORK_API` | none | Network API key |
 | `UNIFI_PROTECT_API` | none | Protect API key |
