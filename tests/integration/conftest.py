@@ -103,6 +103,23 @@ def _protect_writes_enabled() -> bool:
 PROTECT_WRITE_GATE_REASON = "Set LIVE_TEST_PROTECT_WRITES=1 to run Protect write tests against the test controller"
 
 
+def _writes_enabled() -> bool:
+    """True when ``UNIFI_MODE=readwrite`` and ``LIVE_TEST_WRITES`` are both set.
+
+    Used by the network write test classes across multiple modules; defined
+    here to prevent gate-definition drift (#354, #457).
+
+    Returns:
+        Whether the network write gate is open.
+    """
+    return os.environ.get("UNIFI_MODE", "readonly").lower() == "readwrite" and os.environ.get(
+        "LIVE_TEST_WRITES", ""
+    ).strip() in {"1", "true", "yes"}
+
+
+WRITE_GATE_REASON = "Set UNIFI_MODE=readwrite and LIVE_TEST_WRITES=1 to run write tests"
+
+
 def _bool_env(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None:
@@ -494,6 +511,11 @@ def _destructive_calls_in_source(source: str) -> set[str]:
     and the ``create_/delete_/update_`` CRUD prefixes, dropping stdlib helpers
     that share those prefixes. Returns an empty set for read-only tests, so a
     caller can treat a non-empty result as "this test mutates controller state".
+
+    This scan inspects only the test body, so mutations delegated to a helper
+    (e.g. ``_wait_for_pending_then_adopt``) are invisible to it. The explicit
+    ``live_write`` marker is the real gate the #271 abort hook depends on; this
+    scan is a backstop that catches a missing marker on common call shapes.
 
     Args:
         source: The ``inspect.getsource`` text of a test function.
