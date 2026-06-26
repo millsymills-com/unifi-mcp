@@ -10,9 +10,14 @@ import uuid
 
 import pytest
 
+from tests.integration.conftest import WRITE_GATE_REASON, _writes_enabled
+
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 async def test_firewall_rule_crud_roundtrip(
     network_live_client,
     mcptest_prefix,
@@ -65,6 +70,9 @@ async def test_firewall_rule_crud_roundtrip(
     assert not any(r.get("_id") == rule_id for r in read3["data"])
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 async def test_firewall_group_crud_roundtrip(
     network_live_client,
     mcptest_prefix,

@@ -1,6 +1,7 @@
 """Tests for UniFi MCP configuration."""
 
 import logging
+import re
 import socket
 import time
 
@@ -20,6 +21,24 @@ from unifi_mcp.errors import (
 
 _PIN = "a" * 64  # 64 hex chars — valid canonical pin
 _PIN_WITH_COLONS = ":".join(["aa"] * 32)  # 32 pairs of 'aa' joined by colons
+
+
+def _addrinfo(*ips: str):
+    """Build a ``socket.getaddrinfo`` stub returning the given IPs.
+
+    Each entry mimics the 5-tuple ``getaddrinfo`` yields; IPv6 sockaddrs carry
+    the extra ``(flowinfo, scopeid)`` fields, IPv4 sockaddrs do not.
+    """
+
+    def _fake(*_args, **_kwargs):
+        results = []
+        for ip in ips:
+            family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+            sockaddr = (ip, 0, 0, 0) if family == socket.AF_INET6 else (ip, 0)
+            results.append((family, socket.SOCK_STREAM, 0, "", sockaddr))
+        return results
+
+    return _fake
 
 
 class TestUniFiMode:
@@ -374,7 +393,7 @@ class TestVerifySSLAudit:
     def test_unconditional_warn_on_private_host(self, caplog, monkeypatch):
         """Item 1: private host still gets the unconditional WARN, but not
         the public-IP MITM WARN."""
-        monkeypatch.setattr(socket, "gethostbyname", lambda _h: "10.0.0.1")
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1"))
         with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
             UniFiConfig(
                 _env_file=None,
@@ -388,45 +407,28 @@ class TestVerifySSLAudit:
         assert public == [], messages
         assert "10.0.0.1" in unconditional[0]
 
-    def test_both_warns_on_public_ip(self, caplog, monkeypatch):
-        """Item 2: a non-RFC1918 resolution triggers the additional MITM WARN."""
-        monkeypatch.setattr(socket, "gethostbyname", lambda _h: "8.8.8.8")
-        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
-            UniFiConfig(
-                _env_file=None,
-                unifi_network_host="controller.example.com",
-                unifi_network_api="k",
-            )
-        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        unconditional = [m for m in messages if "verify_ssl=False for Network" in m]
-        public = [m for m in messages if "non-private host" in m and "MITM" in m]
-        assert len(unconditional) == 1, messages
-        assert len(public) == 1, messages
-        assert "8.8.8.8" in public[0]
-        assert "controller.example.com" in public[0]
+    def test_dns_failure_for_name_fails_closed(self, monkeypatch):
+        """#454: a DNS-name host that cannot be resolved must fail closed, so an
+        attacker who forces resolution to fail can't skip the non-private check.
+        """
 
-    def test_dns_failure_soft_warns(self, caplog, monkeypatch):
-        """DNS failure must not crash startup; emit a soft WARN that the
-        non-private check was skipped."""
-
-        def boom(_h: str) -> str:
+        def boom(*_args, **_kwargs):
             raise socket.gaierror("nodename nor servname provided")
 
-        monkeypatch.setattr(socket, "gethostbyname", boom)
-        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
+        monkeypatch.setattr(socket, "getaddrinfo", boom)
+        with pytest.raises(ValidationError) as exc_info:
             UniFiConfig(
                 _env_file=None,
                 unifi_network_host="does-not-resolve.invalid",
                 unifi_network_api="k",
             )
-        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("verify_ssl=False for Network" in m for m in messages), messages
-        assert any("could not resolve" in m for m in messages), messages
-        # The public-IP WARN must NOT fire when resolution failed.
-        assert not any("non-private host" in m and "MITM" in m for m in messages), messages
+        msg = str(exc_info.value)
+        assert "could not resolve" in msg
+        assert "does-not-resolve.invalid" in msg
+        assert "UNIFI_NETWORK_VERIFY_SSL" in msg
 
     def test_loopback_treated_as_safe(self, caplog, monkeypatch):
-        monkeypatch.setattr(socket, "gethostbyname", lambda _h: "127.0.0.1")
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("127.0.0.1"))
         with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
             UniFiConfig(
                 _env_file=None,
@@ -436,22 +438,6 @@ class TestVerifySSLAudit:
         messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert not any("non-private host" in m for m in messages), messages
 
-    def test_protect_branch_uses_protect_host(self, caplog, monkeypatch):
-        """Protect host should be evaluated separately and surface 'Protect'
-        in the WARN."""
-        monkeypatch.setattr(socket, "gethostbyname", lambda _h: "8.8.8.8")
-        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
-            UniFiConfig(
-                _env_file=None,
-                unifi_network_host="10.0.0.1",
-                unifi_protect_host="protect.example.com",
-                unifi_protect_api="k",
-                unifi_network_api=None,
-            )
-        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("verify_ssl=False for Protect" in m for m in messages), messages
-        assert any("for Protect" in m and "non-private host" in m for m in messages), messages
-
     def test_dns_timeout_does_not_mutate_socket_default(self, monkeypatch):
         """#191: DNS bound via thread, never via socket.setdefaulttimeout.
 
@@ -459,11 +445,11 @@ class TestVerifySSLAudit:
         ``socket.getdefaulttimeout()`` (process-global state).
         """
 
-        def slow(_h: str) -> str:
+        def slow(*_args, **_kwargs):
             time.sleep(_DNS_LOOKUP_TIMEOUT_S + 1.0)
-            return "1.2.3.4"
+            return _addrinfo("1.2.3.4")("slow.example.invalid")
 
-        monkeypatch.setattr(socket, "gethostbyname", slow)
+        monkeypatch.setattr(socket, "getaddrinfo", slow)
         before = socket.getdefaulttimeout()
         with pytest.raises(OSError, match="exceeded"):
             _resolve_host("slow.example.invalid")
@@ -474,7 +460,7 @@ class TestVerifySSLAudit:
         WARN fires exactly once per process, not once per ``UniFiConfig()``
         call.
         """
-        monkeypatch.setattr(socket, "gethostbyname", lambda _h: "10.0.0.1")
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1"))
         monkeypatch.setenv("UNIFI_NETWORK_HOST", "10.0.0.1")
         monkeypatch.setenv("UNIFI_NETWORK_API", "k")
         get_config.cache_clear()
@@ -491,7 +477,7 @@ class TestVerifySSLAudit:
     def test_pin_suppresses_verify_ssl_warns(self, caplog, monkeypatch):
         """Item 3: pinning provides identity, so the verify_ssl WARNs should
         not fire even on a non-private host."""
-        monkeypatch.setattr(socket, "gethostbyname", lambda _h: "8.8.8.8")
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("8.8.8.8"))
         with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
             UniFiConfig(
                 _env_file=None,
@@ -502,3 +488,159 @@ class TestVerifySSLAudit:
         messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert not [m for m in messages if "verify_ssl=False" in m], messages
         assert not [m for m in messages if "non-private host" in m], messages
+
+
+class TestFailClosedNonPrivateTls:
+    """#440: a non-private host with neither verify_ssl nor a pin must refuse
+    to start, rather than only warning.
+    """
+
+    def test_non_private_host_no_tls_raises(self, monkeypatch):
+        """(a) Non-private host + verify_ssl=False + no pin => refuse to start."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("8.8.8.8"))
+        with pytest.raises(ValidationError) as exc_info:
+            UniFiConfig(
+                _env_file=None,
+                unifi_network_host="controller.example.com",
+                unifi_network_api="k",
+            )
+        msg = str(exc_info.value)
+        assert "controller.example.com" in msg
+        assert "UNIFI_NETWORK_VERIFY_SSL" in msg
+        assert "UNIFI_NETWORK_CERT_FINGERPRINT" in msg
+
+    def test_private_host_no_tls_allowed_with_warn(self, caplog, monkeypatch):
+        """(b) Private/loopback host + verify_ssl=False + no pin => allowed, WARN only."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1"))
+        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
+            config = UniFiConfig(
+                _env_file=None,
+                unifi_network_host="10.0.0.1",
+                unifi_network_api="k",
+            )
+        assert config.unifi_network_host == "10.0.0.1"
+        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("verify_ssl=False for Network" in m for m in messages), messages
+
+    def test_loopback_host_no_tls_allowed(self, monkeypatch):
+        """(b) Loopback host => allowed even without TLS."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("127.0.0.1"))
+        config = UniFiConfig(
+            _env_file=None,
+            unifi_network_host="127.0.0.1",
+            unifi_network_api="k",
+        )
+        assert config.unifi_network_host == "127.0.0.1"
+
+    def test_non_private_host_verify_ssl_allowed(self, monkeypatch):
+        """(c) Non-private host + verify_ssl=True => allowed."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("8.8.8.8"))
+        config = UniFiConfig(
+            _env_file=None,
+            unifi_network_host="controller.example.com",
+            unifi_network_api="k",
+            unifi_network_verify_ssl=True,
+        )
+        assert config.unifi_network_verify_ssl is True
+
+    def test_non_private_host_pinned_allowed(self, monkeypatch):
+        """(d) Non-private host + cert_fingerprint set => allowed."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("8.8.8.8"))
+        config = UniFiConfig(
+            _env_file=None,
+            unifi_network_host="controller.example.com",
+            unifi_network_api="k",
+            unifi_network_cert_fingerprint=_PIN,
+        )
+        assert config.unifi_network_cert_fingerprint == _PIN
+
+    def test_protect_non_private_host_no_tls_raises(self, monkeypatch):
+        """The gate applies to Protect too, naming the Protect-scoped env vars."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("8.8.8.8"))
+        with pytest.raises(ValidationError) as exc_info:
+            UniFiConfig(
+                _env_file=None,
+                unifi_network_host="10.0.0.1",
+                unifi_network_api=None,
+                unifi_protect_host="protect.example.com",
+                unifi_protect_api="k",
+            )
+        msg = str(exc_info.value)
+        assert "protect.example.com" in msg
+        assert "UNIFI_PROTECT_VERIFY_SSL" in msg
+        assert "UNIFI_PROTECT_CERT_FINGERPRINT" in msg
+
+    def test_ip_literal_host_unaffected_by_resolver_failure(self, caplog, monkeypatch):
+        """#454: an IP-literal host short-circuits DNS, so a broken resolver
+        cannot trip the fail-closed path — a private literal still starts."""
+
+        def boom(*_args, **_kwargs):
+            raise socket.gaierror("nodename nor servname provided")
+
+        monkeypatch.setattr(socket, "getaddrinfo", boom)
+        with caplog.at_level(logging.WARNING, logger="unifi_mcp.config"):
+            config = UniFiConfig(
+                _env_file=None,
+                unifi_network_host="10.0.0.1",
+                unifi_network_api="k",
+            )
+        assert config.unifi_network_host == "10.0.0.1"
+        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("verify_ssl=False for Network" in m for m in messages), messages
+
+    def test_mixed_addresses_any_non_private_raises(self, monkeypatch):
+        """(e) getaddrinfo returning a private AND a public address treats the
+        host as non-private — and so refuses to start without TLS."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1", "8.8.8.8"))
+        with pytest.raises(ValidationError, match=re.escape("controller.example.com")):
+            UniFiConfig(
+                _env_file=None,
+                unifi_network_host="controller.example.com",
+                unifi_network_api="k",
+            )
+
+    def test_ipv6_only_non_private_raises(self, monkeypatch):
+        """(e) An IPv6-only public resolution that gethostbyname would have
+        missed is now caught."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("2606:4700:4700::1111"))
+        with pytest.raises(ValidationError, match=re.escape("controller.example.com")):
+            UniFiConfig(
+                _env_file=None,
+                unifi_network_host="controller.example.com",
+                unifi_network_api="k",
+            )
+
+    def test_all_private_addresses_allowed(self, monkeypatch):
+        """A name resolving only to private addresses stays allowed without TLS."""
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1", "fd00::1"))
+        config = UniFiConfig(
+            _env_file=None,
+            unifi_network_host="lan-controller.local",
+            unifi_network_api="k",
+        )
+        assert config.unifi_network_host == "lan-controller.local"
+
+
+class TestResolveHostMultiAddress:
+    """#440 secondary: ``_resolve_host`` returns all addresses via getaddrinfo."""
+
+    def test_returns_all_resolved_addresses(self, monkeypatch):
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1", "8.8.8.8"))
+        resolved = _resolve_host("multi.example.com")
+        assert {str(a) for a in resolved} == {"10.0.0.1", "8.8.8.8"}
+
+    def test_numeric_ipv4_short_circuits(self, monkeypatch):
+        def _fail(*_args, **_kwargs):
+            raise AssertionError("getaddrinfo must not run for an IP literal")
+
+        monkeypatch.setattr(socket, "getaddrinfo", _fail)
+        resolved = _resolve_host("8.8.8.8")
+        assert [str(a) for a in resolved] == ["8.8.8.8"]
+
+    def test_numeric_ipv6_short_circuits(self, monkeypatch):
+        def _fail(*_args, **_kwargs):
+            raise AssertionError("getaddrinfo must not run for an IP literal")
+
+        monkeypatch.setattr(socket, "getaddrinfo", _fail)
+        resolved = _resolve_host("2606:4700:4700::1111")
+        assert [str(a) for a in resolved] == ["2606:4700:4700::1111"]

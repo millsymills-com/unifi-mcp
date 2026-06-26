@@ -155,7 +155,7 @@ See [.env.example](.env.example) for all configuration options.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `UNIFI_MODE` | `readonly` | `readonly` or `readwrite`; see [Write safety](#write-safety) before enabling writes |
-| `UNIFI_NETWORK_HOST` | none | Hostname or IP of the UniFi Network controller |
+| `UNIFI_NETWORK_HOST` | `192.168.1.1` | Hostname or IP of the UniFi Network controller |
 | `UNIFI_PROTECT_HOST` | `UNIFI_NETWORK_HOST` | Hostname or IP of the Protect NVR; defaults to the Network host if not set |
 | `UNIFI_NETWORK_API` | none | Network API key |
 | `UNIFI_PROTECT_API` | none | Protect API key |
@@ -200,11 +200,26 @@ UniFi controllers ship self-signed certificates, so `UNIFI_*_VERIFY_SSL`
 defaults to `false`. That bypasses chain and hostname verification entirely:
 anyone on the path between the MCP server and the controller can present
 their own cert and harvest the `X-API-Key` header. The server emits a
-startup `WARNING` for every service running with `verify_ssl=False` and an
-additional `WARNING` when the resolved host is not RFC1918, loopback, or
-link-local.
+startup `WARNING` for every service running with `verify_ssl=False`.
 
-You have three options to silence the warnings safely.
+When the configured host resolves to a non-private address (anything that is
+not RFC1918, loopback, or link-local), `verify_ssl=False` with no pin would
+send the key across an untrusted path, so the server **refuses to start**
+until you set `UNIFI_*_VERIFY_SSL=true`, pin the cert via
+`UNIFI_*_CERT_FINGERPRINT`, or point at a private/loopback host. The
+fail-closed check resolves every A and AAAA record and trips if any one is
+non-private. If a DNS-name host cannot be resolved at all, the server also
+fails closed, so an attacker who can force resolution to fail cannot skip the
+check.
+
+The check classifies the address resolved **at startup**; httpx re-resolves at
+connection time. An attacker who controls DNS can answer private at startup and
+public at connect (a TOCTOU / DNS-rebinding window). This is inherent to
+host-string configuration — the real defense against an active DNS attacker is
+`UNIFI_*_VERIFY_SSL=true` or a `UNIFI_*_CERT_FINGERPRINT` pin, not the
+startup classification.
+
+You have three options to satisfy the check safely.
 
 ### Option A: pin the controller's leaf cert (recommended for self-signed)
 
@@ -251,10 +266,10 @@ store about your CA so `verify_ssl=true` works without a custom bundle.
 
 ### Option C: stay on `verify_ssl=False` (not recommended)
 
-Accept the startup `WARNING`. Only safe on a trusted private LAN where you
-control every hop between the MCP server and the controller. The
-non-private-host extra `WARNING` is a strong hint that this option doesn't
-fit your topology.
+Accept the startup `WARNING`. Only available when the host is private,
+loopback, or link-local — a non-private host fails closed at startup instead.
+Only safe on a trusted private LAN where you control every hop between the
+MCP server and the controller.
 
 ## Development
 

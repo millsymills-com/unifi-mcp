@@ -42,20 +42,12 @@ from typing import Any
 import pytest
 from fastmcp import Client
 
+from tests.integration.conftest import WRITE_GATE_REASON, _writes_enabled
 from unifi_mcp.server import create_server
 
 pytestmark = pytest.mark.integration
 
 LOG = logging.getLogger(__name__)
-
-
-def _writes_enabled() -> bool:
-    return os.environ.get("UNIFI_MODE", "readonly").lower() == "readwrite" and os.environ.get(
-        "LIVE_TEST_WRITES", ""
-    ).strip() in {"1", "true", "yes"}
-
-
-WRITE_GATE_REASON = "Set UNIFI_MODE=readwrite and LIVE_TEST_WRITES=1 to run write tests"
 
 
 @pytest.fixture
@@ -108,6 +100,8 @@ _FIELD_CASES: tuple[tuple[str, str, str, Any, Any], ...] = (
 )
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
 @pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestUpdateSettingsRoundTrip:
     """Round-trip every named scalar through the live controller.

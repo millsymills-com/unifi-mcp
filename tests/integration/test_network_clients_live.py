@@ -33,6 +33,8 @@ import logging
 
 import pytest
 
+from tests.integration.conftest import WRITE_GATE_REASON, _writes_enabled
+
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.integration
@@ -62,6 +64,9 @@ def _find_known(all_response: dict, mac: str) -> dict | None:
     )
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestBlockUnblockCycle:
     """Live block → verify → unblock → verify cycle.
 
@@ -129,6 +134,9 @@ class TestBlockUnblockCycle:
                 LOG.warning("Cleanup unblock_client(%s) failed: %s", mac, exc)
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestAuthorizeUnauthorizeCycle:
     """Live authorize_guest → verify → unauthorize_guest → verify cycle.
 
@@ -197,6 +205,9 @@ _KICK_RECONNECT_TIMEOUT_S = 30.0
 _KICK_POLL_INTERVAL_S = 1.5
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestKickClient:
     """Live kick_client smoke test.
 

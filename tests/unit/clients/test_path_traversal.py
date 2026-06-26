@@ -119,7 +119,7 @@ class TestProtectPathTraversal:
         """Even a benign ID is encoded; no path-prefix escape possible."""
         with respx.mock(assert_all_called=False) as router:
             router.route().mock(return_value=httpx.Response(200, content=b"jpegbytes"))
-            await protect_client.get_snapshot("cam1")
+            await protect_client.get_snapshot("cam1", max_bytes=1024)
             assert len(router.calls) == 1
             raw_path = router.calls[0].request.url.raw_path.decode("ascii")
             assert raw_path.startswith(PROTECT_PREFIX), raw_path

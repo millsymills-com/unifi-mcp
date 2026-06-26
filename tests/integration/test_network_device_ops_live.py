@@ -36,6 +36,8 @@ import uuid
 
 import pytest
 
+from tests.integration.conftest import WRITE_GATE_REASON, _writes_enabled
+
 LOG = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.integration
@@ -55,6 +57,9 @@ def _find_device(devices: dict, mac: str) -> dict | None:
     )
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestLocateUnlocate:
     """``locate_device`` -> ``unlocate_device`` round-trip.
 
@@ -81,6 +86,9 @@ class TestLocateUnlocate:
             assert isinstance(unlocate_response, dict), "unlocate_device must return a dict"
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestRunSpeedtest:
     """``run_speedtest`` smoke test.
 
@@ -96,6 +104,9 @@ class TestRunSpeedtest:
         assert meta.get("rc") == "ok" or "rc" not in meta, f"run_speedtest meta not ok: {meta}"
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestCreateBackup:
     """``create_backup`` smoke test.
 
@@ -110,6 +121,9 @@ class TestCreateBackup:
         assert isinstance(response, dict), "create_backup must return a dict"
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
+@pytest.mark.skipif(not _writes_enabled(), reason=WRITE_GATE_REASON)
 class TestResetDpi:
     """``reset_dpi`` smoke test.
 
@@ -128,6 +142,8 @@ class TestResetDpi:
 # ── Disruptive device ops ──────────────────────────────────────────────────
 
 
+@pytest.mark.live_write
+@pytest.mark.write_gated
 @pytest.mark.skipif(not _destructive_enabled(), reason=DESTRUCTIVE_GATE_REASON)
 class TestDisruptiveDeviceOps:
     """Disruptive device-ops gated behind ``LIVE_TEST_DESTRUCTIVE=1``.
@@ -136,22 +152,24 @@ class TestDisruptiveDeviceOps:
     enforcement. ``test_target_mac`` already cross-checks the protected set.
     """
 
-    async def test_restart_device(self, network_live_client, test_target_mac, protected_macs):
+    async def test_restart_device(self, network_live_client, test_target_mac, protected_macs, touched_devices):
         mac = test_target_mac
         assert mac not in protected_macs, "test_target_mac collides with protected_macs"
 
+        touched_devices.claim(mac, "restart")
         response = await network_live_client.restart_device(mac)
         assert isinstance(response, dict), "restart_device must return a dict"
         LOG.warning("restart_device(%s) issued — device will reboot in ~30s", mac)
 
-    async def test_provision_device(self, network_live_client, test_target_mac, protected_macs):
+    async def test_provision_device(self, network_live_client, test_target_mac, protected_macs, touched_devices):
         mac = test_target_mac
         assert mac not in protected_macs
 
+        touched_devices.claim(mac, "provision")
         response = await network_live_client.provision_device(mac)
         assert isinstance(response, dict), "provision_device must return a dict"
 
-    async def test_power_cycle_port(self, network_live_client, test_target_mac, protected_macs):
+    async def test_power_cycle_port(self, network_live_client, test_target_mac, protected_macs, touched_devices):
         """Skip unless target is a switch (PoE-capable). Port 1 by convention."""
         mac = test_target_mac
         assert mac not in protected_macs
@@ -162,6 +180,7 @@ class TestDisruptiveDeviceOps:
             pytest.skip(f"Target {mac} is not a switch; power_cycle_port not applicable")
 
         port_idx = int(os.environ.get("UNIFI_MCP_TEST_PORT_IDX", "1"))
+        touched_devices.claim(mac, "power_cycle")
         response = await network_live_client.power_cycle_port(mac, port_idx)
         assert isinstance(response, dict), "power_cycle_port must return a dict"
         LOG.warning("power_cycle_port(%s, port=%d) issued", mac, port_idx)
@@ -173,6 +192,7 @@ class TestDisruptiveDeviceOps:
         protected_macs,
         mcptest_prefix,
         cleanup_register,
+        touched_devices,
     ):
         """Round-trip a port profile assignment, restoring the original.
 
@@ -214,6 +234,7 @@ class TestDisruptiveDeviceOps:
             None,
         )
 
+        touched_devices.claim(mac, "assign_port_profile")
         try:
             response = await network_live_client.assign_port_profile(mac, port_idx, test_profile_id)
             assert isinstance(response, dict), "assign_port_profile must return a dict"
