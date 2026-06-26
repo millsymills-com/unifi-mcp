@@ -208,9 +208,10 @@ class UniFiConfig(BaseSettings):
            (see ``_audit_service_tls``) rather than only warning. A private,
            loopback, or link-local host stays permissible (WARN only) for the
            common home-controller case.
-        3. Soft WARN if DNS resolution fails so we don't crash startup on a
-           resolver hiccup; the operator still gets a visible note that the
-           safety check didn't run.
+        3. A DNS *name* that fails to resolve **refuses to start** as well, so
+           an attacker who forces resolution to fail (SERVFAIL/timeout) cannot
+           skip the non-private check. Only IP-literal hosts — which never hit
+           DNS — soft-WARN and continue.
 
         Pinning (``*_cert_fingerprint``) suppresses all of the above because
         the pin provides identity even with chain/hostname verification
