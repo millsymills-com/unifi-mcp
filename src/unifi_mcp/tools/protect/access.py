@@ -104,8 +104,9 @@ def register_protect_access_tools(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Get the RTSPS stream descriptor(s) for a camera.
 
-        Stream URLs/tokens are credential-bearing and redacted before the
-        response leaves this tool.
+        The stream URLs carry the bearer credential in their path alias
+        (``rtsps://host:7441/<alias>``), so each is redacted by stream-URL
+        shape before the response leaves this tool (#455).
 
         Args:
             camera_id: The camera ID.
