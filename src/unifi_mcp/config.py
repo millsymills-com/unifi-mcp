@@ -210,8 +210,8 @@ class UniFiConfig(BaseSettings):
            common home-controller case.
         3. A DNS *name* that fails to resolve **refuses to start** as well, so
            an attacker who forces resolution to fail (SERVFAIL/timeout) cannot
-           skip the non-private check. Only IP-literal hosts — which never hit
-           DNS — soft-WARN and continue.
+           skip the non-private check. IP-literal hosts never hit DNS, so they
+           are always classified by step 2.
 
         Pinning (``*_cert_fingerprint``) suppresses all of the above because
         the pin provides identity even with chain/hostname verification
@@ -243,7 +243,8 @@ class UniFiConfig(BaseSettings):
         any non-private address without ``verify_ssl`` or a pin, and also when a
         DNS *name* host cannot be resolved at all — so an attacker who can force
         resolution to fail (SERVFAIL/timeout) cannot skip the check. IP-literal
-        hosts, which cannot fail to resolve, keep the warn-and-skip path.
+        hosts bypass DNS in ``_resolve_host``, so they never reach the
+        resolution-failure path and are always classified.
         """
         if verify_ssl or fingerprint is not None:
             return
@@ -255,14 +256,6 @@ class UniFiConfig(BaseSettings):
         try:
             resolved = _resolve_host(host)
         except (OSError, ValueError) as exc:
-            if _is_ip_literal(host):
-                logger.warning(
-                    "could not classify %s host %r for TLS safety check (%s); skipping non-private check",
-                    service,
-                    host,
-                    exc,
-                )
-                return
             raise ValueError(
                 f"refusing to start: could not resolve {service} host {host!r} ({exc}) to confirm it is "
                 f"private, and verify_ssl=False would send the X-API-Key over unverified TLS. Failing closed "
@@ -361,15 +354,6 @@ def _first_non_private(
         if not (address.is_private or address.is_loopback or address.is_link_local):
             return address
     return None
-
-
-def _is_ip_literal(host: str) -> bool:
-    """True if ``host`` is a numeric IPv4/IPv6 literal rather than a DNS name."""
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    return True
 
 
 def _resolve_host(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
