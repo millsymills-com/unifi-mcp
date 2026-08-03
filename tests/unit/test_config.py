@@ -588,6 +588,20 @@ class TestFailClosedNonPrivateTls:
         messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert any("verify_ssl=False for Network" in m for m in messages), messages
 
+    def test_public_ip_literal_host_raises(self, monkeypatch):
+        """#461: a public IP literal is classified in the main path, without DNS."""
+
+        def _fail(*_args, **_kwargs):
+            raise AssertionError("getaddrinfo must not run for an IP literal")
+
+        monkeypatch.setattr(socket, "getaddrinfo", _fail)
+        with pytest.raises(ValidationError, match=re.escape("8.8.8.8")):
+            UniFiConfig(
+                _env_file=None,
+                unifi_network_host="8.8.8.8",
+                unifi_network_api="k",
+            )
+
     def test_mixed_addresses_any_non_private_raises(self, monkeypatch):
         """(e) getaddrinfo returning a private AND a public address treats the
         host as non-private — and so refuses to start without TLS."""
