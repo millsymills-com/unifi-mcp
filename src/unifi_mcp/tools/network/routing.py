@@ -51,6 +51,7 @@ def register_routing_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_network_create_route(
         ctx: Context,
+        *,
         name: str,
         network: str,
         route_type: str = "nexthop-route",

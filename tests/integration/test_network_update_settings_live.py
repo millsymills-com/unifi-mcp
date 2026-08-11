@@ -119,6 +119,7 @@ class TestUpdateSettingsRoundTrip:
     )
     async def test_named_arg_round_trips(
         self,
+        *,
         live_client: Client,
         named_arg: str,
         section_key: str,

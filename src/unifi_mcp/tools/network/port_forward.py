@@ -51,6 +51,7 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_network_create_port_forward(
         ctx: Context,
+        *,
         name: str,
         dst_port: str,
         fwd: str,

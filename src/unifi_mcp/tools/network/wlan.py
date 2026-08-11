@@ -63,6 +63,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_network_create_wlan(
         ctx: Context,
+        *,
         name: str,
         security: str = "wpapsk",
         wpa_mode: str = "wpa2",
