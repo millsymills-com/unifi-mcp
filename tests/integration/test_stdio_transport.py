@@ -117,7 +117,7 @@ def _server_env() -> dict[str, str]:
     do *not* copy the rest of the parent env because a developer running this
     locally is very likely to have ``UNIFI_*`` set in their shell.
     """
-    env = {
+    env: dict[str, str] = {
         "UNIFI_MODE": "readonly",
         "PATH": os.environ.get("PATH", ""),
         "HOME": os.environ.get("HOME", ""),
@@ -312,7 +312,7 @@ def _mode_flip_env(*, mode: str, network_port: int) -> dict[str, str]:
     keeping the served tool set deterministic. ``UNIFI_NETWORK_VERIFY_SSL`` is
     forced false so httpx accepts the in-test self-signed cert.
     """
-    env = {
+    env: dict[str, str] = {
         "UNIFI_MODE": mode,
         "UNIFI_NETWORK_HOST": "127.0.0.1",
         "UNIFI_NETWORK_PORT": str(network_port),

@@ -151,7 +151,7 @@ class TestSetRecordingModeConfirmGate:
         tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
         kwargs = {} if confirm is None else {"confirm": confirm}
         with pytest.raises(ToolError, match=r"Invalid request:.*confirm=True"):
-            await tool.fn(ctx, "cam-1", "never", **kwargs)
+            await tool.fn(ctx, camera_id="cam-1", mode="never", **kwargs)
         client.set_recording_mode.assert_not_awaited()
 
     async def test_never_with_confirm_calls_client(self, mcp_with_cameras):
@@ -159,7 +159,7 @@ class TestSetRecordingModeConfirmGate:
         client.set_recording_mode.return_value = {}
         ctx = _protect_ctx(client)
         tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
-        result = await tool.fn(ctx, "cam-1", "never", confirm=True)
+        result = await tool.fn(ctx, camera_id="cam-1", mode="never", confirm=True)
         assert result == {}
         client.set_recording_mode.assert_awaited_once()
 
@@ -169,7 +169,7 @@ class TestSetRecordingModeConfirmGate:
         client.set_recording_mode.return_value = {}
         ctx = _protect_ctx(client)
         tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
-        result = await tool.fn(ctx, "cam-1", mode)
+        result = await tool.fn(ctx, camera_id="cam-1", mode=mode)
         assert result == {}
         client.set_recording_mode.assert_awaited_once()
 
@@ -178,5 +178,5 @@ class TestSetRecordingModeConfirmGate:
         ctx = _protect_ctx(client)
         tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
         with pytest.raises(ToolError, match=r"Invalid request:.*mode"):
-            await tool.fn(ctx, "cam-1", "bogus")
+            await tool.fn(ctx, camera_id="cam-1", mode="bogus")
         client.set_recording_mode.assert_not_awaited()

@@ -143,7 +143,7 @@ class TestTeardownOnMismatch:
     async def test_mismatch_closes_response(self, monkeypatch):
         transport = CertPinningTransport(expected_fingerprint="c" * 64)
         response = _make_response(_FakeSSLObject(_FAKE_DER))
-        response.aclose = AsyncMock()  # ty: ignore[invalid-assignment]
+        response.aclose = AsyncMock()
 
         async def fake_super(self_: Any, request: httpx.Request) -> httpx.Response:
             return response
@@ -199,7 +199,7 @@ class TestTeardownOnMismatch:
         transport = CertPinningTransport(expected_fingerprint="c" * 64)
         transport._pool = None  # ty: ignore[invalid-assignment]
         response = _make_response(_FakeSSLObject(_FAKE_DER))
-        response.aclose = AsyncMock()  # ty: ignore[invalid-assignment]
+        response.aclose = AsyncMock()
 
         async def fake_super(self_: Any, request: httpx.Request) -> httpx.Response:
             return response
@@ -262,7 +262,7 @@ class TestTeardownOnMismatch:
     async def test_success_path_does_not_teardown(self, monkeypatch):
         transport = CertPinningTransport(expected_fingerprint=_FAKE_FP)
         response = _make_response(_FakeSSLObject(_FAKE_DER))
-        response.aclose = AsyncMock()  # ty: ignore[invalid-assignment]
+        response.aclose = AsyncMock()
 
         async def fake_super(self_: Any, request: httpx.Request) -> httpx.Response:
             return response

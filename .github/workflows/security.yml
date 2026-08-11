@@ -88,4 +88,8 @@ jobs:
         with:
           fail-on-severity: high
           allow-licenses: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0, Python-2.0, 0BSD, Unlicense
+          # hypothesis (dev-only) and certifi (runtime, via httpx) are MPL-2.0. File-level
+          # copyleft and neither is modified, so exempt them by name rather than allowing
+          # MPL-2.0 for every future dependency.
+          allow-dependencies-licenses: pkg:pypi/hypothesis, pkg:pypi/certifi
           comment-summary-in-pr: on-failure

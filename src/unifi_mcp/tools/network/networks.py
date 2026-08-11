@@ -54,6 +54,7 @@ def register_network_config_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_network_create_network(
         ctx: Context,
+        *,
         name: str,
         purpose: str = "corporate",
         subnet: str | None = None,

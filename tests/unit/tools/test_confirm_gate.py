@@ -23,9 +23,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.server.context import Context, set_context
-from pydantic import ValidationError
 
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
@@ -211,7 +210,7 @@ class TestConfirmSchemaCoercion:
     @pytest.mark.parametrize("confirm", [2, "maybe"])
     async def test_non_coercible_input_rejected_by_schema(self, confirm):
         client = AsyncMock()
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="confirm"):
             await _run_validated(
                 register_client_tools,
                 "unifi_network_block_client",
