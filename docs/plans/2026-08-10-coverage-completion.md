@@ -1,9 +1,9 @@
 # Plan: API Coverage Completion (Network 100%, Protect 81%)
 
-> Source PRD: the API coverage PRD, 47 numbered user stories, tracked in #494.
-> The PRD text is not committed to this repo and is not yet pasted into that issue,
-> so the `**User stories**` references below do not resolve to anything readable
-> yet. #494 carries the story → phase mapping as a checksum for when it lands.
+> Source PRD: #494, 47 numbered user stories. Every `**User stories**` line below
+> indexes into that numbering. Where this plan and the PRD disagree, this plan
+> wins: it carries corrections made after the PRD was written, listed at the top
+> of #494.
 >
 > Adds 24 tools (23 write, 1 read), taking the server from 160 tools
 > (100 read / 60 write) to 184 (101 read / 83 write). Prior work: #423 plan,
