@@ -54,7 +54,7 @@ early-access rows).
 > (legacy `stat/*`, `rest/*`, `cmd/*` paths), which is undocumented by Ubiquiti but
 > exposes a much broader surface (port-forwards, routing, port profiles, settings,
 > firewall groups, device/client commands) that the Integration API still lacks. A
-> separate read-only `NetworkIntegrationClient` adds 28 GET/list tools over the
+> separate `NetworkIntegrationClient` adds 28 GET/list tools over the
 > Integration API for resources the legacy controller doesn't expose (ACL rules,
 > firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
 > The Network section below therefore has two tables: (3a) the legacy paths we call,

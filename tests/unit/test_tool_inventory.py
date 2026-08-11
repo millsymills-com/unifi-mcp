@@ -113,10 +113,11 @@ class TestDocsCiteCanonicalCounts:
         text = " ".join(_doc("CLAUDE.md").split())
         network = EXPECTED_NAMESPACE_SPLITS["network"]
         protect = EXPECTED_NAMESPACE_SPLITS["protect"]
-        assert (
+        sentence = (
             f"Per-API tool counts: Network {network['read']} read + {network['write']} write tools "
             f"({EXPECTED_TOOL_COUNTS['network']} total); "
             f"Protect {protect['read']} read + {protect['write']} write tools "
             f"({EXPECTED_TOOL_COUNTS['protect']} total); "
             f"Site Manager {EXPECTED_NAMESPACE_SPLITS['site_manager']['read']} read-only tools."
-        ) in text
+        )
+        assert sentence in text, f"CLAUDE.md must contain this sentence verbatim (line breaks free): {sentence}"
