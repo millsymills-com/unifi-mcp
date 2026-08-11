@@ -20,7 +20,7 @@
 
 <!-- Describe how you tested these changes -->
 
-- [ ] Unit tests pass (`pytest tests/unit/`)
+- [ ] Tests pass (`pytest tests/unit/ tests/property/`)
 - [ ] Linting passes (`ruff check`)
 - [ ] Type checking passes (`ty check src/ tests/`)
 - [ ] Integration tests pass (if applicable)
