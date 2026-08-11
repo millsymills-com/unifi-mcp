@@ -28,7 +28,7 @@ All checks must pass locally before you push:
 uv lock --check
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
-uv run ty check src/ tests/
+uv run ty check src/unifi_mcp/
 uv run pytest tests/unit/ tests/property/ -v
 ```
 
