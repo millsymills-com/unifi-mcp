@@ -1,8 +1,9 @@
 # Plan: API Coverage Completion (Network 100%, Protect 81%)
 
-> Source PRD: the API coverage PRD, 47 numbered user stories. Not committed to this
-> repo — file it as a GitHub issue and replace this line with the issue number
-> before merging, so the story references below resolve.
+> Source PRD: the API coverage PRD, 47 numbered user stories, tracked in #494.
+> The PRD text is not committed to this repo and is not yet pasted into that issue,
+> so the `**User stories**` references below do not resolve to anything readable
+> yet. #494 carries the story → phase mapping as a checksum for when it lands.
 >
 > Adds 24 tools (23 write, 1 read), taking the server from 160 tools
 > (100 read / 60 write) to 184 (101 read / 83 write). Prior work: #423 plan,
