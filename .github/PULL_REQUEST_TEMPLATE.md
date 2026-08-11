@@ -22,7 +22,7 @@
 
 - [ ] Unit tests pass (`pytest tests/unit/`)
 - [ ] Linting passes (`ruff check`)
-- [ ] Type checking passes (`mypy src/unifi_mcp/`)
+- [ ] Type checking passes (`ty check src/ tests/`)
 - [ ] Integration tests pass (if applicable)
 
 ## Checklist
