@@ -27,7 +27,7 @@ All checks must pass locally before you push:
 ```bash
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
-uv run ty check src/unifi_mcp/
+uv run ty check src/ tests/
 uv run pytest tests/unit/ -v
 ```
 
