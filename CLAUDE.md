@@ -15,7 +15,7 @@ uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 
 # Type check
-uv run ty check src/unifi_mcp/
+uv run ty check src/ tests/
 
 # Test (unit only, excludes integration)
 uv run pytest tests/unit/ -v
