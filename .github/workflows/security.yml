@@ -87,7 +87,9 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v5.0.0
         with:
           fail-on-severity: high
-          # MPL-2.0 is file-level copyleft and only enters via dev/test deps (hypothesis),
-          # which are never distributed with the package.
-          allow-licenses: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0, Python-2.0, 0BSD, Unlicense, MPL-2.0
+          allow-licenses: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0, Python-2.0, 0BSD, Unlicense
+          # hypothesis (dev-only) and certifi (runtime, via httpx) are MPL-2.0. File-level
+          # copyleft and neither is modified, so exempt them by name rather than allowing
+          # MPL-2.0 for every future dependency.
+          allow-dependencies-licenses: pkg:pypi/hypothesis, pkg:pypi/certifi
           comment-summary-in-pr: on-failure
