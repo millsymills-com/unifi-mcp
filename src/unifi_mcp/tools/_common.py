@@ -89,10 +89,12 @@ def tool_handler[**P, R](
 #
 # NOT caught: evidence suppression via Protect recording fields.
 # `recordingSettings` normalizes to `recordingsettings`, which is in no
-# exact-key set and ends in neither suffix. Unreachable today only because
-# `update_camera` builds its body from the field allowlist with `data=None`
-# and the other Protect writers expose no recording fields — a new writer
-# that accepts them reopens it (#501).
+# exact-key set, starts with no denied prefix, and ends in neither suffix.
+# Unreachable today only because no Protect writer that targets
+# `cameras/{id}` accepts a raw dict: `update_camera` takes named scalar args
+# only and passes `data=None`. `update_chime`, `update_light` and
+# `update_sensor` do forward `data` verbatim, but their endpoints carry no
+# recording settings. A camera writer that accepts `data` reopens it (#501).
 #
 # This denylist is a stopgap (option 2 from the issue). The honest answer
 # (option 1) is per-endpoint named scalar args + an explicit allowlist —
