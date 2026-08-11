@@ -132,6 +132,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_protect_set_recording_mode(
         ctx: Context,
+        *,
         camera_id: str,
         mode: str,
         pre_padding: int | None = None,

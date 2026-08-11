@@ -82,6 +82,7 @@ def register_firewall_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_network_create_firewall_rule(
         ctx: Context,
+        *,
         name: str,
         ruleset: str,
         action: str = "drop",
