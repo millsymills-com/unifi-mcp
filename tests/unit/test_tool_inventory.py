@@ -105,3 +105,18 @@ class TestDocsCiteCanonicalCounts:
             split = EXPECTED_NAMESPACE_SPLITS[namespace]
             total = EXPECTED_TOOL_COUNTS[namespace]
             assert f"{split['read']} read + {split['write']} write tools ({total} total" in text
+
+    def test_claude_md_prose_paragraph(self):
+        # The prose paragraph restates the tree block's numbers and drifted from it
+        # undetected (#489), because the assertions above are satisfied by whichever
+        # surface happens to be right. Pin the whole sentence, Site Manager included.
+        text = " ".join(_doc("CLAUDE.md").split())
+        network = EXPECTED_NAMESPACE_SPLITS["network"]
+        protect = EXPECTED_NAMESPACE_SPLITS["protect"]
+        assert (
+            f"Per-API tool counts: Network {network['read']} read + {network['write']} write tools "
+            f"({EXPECTED_TOOL_COUNTS['network']} total); "
+            f"Protect {protect['read']} read + {protect['write']} write tools "
+            f"({EXPECTED_TOOL_COUNTS['protect']} total); "
+            f"Site Manager {EXPECTED_NAMESPACE_SPLITS['site_manager']['read']} read-only tools."
+        ) in text
