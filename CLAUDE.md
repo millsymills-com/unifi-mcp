@@ -137,7 +137,7 @@ if config.protect_enabled:
 ## CI/CD
 
 - **CI**: Runs on push to main and PRs. Four jobs feed the `CI Pass` gate: lint (`uv lock --check` + ruff), typecheck (ty), test (pytest over `tests/unit/` and `tests/property/`), and dependency audit (pip-audit), all on Python 3.13
-- **Security**: Bandit and dependency review run on every push and PR, not only the Monday cron
+- **Security** (`security.yml`): Bandit runs on pushes to main, PRs, and the Monday cron; dependency review is PR-only; this workflow's own pip-audit is cron/manual only. The pip-audit that blocks PRs is CI's `audit` job, not this one
 - **Dependabot**: Weekly updates for Python deps and GitHub Actions
 - **Release**: No automated release pipeline yet — `uv build` produces a wheel locally; PyPI publishing is not wired up
 
