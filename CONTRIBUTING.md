@@ -25,11 +25,16 @@ Copy `.env.example` to `.env` and fill in the API keys for whichever UniFi surfa
 All checks must pass locally before you push:
 
 ```bash
+uv lock --check
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 uv run ty check src/unifi_mcp/
-uv run pytest tests/unit/ -v
+uv run pytest tests/unit/ tests/property/ -v
 ```
+
+`uv lock --check` is the one most easily missed: a dependency bump that edits
+`pyproject.toml` without regenerating `uv.lock` passes every other gate here and
+fails CI.
 
 For security-sensitive changes also run:
 

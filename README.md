@@ -285,7 +285,7 @@ uv run ruff format --check src/ tests/
 uv run ty check src/unifi_mcp/
 
 # Test
-uv run pytest tests/unit/ -v
+uv run pytest tests/unit/ tests/property/ -v
 
 # Pre-commit hooks
 uv run pre-commit install

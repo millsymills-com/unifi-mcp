@@ -10,6 +10,9 @@ Production-grade Python MCP server for UniFi Site Manager, Network, and Protect 
 # Install (development)
 uv sync --extra dev
 
+# Lockfile in sync with pyproject.toml (merge-blocking in CI)
+uv lock --check
+
 # Lint
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
@@ -17,11 +20,11 @@ uv run ruff format --check src/ tests/
 # Type check
 uv run ty check src/unifi_mcp/
 
-# Test (unit only, excludes integration)
-uv run pytest tests/unit/ -v
+# Test (unit + property, excludes integration — same scope as CI)
+uv run pytest tests/unit/ tests/property/ -v
 
 # Test with coverage
-uv run pytest tests/unit/ --cov=unifi_mcp --cov-report=term-missing -m "not integration"
+uv run pytest tests/unit/ tests/property/ --cov=unifi_mcp --cov-report=term-missing -m "not integration"
 
 # Integration tests (requires live UniFi hardware)
 uv run pytest tests/integration/ -v -m integration
@@ -133,8 +136,8 @@ if config.protect_enabled:
 
 ## CI/CD
 
-- **CI**: Runs on push to main and PRs. Lint (ruff), typecheck (ty), and test (pytest) all on Python 3.13
-- **Security**: Weekly Bandit scans + dependency review on PRs
+- **CI**: Runs on push to main and PRs. Four jobs feed the `CI Pass` gate: lint (`uv lock --check` + ruff), typecheck (ty), test (pytest over `tests/unit/` and `tests/property/`), and dependency audit (pip-audit), all on Python 3.13
+- **Security**: Bandit and dependency review run on every push and PR, not only the Monday cron
 - **Dependabot**: Weekly updates for Python deps and GitHub Actions
 - **Release**: No automated release pipeline yet — `uv build` produces a wheel locally; PyPI publishing is not wired up
 
