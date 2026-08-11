@@ -29,6 +29,15 @@ TOTAL_TOOLS = sum(EXPECTED_TOOL_COUNTS.values())
 
 EXPECTED_READ_TOOLS = TOTAL_TOOLS - EXPECTED_WRITE_TOOLS
 
+NETWORK_INTEGRATION_TAG = "network_integration"
+
+# The `network` namespace is served by two clients. Both register `unifi_network_*`
+# tools, so the namespace totals above cannot tell them apart; the tag can.
+NETWORK_ORIGIN_SPLITS: dict[str, dict[str, int]] = {
+    "legacy": {"read": 26, "write": 39},
+    "integration": {"read": 28, "write": 13},
+}
+
 NAMESPACE_PREFIXES: dict[str, str] = {
     "network": "unifi_network_",
     "protect": "unifi_protect_",

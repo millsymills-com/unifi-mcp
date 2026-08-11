@@ -15,7 +15,7 @@ uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 
 # Type check
-uv run ty check src/unifi_mcp/
+uv run ty check src/ tests/
 
 # Test (unit only, excludes integration)
 uv run pytest tests/unit/ -v
@@ -71,7 +71,7 @@ src/unifi_mcp/
 ├── clients/                 # API clients (httpx async)
 │   ├── base.py              # BaseUniFiClient with retry/auth/error mapping
 │   ├── network.py           # Legacy Network controller client (/proxy/network/api/s/{site}/)
-│   ├── network_integration.py  # Network Integration client (/proxy/network/integration/v1/, read-only)
+│   ├── network_integration.py  # Network Integration client (/proxy/network/integration/v1/)
 │   ├── protect.py           # Protect API client
 │   └── site_manager.py      # Site Manager API client
 └── tools/                   # MCP tool definitions
@@ -82,8 +82,8 @@ src/unifi_mcp/
     └── site_manager/        # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
 ```
 
-Per-API tool counts: Network 54 read + 52 write tools (106 total); Protect 9 read
-+ 8 write tools (17 total); Site Manager 3 read-only tools. The Network 54 read
+Per-API tool counts: Network 54 read + 52 write tools (106 total); Protect 37 read
++ 8 write tools (45 total); Site Manager 9 read-only tools. The Network 54 read
 splits into 26 legacy-controller reads + 28 Network Integration reads; the
 Network write 52 splits into 39 legacy-controller writes + 13 Network Integration
 writes (ACL + DNS + firewall-zones + vouchers groups). The Network Integration
