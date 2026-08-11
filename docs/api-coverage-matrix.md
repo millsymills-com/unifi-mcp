@@ -275,6 +275,11 @@ on a `cmd` body field.
 | POST | `cmd/stamgr` `unauthorize-guest` | `unifi_network_unauthorize_guest` |
 | POST | `cmd/stat` `reset-dpi` | `unifi_network_reset_dpi` |
 
+63 rows, 47 counted: the summary's 47 is the non-`cmd/*` rows. The 16 `cmd/*` rows
+multiplex on a `cmd` body field rather than being separate paths, so they are not
+counted as ones. Rows are method-plus-path pairs, so a path carrying several methods
+appears more than once — 63 rows span 42 distinct path strings.
+
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
 We now call this surface via `NetworkIntegrationClient` (28 read tools plus the
