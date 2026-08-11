@@ -153,7 +153,7 @@ def handle_client_error(error: BaseException) -> NoReturn:
     if isinstance(error, UniFiError):
         raise ToolError(f"{tag}UniFi API error: {error}") from error
     # Unexpected errors — do NOT echo str(error) to the agent. ``exc_info=error``
-    # keeps the full traceback in the server log for the operator; the caller may
-    # invoke this outside an active ``except`` block, so implicit exc_info is unsafe.
+    # keeps the full traceback in the server log for the operator; the call is not
+    # lexically inside an ``except`` block, which is what rules out logger.exception.
     logger.error("Unexpected error in tool execution", exc_info=error)
     raise ToolError("Unexpected internal error; check server logs") from error

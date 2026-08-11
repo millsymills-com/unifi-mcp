@@ -105,6 +105,7 @@ ignore = [
     "ARG001",  # unused function args (fixtures)
     "PLR2004", # magic values in tests
     "S106",    # hardcoded passwords in test fixtures
+    "PLR0917", # pytest injects fixtures and parametrize values by keyword; nothing calls a test
 ]
 # FastMCP introspects type annotations at runtime, so Context/FastMCP must not be behind TYPE_CHECKING
 "src/unifi_mcp/tools/**/*.py" = [

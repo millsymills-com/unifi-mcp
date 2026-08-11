@@ -187,7 +187,6 @@ class TestDisruptiveDeviceOps:
 
     async def test_assign_port_profile(
         self,
-        *,
         network_live_client,
         test_target_mac,
         protected_macs,
