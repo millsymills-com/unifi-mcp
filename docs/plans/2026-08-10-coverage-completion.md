@@ -51,9 +51,12 @@ Durable decisions that apply across all phases.
   container-typed argument carries arbitrary nested keys under an allowed path.
   Every new write tool therefore also calls
   `reject_dangerous_keys(body, tool_name=...)` after building the body, matching
-  every existing call site (`cameras.py:128`, `devices.py:136/193/280`,
-  `system.py:130`) — the helper does not call it despite its own comment
-  suggesting otherwise. Note that the denylist is a documented stopgap and does
+  the five existing named-arg-builder call sites (`cameras.py:128`,
+  `devices.py:136/193/280`, `system.py:130`) — the pattern to copy, since the
+  other thirteen of the eighteen call sites in `src/unifi_mcp/tools/` guard a
+  free-form `data` argument instead. The helper does not call it despite its own
+  comment suggesting otherwise (`_common.py:226`); phase 1 is already editing that
+  function, so correct the comment there. Note that the denylist is a documented stopgap and does
   not stop `action`, `enabled`, `armed`, `isArmed`, `recordingSettings`, or
   `webhookUri` (`_DENYLIST_KEY_SUFFIXES` is `("_url", "_command")`, and
   `webhookUri` normalizes to `webhookuri`, which ends in neither). Where a phase
@@ -82,16 +85,20 @@ Durable decisions that apply across all phases.
   because it computes 67/72, excluding `GET /v1/countries` from the denominator;
   92% is the same coverage under the new formula, not a correction.
 - **Protect gaps are prose, not rows**: `docs/api-coverage-matrix.md:166-189` lists
-  the uncovered Protect surface as bullets; the Protect tables hold Covered and
-  Excluded rows only. So every "N matrix rows move Gap → Covered (unverified)"
-  criterion below means *authoring* new rows in the Covered table and deleting the
-  corresponding bullet, not reclassifying an existing row. Two bullets need
-  splitting rather than deleting: `POST/DELETE cameras/{id}/rtsps-stream` (`:173`)
-  is one bullet covering two operations and becomes two rows, and six of the twelve
-  deferred actuation endpoints (siren play/stop/test-sound, speaker test-sound,
-  relay activate, alarm-hub trigger) are parenthetical `(+…)` suffixes on the
-  device-class PATCH bullets Phase 5 covers (`:176-179`), so Phase 5 splits each of
-  those bullets and leaves the deferred half in place.
+  the uncovered Protect surface as free prose — labelled paragraphs (`Camera
+  actions: …`, `Device-class writes: …`, `Live views: …`, `Alarm manager: …`,
+  `Other: …`) carrying comma-separated endpoints, with no list markers at all —
+  while the Protect tables hold Covered and Excluded rows only. So every "N matrix
+  rows move Gap → Covered (unverified)" criterion below means *authoring* new rows
+  in the Covered table and striking the endpoint out of its paragraph, not
+  reclassifying an existing row; when a paragraph empties, delete the paragraph.
+  Two entries need splitting rather than striking: `POST/DELETE
+  cameras/{id}/rtsps-stream` (`:173`) is one entry covering two operations and
+  becomes two rows, and six of the twelve deferred actuation endpoints (siren
+  play/stop/test-sound, speaker test-sound, relay activate, alarm-hub trigger) are
+  parenthetical `(+…)` suffixes on the device-class PATCH entries Phase 5 covers
+  (`:176-179`), so Phase 5 splits each of those and leaves the deferred half in
+  place.
 - **Disposition of new rows**: every row this change adds lands as
   **Covered (unverified)**, never **Covered** — verification is cassette-only, so
   no new tool is exercised against a controller. The summary table gains a
@@ -127,7 +134,13 @@ Every tool-adding phase (2–7, 9, 10) must satisfy all of these, in the same PR
 - [ ] `docs/tool-schema-matrix.md` regenerated with
       `uv run python scripts/gen_schema_matrix.py`, never hand-edited, so
       `tests/unit/test_schema_matrix.py` stays green.
-- [ ] `README.md` and `CLAUDE.md` count literals updated (both are CI-guarded).
+- [ ] `README.md` and `CLAUDE.md` count literals updated. `tests/unit/test_tool_inventory.py`
+      guards the totals in both and the per-API read/write splits in `CLAUDE.md`, but
+      only for `network` and `protect` (`:104` loops over that pair) — Site Manager's
+      split and every line of surrounding prose are unguarded, so they need reading by
+      eye. The guard also asserts substring *containment*: it proves a correct literal
+      exists somewhere in the file and cannot detect a second, contradictory one
+      elsewhere, which is how #489's wrong prose paragraph survives a green suite.
 - [ ] `CHANGELOG.md` gains an `Unreleased` → `Added` entry naming the tool group,
       matching the shape of the 0.4.0 release section. There is no `Unreleased`
       section today — 0.4.0 is topmost — so the first phase to land creates it.
@@ -145,9 +158,10 @@ Every tool-adding phase (2–7, 9, 10) must satisfy all of these, in the same PR
 - [ ] Every new write tool calls `reject_dangerous_keys(body, tool_name=...)`
       after building its body, with a test that a dangerous key nested inside an
       allowlisted container argument is rejected.
-- [ ] Lint, types, and unit tests green: `uv run ruff check src/ tests/`,
-      `uv run ruff format --check src/ tests/`, `uv run ty check src/unifi_mcp/`,
-      `uv run pytest tests/unit/ -v`.
+- [ ] Lint, types, and unit tests green at CI's scope, not the narrower scope some
+      docs still give (#493): `uv run ruff check src/ tests/`,
+      `uv run ruff format --check src/ tests/`, `uv run ty check src/ tests/`,
+      `uv run pytest tests/unit/ tests/property/ -m "not integration" -v`.
 
 Readonly-mode absence needs no per-tool tests: `tests/unit/test_audit_inventory.py`
 §3e enumerates the `write`-tagged tools in a readonly server and asserts the set is
@@ -200,6 +214,10 @@ on the helper rather than copying the gate again.
       `build_named_arg_body` with a raw dict.
 - [ ] A `field_paths` / `named_values` key mismatch raises a clear error rather
       than a bare `KeyError`.
+- [ ] The builder's preamble comment (`tools/_common.py:226`) no longer claims "the
+      resulting body still flows through `reject_dangerous_keys`" — the builder has
+      never called it, and the removed `data` branch was the clause's only remaining
+      pretext. State that each caller must call it.
 - [ ] Schema matrix regenerated and `_inventory.py` unchanged — the removed `data`
       arguments change three tools' input schemas without changing any count.
 - [ ] `CHANGELOG.md` records the `data` removal under `Unreleased` → `Removed` as a
@@ -214,6 +232,17 @@ on the helper rather than copying the gate again.
 > unacceptable, the fallback is to keep the parameter and rely on the cross-cutting
 > criterion above — weaker, because it is a convention rather than a
 > compiler-checked constraint.
+>
+> The guarantee this buys is module-local, and the plan claims no more than that.
+> Thirteen other shipped tools still take a free-form `data: JsonObject` directly,
+> bypassing `build_named_arg_body` entirely: `network/firewall.py:93,139,203`,
+> `network/port_forward.py:87`, `network/networks.py:85`,
+> `network/port_profiles.py:62,80`, `network/wlan.py:96`, `network/routing.py:91`,
+> `network_integration/dns.py:68,94`, and `network_integration/acl.py:79,106`. So
+> after phase 1 the PRD rule holds inside `protect/devices.py` — the module phase 5
+> extends, which is what makes it worth doing now — and remains false across
+> `src/unifi_mcp/tools/` as a whole. Migrating those thirteen is out of scope here
+> and tracked separately.
 - [ ] All 21 mechanical call sites use it; no `if not confirm:` raise remains in
       `src/unifi_mcp/tools/`.
 - [ ] `unifi_protect_set_recording_mode` still accepts `always`, `motion`, and
@@ -661,13 +690,16 @@ that nothing in CI catches, so each needs to be done deliberately:
    Gap count and the number of Gap rows §3b actually holds today (firewall policies
    ordering PUT, firewall policies PATCH, and the three traffic-matching-list writes).
 
-   So the trailer's correct value *before* this plan is 67/73 with 5 gaps, and after
-   phases 2 and 3 fill those five rows it is 72 Covered + 1 Excluded
-   (`GET /v1/countries`) = 73 of 73 dispositioned, 0 gaps. Say the excluded row out
-   loud while rewriting: 72/73 is 98.6%, so "100%" is only true under the item-1
-   formula that counts a dispositioned exclusion as resolved. The trailer's second
+   So the trailer's correct value *before* this plan is 67/73 with 5 gaps. Carry the
+   sequence all the way through: phases 2 and 3 fill those five Gap rows, giving 72
+   Covered + 1 Excluded (`GET /v1/countries`), and then phase 4 reclassifies
+   `GET /v1/countries` from Excluded to Covered (unverified). Phase 11 lands after
+   all of them, so the trailer it rewrites reads 73 Covered / 0 gaps / 0 excluded —
+   a plain 100% under any formula, with no exclusion caveat to write. Do not carry
+   the intermediate 72/73 (98.6%) figure into the table. The trailer's second
    sentence ("All 18 remaining gaps are writes — the read ceiling for this surface")
-   is still true of the 5 that remain and should be rescaled, not deleted.
+   describes a population that is empty once phases 2 and 3 land, so it is deleted
+   rather than rescaled.
 4. **The intro prose.** The intro hardcodes the same totals: "the 160 MCP tools this
    server exposes," "Network 106, Protect 45, Site Manager 9 = 160," and "41 Network
    Integration tools (28 read + 13 write, §3b)." These become 184, "Network 112,
@@ -675,6 +707,13 @@ that nothing in CI catches, so each needs to be done deliberately:
    18 write, §3b)." `tests/unit/test_tool_inventory.py` pins count literals in
    `README.md` and `CLAUDE.md` only and never opens the matrix, so CI will not catch
    these. The §3a "all 65 Network tools" figure is unchanged.
+
+   Edit these by hand, not by find/replace on the strings quoted above: two of the
+   three wrap across source lines in the file — "the 160 MCP tools this / server
+   exposes" spans `api-coverage-matrix.md:3-4` and "Network 106, Protect 45, /
+   Site Manager 9 = 160" spans `:13-14`. Only the third (`:15`) is a single-line
+   literal. A find/replace pass silently matches nothing on the first two and
+   leaves the stale totals in place.
 
    Three defects that already exist on `main` land in the same edit, since this phase
    is already touching both files: the Protect Covered table holds 42 data rows
@@ -711,14 +750,16 @@ set.
       Site Manager and the legacy-controller row.
 - [ ] §3b audit complete: every §3b and Protect write row carries one disposition
       convention, with unexercised rows demoted to Covered (unverified).
-- [ ] §3b trailer reads 73/73 with 0 gaps and 1 excluded, and no longer contradicts
-      the summary table.
+- [ ] §3b trailer reads 73/73 with 0 gaps and 0 excluded, and no longer contradicts
+      the summary table or phase 4's acceptance criterion.
 - [ ] Intro prose counts updated: 184 total; Network 112, Protect 63, Site Manager 9;
       47 NI tools (29 read + 18 write). §3a's 65 unchanged.
 - [ ] Twelve deferred endpoints listed as Gap with the deferral note; two WebSocket
       endpoints still Excluded.
 - [ ] `README.md` and `CLAUDE.md` state Network 100% and Protect 81% under the one
-      stated formula.
+      stated formula. Neither carries a coverage percentage today — README's only
+      reference to the matrix is the link at `README.md:18` — so this adds the
+      figures rather than reconciling existing ones.
 - [ ] Snapshot date and pinned spec versions re-verified and updated.
 - [ ] `uv run pytest tests/unit/ -v` green, including `test_tool_inventory.py` and
       `test_schema_matrix.py`.
