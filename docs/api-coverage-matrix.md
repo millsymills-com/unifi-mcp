@@ -10,6 +10,12 @@ exactly one disposition:
 - **Gap** — plausibly in scope, not yet implemented (one-line note on what it does).
 - **Excluded** — deliberately out of scope (one-line reason).
 
+A row marked **†** is an endpoint the pinned OpenAPI snapshot does not document —
+undocumented by the vendor, or newer than the mirror. We ship and verify a tool for
+it, but it is **not counted** on either side of the coverage fraction, because the
+denominator is the pinned spec. Expect a Covered table to have one more row than its
+Covered number for each **†** it carries.
+
 Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 106, Protect 45,
 Site Manager 9 = 160). The Network 106 splits into 65 legacy-controller tools
 (§3a) and 41 Network Integration tools (28 read + 13 write, §3b).
@@ -54,7 +60,7 @@ early-access rows).
 > (legacy `stat/*`, `rest/*`, `cmd/*` paths), which is undocumented by Ubiquiti but
 > exposes a much broader surface (port-forwards, routing, port profiles, settings,
 > firewall groups, device/client commands) that the Integration API still lacks. A
-> separate read-only `NetworkIntegrationClient` adds 28 GET/list tools over the
+> separate `NetworkIntegrationClient` adds 28 GET/list tools over the
 > Integration API for resources the legacy controller doesn't expose (ACL rules,
 > firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
 > The Network section below therefore has two tables: (3a) the legacy paths we call,
@@ -68,7 +74,7 @@ early-access rows).
 |---|---:|---:|---:|---:|---:|
 | Network — official Integration API (functional equivalent + direct reads) | 67 | 1 | 5 | 73 ops | **93%** |
 | Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
-| Protect — Integration API | 41 | 2 | 30 | 73 ops | **56%** |
+| Protect — Integration API | 41 (+1 †) | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
 
 The "feature-complete" framing in the README is accurate for the **legacy Network
@@ -117,7 +123,7 @@ qualifier.
 | GET | `cameras/{id}` | **Covered** | `unifi_protect_get_camera` |
 | PATCH | `cameras/{id}` | **Covered** | `unifi_protect_update_camera`, `unifi_protect_set_recording_mode`, `unifi_protect_set_smart_detection` |
 | GET | `cameras/{id}/snapshot` | **Covered** | `unifi_protect_get_snapshot` |
-| GET | `cameras/{id}/video/export` | **Covered** | `unifi_protect_export_video` — not present in the pinned 7.1.42 OpenAPI snapshot but live-verified working; likely undocumented or newer than the mirror. |
+| GET | `cameras/{id}/video/export` | **Covered †** | `unifi_protect_export_video` — not present in the pinned 7.1.42 OpenAPI snapshot but live-verified working; likely undocumented or newer than the mirror. |
 | GET | `cameras/{id}/rtsps-stream` | **Covered** | `unifi_protect_get_rtsps_stream` — GET only; may 404/empty with no active stream (like `export_video`). |
 | GET | `nvrs` | **Covered** | `unifi_protect_get_nvr` |
 | GET | `chimes` | **Covered** | `unifi_protect_list_chimes` |
@@ -156,6 +162,9 @@ qualifier.
 | GET | `meta/info` | **Covered** | `unifi_protect_get_meta_info` |
 | GET | `files/{fileType}` | **Covered** | `unifi_protect_get_file_asset` — content-type unverified; assumes JSON metadata, may move to `media.py` if raw bytes. |
 
+42 rows, 41 counted: `cameras/{id}/video/export` is marked **†** and sits outside the
+pinned 73-op denominator.
+
 ### Excluded
 
 | Method | Path | Reason |
@@ -186,7 +195,8 @@ Alarm manager: `POST arm-profiles`, `POST arm-profiles/enable`, `POST arm-profil
 
 Other: `POST files/{fileType}` (asset upload; the GET is covered).
 
-Covered 41/73 ops (56%); WebSocket subscriptions excluded.
+Covered 41/73 ops (56%); WebSocket subscriptions excluded, and the one **†** row
+counted on neither side.
 
 ---
 
@@ -264,6 +274,12 @@ on a `cmd` body field.
 | POST | `cmd/stamgr` `authorize-guest` | `unifi_network_authorize_guest` |
 | POST | `cmd/stamgr` `unauthorize-guest` | `unifi_network_unauthorize_guest` |
 | POST | `cmd/stat` `reset-dpi` | `unifi_network_reset_dpi` |
+
+63 rows, 47 counted: the summary's 47 is the non-`cmd/*` rows. The 16 `cmd/*` rows
+multiplex on a `cmd` body field rather than being separate paths, so they are not
+counted as ones. Rows are method-plus-path pairs, so a path carrying several methods
+appears more than once — the 63 rows resolve to 31 distinct URL paths, 26 of them
+non-`cmd/*` and 5 the `cmd/*` endpoints the 16 subcommands multiplex over.
 
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 

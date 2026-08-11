@@ -83,9 +83,18 @@ def tool_handler[**P, R](
 #
 # `dict[str, Any]` write tools forward the body verbatim to the controller.
 # A write-mode agent receiving a prompt-injected instruction can smuggle
-# config changes the tool name does NOT advertise: RADIUS hijack via
-# `radius_servers`, callback exfil via `super_mgmt_url`, lockout via
-# `mac_filter_list`, evidence suppression via Protect recording fields.
+# config changes the tool name does NOT advertise. Caught here: RADIUS
+# hijack via `radius_servers`, callback exfil via `super_mgmt_url`, lockout
+# via `mac_filter_list`.
+#
+# NOT caught: evidence suppression via Protect recording fields.
+# `recordingSettings` normalizes to `recordingsettings`, which is in no
+# exact-key set, starts with no denied prefix, and ends in neither suffix.
+# Unreachable today only because no Protect writer that targets
+# `cameras/{id}` accepts a raw dict: `update_camera` takes named scalar args
+# only and passes `data=None`. `update_chime`, `update_light` and
+# `update_sensor` do forward `data` verbatim, but their endpoints carry no
+# recording settings. A camera writer that accepts `data` reopens it (#501).
 #
 # This denylist is a stopgap (option 2 from the issue). The honest answer
 # (option 1) is per-endpoint named scalar args + an explicit allowlist —

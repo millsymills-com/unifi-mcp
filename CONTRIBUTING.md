@@ -28,7 +28,7 @@ All checks must pass locally before you push:
 uv lock --check
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
-uv run ty check src/unifi_mcp/
+uv run ty check src/ tests/
 uv run pytest tests/unit/ tests/property/ -v
 ```
 
@@ -54,7 +54,7 @@ uv run bandit -r src/unifi_mcp/ -c pyproject.toml
 
 ## Tool Naming and Registration
 
-- Tool names follow `{api}_{verb}_{entity}` (e.g., `unifi_network_list_devices`, `unifi_protect_get_snapshot`).
+- Tool names follow `unifi_{api}_{verb}_{entity}` (e.g., `unifi_network_list_devices`, `unifi_protect_get_snapshot`). The `unifi_` prefix is mandatory: PROTO-002 requires every tool name to carry the server namespace, and the consistency audit gates on it.
 - Write tools must be tagged `tags={"write"}` and annotated `readOnlyHint=False`.
 - Write tools must also check `config.writes_enabled` inside the function body (defense-in-depth).
 - Destructive tools (delete, block, adopt, etc.) should also carry `destructiveHint: True`.
