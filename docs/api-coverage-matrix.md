@@ -278,7 +278,8 @@ on a `cmd` body field.
 63 rows, 47 counted: the summary's 47 is the non-`cmd/*` rows. The 16 `cmd/*` rows
 multiplex on a `cmd` body field rather than being separate paths, so they are not
 counted as ones. Rows are method-plus-path pairs, so a path carrying several methods
-appears more than once — 63 rows span 42 distinct path strings.
+appears more than once — the 63 rows resolve to 31 distinct URL paths, 26 of them
+non-`cmd/*` and 5 the `cmd/*` endpoints the 16 subcommands multiplex over.
 
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
