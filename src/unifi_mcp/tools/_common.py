@@ -87,14 +87,11 @@ def tool_handler[**P, R](
 # hijack via `radius_servers`, callback exfil via `super_mgmt_url`, lockout
 # via `mac_filter_list`.
 #
-# NOT caught: evidence suppression via Protect recording fields.
-# `recordingSettings` normalizes to `recordingsettings`, which is in no
-# exact-key set, starts with no denied prefix, and ends in neither suffix.
-# Unreachable today only because no Protect writer that targets
-# `cameras/{id}` accepts a raw dict: `update_camera` takes named scalar args
-# only and passes `data=None`. `update_chime`, `update_light` and
-# `update_sensor` do forward `data` verbatim, but their endpoints carry no
-# recording settings. A camera writer that accepts `data` reopens it (#501).
+# Evidence suppression via Protect `recordingSettings` / `smartDetectSettings`
+# is caught by the exact-key set below (#501). Denying them costs the
+# legitimate path nothing: `set_recording_mode` and `set_smart_detection` take
+# named scalars and never route through this walk, so only a raw `data` dict
+# can reach these keys, and no caller has a reason to.
 #
 # This denylist is a stopgap (option 2 from the issue). The honest answer
 # (option 1) is per-endpoint named scalar args + an explicit allowlist —
@@ -110,6 +107,8 @@ _DENYLIST_EXACT_KEYS: frozenset[str] = frozenset(
         "permissions",
         "mac_filter_list",
         "mac_filter_enabled",
+        "recordingSettings",
+        "smartDetectSettings",
     }
 )
 _DENYLIST_KEY_PREFIXES: tuple[str, ...] = ("super_", "radius_")
