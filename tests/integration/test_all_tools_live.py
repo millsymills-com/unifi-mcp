@@ -1001,7 +1001,7 @@ class TestWriteRoundtrips:
                 "purpose": "corporate",
                 "vlan": chosen_vlan,
                 "vlan_enabled": True,
-                "subnet": f"10.80.{chosen_vlan}.1/24",
+                "ip_subnet": f"10.80.{chosen_vlan}.1/24",
                 "dhcpd_enabled": False,
             }
         )
