@@ -572,12 +572,9 @@ class TestWriteRoundtrips:
         name in ``finally``. Non-destructive — the WLAN stays present and
         clients (if any) keep their association across a name change.
 
-        ``create_wlan`` and ``delete_wlan`` are NOT exercised here: the
-        tool-layer ``create_wlan`` only forwards 5 fields (name/security/
-        wpa_mode/x_passphrase/enabled) and the controller rejects with
-        ``api.err.ApGroupMissing`` because ``ap_group_ids`` /
-        ``networkconf_id`` / ``usergroup_id`` aren't passed. See the strict
-        xfail below.
+        ``create_wlan`` and ``delete_wlan`` are covered separately, by
+        :meth:`test_create_wlan_through_the_tool` and
+        :meth:`test_delete_wlan_via_tool_boundary`.
         """
         list_resp = await _invoke(live_client, "unifi_network_list_wlans")
         wlans = _unwrap_list(list_resp)
@@ -615,42 +612,54 @@ class TestWriteRoundtrips:
             )
             artifacts.dump("wlan_update_restored", {"wlan_id": wlan_id, "restored_name": original_name})
 
-    async def test_create_wlan_pins_apgroup_missing(self, live_client, artifacts):
-        """Pin for the create_wlan tool-layer payload bug.
+    async def test_create_wlan_through_the_tool(self, live_client, artifacts, network_live_client, cleanup_register):
+        """Tool-boundary positive path for ``create_wlan``.
 
-        The tool only forwards ``name/security/wpa_mode/x_passphrase/enabled``
-        — the controller demands ``ap_group_ids`` / ``networkconf_id`` /
-        ``usergroup_id`` and rejects with ``api.err.ApGroupMissing``. Same
-        class as #257.
+        Was an inversion pin asserting ``api.err.ApGroupMissing`` while the
+        tool forwarded only ``name/security/wpa_mode/x_passphrase/enabled``.
+        The tool now sends ``wpa_enc`` / ``wlan_band`` / ``wlan_bands`` /
+        ``ap_group_mode`` and borrows the per-site ``ap_group_ids`` and
+        ``usergroup_id`` from an existing WLAN, so the pin is promoted to a
+        real create.
 
-        ``pytest.raises(match=...)`` makes the failure mode unambiguous:
-        today's bug → ToolError matching ``ApGroupMissing`` → test PASSES;
-        after the fix → no exception → ``pytest.raises`` reports DID NOT
-        RAISE → test FAILS red, prompting promotion to a real CRUD test.
-        Unlike a class-wide ``xfail`` marker, this can't be satisfied by an
-        unrelated prelude failure.
+        Asserts the structural ids on the read-back, not just ``_id`` — an
+        unrecognized body key is dropped silently and the POST still returns
+        an ``_id``. Created disabled so it never broadcasts, and cleanup is
+        registered so a success cannot orphan an SSID.
 
-        Pre-checks the bench is under the 4-WLAN cap so a cap-error doesn't
-        masquerade as the missing-field error.
+        Pre-checks the bench is under the 4-WLAN cap so a cap error doesn't
+        masquerade as a payload error.
         """
         wlans = _unwrap_list(await _invoke(live_client, "unifi_network_list_wlans"))
         enabled_count = sum(1 for w in wlans if w.get("enabled"))
         if enabled_count >= 4:
-            pytest.skip(f"Bench at WLAN cap ({enabled_count} enabled); cap error would mask the bug")
+            pytest.skip(f"Bench at WLAN cap ({enabled_count} enabled); cap error would mask a payload error")
+        if not any(w.get("ap_group_ids") and w.get("usergroup_id") for w in wlans):
+            pytest.skip("No WLAN on the site to copy ap_group_ids/usergroup_id from")
 
-        with pytest.raises(ToolError, match="ApGroupMissing"):
-            await _invoke(
-                live_client,
-                "unifi_network_create_wlan",
-                {
-                    "name": f"mcp-audit-wlan-{uuid.uuid4().hex[:8]}",
-                    "security": "wpapsk",
-                    "wpa_mode": "wpa2",
-                    "x_passphrase": f"mcp-audit-pass-{uuid.uuid4().hex[:16]}",
-                    "enabled": False,
-                },
-            )
-        artifacts.dump("create_wlan_pin", {"ok": True, "enabled_wlan_count": enabled_count})
+        ssid = f"mcp-audit-wlan-{uuid.uuid4().hex[:8]}"
+        created = await _invoke(
+            live_client,
+            "unifi_network_create_wlan",
+            {
+                "name": ssid,
+                "security": "wpapsk",
+                "wpa_mode": "wpa2",
+                "x_passphrase": f"mcp-audit-pass-{uuid.uuid4().hex[:16]}",
+                "enabled": False,
+            },
+        )
+        wlan_id = (_unwrap_list(created) or [{}])[0].get("_id")
+        assert isinstance(wlan_id, str), f"create_wlan missing _id: {created}"
+        cleanup_register(network_live_client.delete_wlan, wlan_id)
+
+        read_back = _unwrap_list(await _invoke(live_client, "unifi_network_get_wlan", {"wlan_id": wlan_id}))
+        found = next((w for w in read_back if w.get("_id") == wlan_id), None)
+        assert found is not None, f"created WLAN {wlan_id} not readable"
+        assert found.get("name") == ssid
+        assert found.get("ap_group_ids"), "ap_group_ids was dropped — the controller ignored the key"
+        assert found.get("usergroup_id"), "usergroup_id was dropped — the controller ignored the key"
+        artifacts.dump("create_wlan_roundtrip", {"ok": True, "wlan_id": wlan_id, "enabled_wlan_count": enabled_count})
 
     async def test_firewall_rule_crud(self, live_client, artifacts):
         """Tool-boundary CRUD for LAN_IN firewall rules.
@@ -914,16 +923,11 @@ class TestWriteRoundtrips:
     async def test_delete_wlan_via_tool_boundary(self, live_client, artifacts, network_live_client):
         """Tool-boundary positive-path coverage for ``delete_wlan``.
 
-        Self-bootstraps a sacrificial WLAN via the client layer (the
-        tool-layer ``create_wlan`` is the bug pinned in
-        ``test_create_wlan_pins_apgroup_missing``) then deletes it through
-        the MCP tool boundary. Skips when the bench is already at the
-        4-WLAN cap or has no template WLAN to copy structural fields from.
+        Self-bootstraps a sacrificial WLAN via the client layer so this test
+        isolates ``delete_wlan``, then deletes it through the MCP tool
+        boundary. Skips when the bench is already at the 4-WLAN cap or has no
+        template WLAN to copy structural fields from.
         """
-        # Self-bootstrap a WLAN via the client layer (the tool's create_wlan
-        # is the strict-xfail pinned bug); then delete via the tool boundary
-        # to give positive-path coverage that doesn't depend on bench leftovers.
-        # Skips cleanly when the bench is already at the 4-WLAN cap.
         wlans = _unwrap_list(await _invoke(live_client, "unifi_network_list_wlans"))
         enabled = sum(1 for w in wlans if w.get("enabled"))
         if enabled >= 4:
@@ -980,8 +984,8 @@ class TestWriteRoundtrips:
         """Tool-boundary positive path for ``update_network`` and ``delete_network``.
 
         Self-bootstraps a disposable VLAN via the client layer (the tool-layer
-        ``create_network`` is the ``VlanUsed`` bug pinned in
-        :meth:`test_create_network_vlan_pins_vlan_enabled`), then updates and
+        ``create_network`` has its own positive-path coverage in
+        :meth:`test_create_network_vlan_through_the_tool`), then updates and
         deletes it through the MCP tool boundary, asserting the read-back and
         confirming removal. Never targets the default LAN; on any failure it
         deletes the VLAN via the client layer so a failed assertion can't leak
@@ -1042,20 +1046,21 @@ class TestWriteRoundtrips:
                 artifacts.dump("update_delete_network_cleanup_failed", {"error": str(cleanup_exc)})
             raise
 
-    async def test_create_network_vlan_pins_vlan_enabled(self, live_client, artifacts):
-        """Pin for the create_network VLAN payload gap.
+    async def test_create_network_vlan_through_the_tool(
+        self, live_client, artifacts, network_live_client, cleanup_register
+    ):
+        """Tool-boundary positive path for a VLAN-bearing ``create_network``.
 
-        The tool doesn't forward ``vlan_enabled``; controller rejects any
-        VLAN-bearing payload with the misleading ``api.err.VlanUsed`` (the
-        VLAN isn't in use — the flag is just missing). ``conftest.py``'s
-        ``test_vlan_id`` fixture works by going through the client layer
-        with the full payload.
+        Was an inversion pin asserting ``api.err.VlanUsed`` while the tool
+        omitted ``vlan_enabled``. The tool now sends it, so the pin is
+        promoted to a real create. Asserts ``ip_subnet`` and ``vlan`` on the
+        read-back rather than just ``_id``: an unrecognized body key is
+        dropped silently and the POST still returns an ``_id``, so an
+        existence-only check passes against an unusable network.
 
-        Same inversion-safe ``pytest.raises(match=...)`` pattern as
-        ``test_create_wlan_pins_apgroup_missing``: today's bug → ToolError
-        matching ``VlanUsed`` → test PASSES; after the fix → no exception →
-        DID NOT RAISE → test FAILS red. VLAN range 80-89 (vs the conftest
-        fixture's 90-99) avoids fixture collision.
+        Registers cleanup — the pin did not, because it expected the create
+        to fail, and an unregistered success orphans a network on every run.
+        VLAN range 80-89 (the conftest fixture owns 90-99).
         """
         existing = _unwrap_list(await _invoke(live_client, "unifi_network_list_networks"))
         used_vlans = {n.get("vlan") for n in existing if isinstance(n, dict) and n.get("vlan")}
@@ -1063,19 +1068,28 @@ class TestWriteRoundtrips:
         if chosen_vlan is None:
             pytest.skip("VLAN IDs 80-89 are all in use; cannot attempt sandbox network create")
 
-        with pytest.raises(ToolError, match="VlanUsed"):
-            await _invoke(
-                live_client,
-                "unifi_network_create_network",
-                {
-                    "name": f"mcp-audit-net-{uuid.uuid4().hex[:8]}",
-                    "purpose": "corporate",
-                    "subnet": f"10.99.{chosen_vlan}.1/24",
-                    "vlan": chosen_vlan,
-                    "dhcpd_enabled": False,
-                },
-            )
-        artifacts.dump("create_network_pin", {"ok": True, "vlan": chosen_vlan})
+        subnet = f"10.80.{chosen_vlan}.1/24"
+        created = await _invoke(
+            live_client,
+            "unifi_network_create_network",
+            {
+                "name": f"mcp-audit-net-{uuid.uuid4().hex[:8]}",
+                "purpose": "corporate",
+                "ip_subnet": subnet,
+                "vlan": chosen_vlan,
+                "dhcpd_enabled": False,
+            },
+        )
+        network_id = (_unwrap_list(created) or [{}])[0].get("_id")
+        assert isinstance(network_id, str), f"create_network missing _id: {created}"
+        cleanup_register(network_live_client.delete_network, network_id)
+
+        read_back = _unwrap_list(await _invoke(live_client, "unifi_network_get_network", {"network_id": network_id}))
+        found = next((n for n in read_back if n.get("_id") == network_id), None)
+        assert found is not None, f"created network {network_id} not readable"
+        assert found.get("ip_subnet") == subnet
+        assert found.get("vlan") == chosen_vlan
+        artifacts.dump("create_network_vlan", {"ok": True, "vlan": chosen_vlan, "network_id": network_id})
 
     async def test_port_profile_crud(self, live_client, artifacts, test_vlan_id):
         """Tool-boundary CRUD for switch port profiles.
