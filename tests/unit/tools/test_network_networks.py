@@ -118,6 +118,7 @@ class TestCreateNetworkHandler:
         (forwarded,), _ = client.create_network.call_args
         assert forwarded["subnet"] == "192.168.2.0/24"
         assert forwarded["vlan"] == 100
+        assert forwarded["vlan_enabled"] is True
 
     async def test_subnet_and_vlan_absent_when_omitted(self, mcp_with_networks):
         client = AsyncMock()
@@ -128,3 +129,4 @@ class TestCreateNetworkHandler:
         (forwarded,), _ = client.create_network.call_args
         assert "subnet" not in forwarded
         assert "vlan" not in forwarded
+        assert "vlan_enabled" not in forwarded

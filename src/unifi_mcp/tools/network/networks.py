@@ -77,7 +77,9 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         if subnet is not None:
             data["subnet"] = subnet
         if vlan is not None:
+            # The controller rejects a VLAN id with VlanUsed unless the flag rides along.
             data["vlan"] = vlan
+            data["vlan_enabled"] = True
         return redact_secrets(await get_server_context(ctx).clients["network"].create_network(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
