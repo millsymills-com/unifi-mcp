@@ -69,8 +69,17 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         wpa_mode: str = "wpa2",
         x_passphrase: str = "",
         enabled: bool = True,
+        networkconf_id: str | None = None,
+        is_guest: bool = False,
+        l2_isolation: bool = False,
     ) -> dict[str, Any]:
         """Create a new WLAN (Wi-Fi network).
+
+        Omitting ``networkconf_id`` lands the SSID on the site's default
+        network, so a guest SSID must pass the id of a ``purpose="guest"``
+        network explicitly. ``is_guest`` marks the SSID as a guest network;
+        ``l2_isolation`` additionally blocks client-to-client traffic within
+        it, which the guest firewall zone does not cover on its own.
 
         Args:
             name: SSID name for the wireless network.
@@ -78,9 +87,15 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             wpa_mode: WPA mode — "wpa2" or "wpa3".
             x_passphrase: Wi-Fi password (required for wpapsk).
             enabled: Whether the WLAN is enabled.
+            networkconf_id: Network (VLAN) id to attach the SSID to.
+            is_guest: Whether to mark the SSID as a guest network.
+            l2_isolation: Whether to block client-to-client traffic.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled or ``networkconf_id`` is malformed.
         """
         data: JsonObject = {
             "name": name,
@@ -88,7 +103,12 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             "wpa_mode": wpa_mode,
             "x_passphrase": x_passphrase,
             "enabled": enabled,
+            "is_guest": is_guest,
+            "l2_isolation": l2_isolation,
         }
+        if networkconf_id is not None:
+            validate_id(networkconf_id, field="networkconf_id")
+            data["networkconf_id"] = networkconf_id
         return redact_secrets(await get_server_context(ctx).clients["network"].create_wlan(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})

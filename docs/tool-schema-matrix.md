@@ -43,7 +43,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_create_port_profile` | W | `data: object` |
 | `unifi_network_create_route` | W | `name: string, network: string, route_type?: string = "nexthop-route", gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean = true` |
 | `unifi_network_create_vouchers` | W | `name: string, time_limit_minutes: integer, count?: integer = 1, authorized_guest_limit?: integer \| null = null, data_usage_limit_mbytes?: integer \| null = null, rx_rate_limit_kbps?: integer \| null = null, tx_rate_limit_kbps?: integer \| null = null` |
-| `unifi_network_create_wlan` | W | `name: string, security?: string = "wpapsk", wpa_mode?: string = "wpa2", x_passphrase?: string = "", enabled?: boolean = true` |
+| `unifi_network_create_wlan` | W | `name: string, security?: string = "wpapsk", wpa_mode?: string = "wpa2", x_passphrase?: string = "", enabled?: boolean = true, networkconf_id?: string \| null = null, is_guest?: boolean = false, l2_isolation?: boolean = false` |
 | `unifi_network_delete_acl_rule` | W | `acl_rule_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_dns_policy` | W | `dns_policy_id: string, confirm?: boolean = false` |
 | `unifi_network_delete_firewall_group` | W | `group_id: string, confirm?: boolean = false` |

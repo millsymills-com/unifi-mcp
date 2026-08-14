@@ -204,6 +204,43 @@ class TestNetworkWlanHandlers:
         # Defaults fill in for security and wpa_mode.
         assert payload["security"] == "wpapsk"
         assert payload["wpa_mode"] == "wpa2"
+        # A plain SSID stays non-guest and non-isolated.
+        assert payload["is_guest"] is False
+        assert payload["l2_isolation"] is False
+        assert "networkconf_id" not in payload
+
+    async def test_create_wlan_carries_guest_and_isolation_flags(self, server):
+        client = AsyncMock()
+        client.create_wlan.return_value = {}
+        ctx = _fake_ctx(_readwrite_config(), network=client)
+        await _call(
+            server,
+            "unifi_network_create_wlan",
+            ctx,
+            name="mills_guest",
+            x_passphrase="pw",
+            networkconf_id="67b7c5e134d38d3b409ec6e0",
+            is_guest=True,
+            l2_isolation=True,
+        )
+        args, _ = client.create_wlan.call_args
+        payload = args[0]
+        assert payload["networkconf_id"] == "67b7c5e134d38d3b409ec6e0"
+        assert payload["is_guest"] is True
+        assert payload["l2_isolation"] is True
+
+    async def test_create_wlan_rejects_malformed_networkconf_id(self, server):
+        client = AsyncMock()
+        ctx = _fake_ctx(_readwrite_config(), network=client)
+        with pytest.raises(ToolError, match="invalid id format"):
+            await _call(
+                server,
+                "unifi_network_create_wlan",
+                ctx,
+                name="mills_guest",
+                networkconf_id="../../self/set_super_mgmt",
+            )
+        client.create_wlan.assert_not_awaited()
 
     async def test_delete_wlan_readonly_blocked(self, server):
         client = AsyncMock()
