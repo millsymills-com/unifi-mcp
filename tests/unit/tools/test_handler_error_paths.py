@@ -124,7 +124,15 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
     # WLAN
     (register_wlan_tools, "unifi_network_list_wlans", "list_wlans", "network", {}),
     (register_wlan_tools, "unifi_network_get_wlan", "get_wlan", "network", {"wlan_id": "w-1"}),
-    (register_wlan_tools, "unifi_network_create_wlan", "create_wlan", "network", {"name": "n"}),
+    # Structural ids passed explicitly so the tool skips its list_wlans lookup
+    # and the mocked create_wlan is what raises.
+    (
+        register_wlan_tools,
+        "unifi_network_create_wlan",
+        "create_wlan",
+        "network",
+        {"name": "n", "ap_group_ids": ["ap-1"], "usergroup_id": "ug-1"},
+    ),
     (register_wlan_tools, "unifi_network_update_wlan", "update_wlan", "network", {"wlan_id": "w-1", "data": {}}),
     (register_wlan_tools, "unifi_network_delete_wlan", "delete_wlan", "network", {"wlan_id": "w-1", "confirm": True}),
     # Firewall

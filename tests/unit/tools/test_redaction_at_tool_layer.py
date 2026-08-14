@@ -417,7 +417,15 @@ class TestWriteResponseRedaction:
             return_value={"data": [{"_id": "w-2", "name": "Guest", "x_passphrase": "leak-me"}]},
         )
         ctx = _fake_rw_ctx(network=network_client)
-        result = await _call(server, "unifi_network_create_wlan", ctx, name="Guest", x_passphrase="pw")
+        result = await _call(
+            server,
+            "unifi_network_create_wlan",
+            ctx,
+            name="Guest",
+            x_passphrase="pw",
+            ap_group_ids=["ap-1"],
+            usergroup_id="ug-1",
+        )
         assert result["data"][0]["x_passphrase"] == REDACTED
         assert "leak-me" not in str(result)
 
