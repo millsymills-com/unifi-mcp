@@ -57,7 +57,7 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         *,
         name: str,
         purpose: str = "corporate",
-        subnet: str | None = None,
+        ip_subnet: str | None = None,
         vlan: int | None = None,
         dhcpd_enabled: bool = True,
     ) -> dict[str, Any]:
@@ -66,8 +66,8 @@ def register_network_config_tools(mcp: FastMCP) -> None:
         Args:
             name: Network name.
             purpose: Purpose — "corporate", "guest", "wan", "vlan-only".
-            subnet: Gateway address with prefix, not the network address —
-                "192.168.2.1/24", not "192.168.2.0/24". Sent as ``ip_subnet``.
+            ip_subnet: Gateway address with prefix, not the network address —
+                "192.168.2.1/24", not "192.168.2.0/24".
             vlan: VLAN ID (optional).
             dhcpd_enabled: Whether DHCP server is enabled.
 
@@ -75,10 +75,10 @@ def register_network_config_tools(mcp: FastMCP) -> None:
             The upstream API response.
         """
         data: JsonObject = {"name": name, "purpose": purpose, "dhcpd_enabled": dhcpd_enabled}
-        if subnet is not None:
-            # The controller's field is `ip_subnet`; a `subnet` key is silently
-            # dropped and the POST still returns an _id for an unusable network.
-            data["ip_subnet"] = subnet
+        if ip_subnet is not None:
+            # Named to match the wire field: a `subnet` key is silently dropped
+            # and the POST still returns an _id for an unusable network.
+            data["ip_subnet"] = ip_subnet
         if vlan is not None:
             # The controller rejects a VLAN id with VlanUsed unless the flag rides along.
             data["vlan"] = vlan

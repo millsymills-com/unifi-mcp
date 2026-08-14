@@ -113,7 +113,7 @@ class TestCreateNetworkHandler:
         client.create_network.return_value = {"ok": True}
         ctx = _ctx(UniFiMode.READWRITE, network=client)
         tool = await mcp_with_networks.get_tool("unifi_network_create_network")
-        result = await tool.fn(ctx, name="guest", subnet="192.168.2.1/24", vlan=100)
+        result = await tool.fn(ctx, name="guest", ip_subnet="192.168.2.1/24", vlan=100)
         assert result == {"ok": True}
         (forwarded,), _ = client.create_network.call_args
         # The controller drops a `subnet` key and creates an unusable network.
