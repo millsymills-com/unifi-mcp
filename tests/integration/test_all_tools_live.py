@@ -39,6 +39,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 from tests.integration.conftest import WRITE_GATE_REASON, _normalize_mac, _writes_enabled, live_test_device_macs
+from unifi_mcp._redaction import redact_secrets
 from unifi_mcp.server import create_server, server_lifespan
 
 pytestmark = pytest.mark.integration
@@ -60,8 +61,17 @@ class ArtifactWriter:
     root: Path
 
     def dump(self, tool_name: str, payload: dict[str, Any]) -> None:
+        """Write a live response to disk, redacting first.
+
+        Most payloads arrive already redacted, having come back through the
+        tool boundary — but a live WireGuard private key still reached disk
+        here once, because the tool-layer denylist had a gap. Some callers
+        also dump raw client responses, which never pass that boundary at
+        all. Redacting again on the way out costs nothing and means a future
+        denylist gap cannot write key material to a file that outlives the run.
+        """
         path = self.root / f"{tool_name}.json"
-        path.write_text(json.dumps(payload, indent=2, default=str))
+        path.write_text(json.dumps(redact_secrets(payload), indent=2, default=str))
 
 
 @pytest.fixture(scope="session")
