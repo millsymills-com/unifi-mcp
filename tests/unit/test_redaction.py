@@ -330,20 +330,24 @@ class TestRedactSecretsEmbeddedKeyMaterial:
         out = redact_secrets({"data": [{"name": "Home", "security": "wpapsk"}]})
         assert out["data"][0]["security"] == "wpapsk"
 
-    @pytest.mark.parametrize(
-        "key",
-        ["psks", "preshared_keys", "sharedKeys", "passwords", "secrets", "privateKeys"],
-    )
-    def test_plural_credential_names_redacted(self, key):
-        """A plural field holds the same material as its singular."""
-        out = redact_secrets({key: "EXAMPLE7777777777="})
-        assert out[key] == REDACTED
+    def test_multi_psk_list_keeps_its_shape(self):
+        """The real `private_preshared_keys` row: drop the secret, keep the mapping.
 
-    @pytest.mark.parametrize("key", ["sessions", "keys", "networks", "devices", "tags"])
-    def test_plural_container_names_pass_through(self, key):
-        """Depluralizing must not reach the exact list and swallow containers."""
-        out = redact_secrets({key: ["a", "b"]})
-        assert out[key] == ["a", "b"]
+        A suffix broad enough to match the plural container redacts the whole
+        list, which costs the vlan/network mapping an agent legitimately reads.
+        """
+        payload = {"private_preshared_keys": [{"password": "EXAMPLE7777=", "vlan": 30, "networkconf_id": "n1"}]}
+        out = redact_secrets(payload)
+        entry = out["private_preshared_keys"][0]
+        assert entry["password"] == REDACTED
+        assert entry["vlan"] == 30
+        assert entry["networkconf_id"] == "n1"
+
+    def test_iapp_key_redacted(self):
+        """`list_wlans` returns this as 32 hex chars on every row."""
+        out = redact_secrets({"data": [{"name": "Home", "x_iapp_key": "cf0d0f3b9a8c0ffe9861f57e1ed96568"}]})
+        assert out["data"][0]["x_iapp_key"] == REDACTED
+        assert out["data"][0]["name"] == "Home"
 
     def test_double_encoded_config_blob_redacted(self):
         """An extra round of JSON encoding leaves literal `\\n` where newlines were."""

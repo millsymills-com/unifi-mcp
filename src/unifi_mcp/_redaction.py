@@ -31,6 +31,9 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
         "x_authkey",
         "x_inform_authkey",
         "x_vrrpd_md5_key",
+        # Returned as 32 hex chars on every `list_wlans` row; it is the shared
+        # key APs use for IAPP roaming, and no read path needs its value.
+        "x_iapp_key",
         # Dynamic-DNS credentials
         "x_ddns_pwd",
         # VPN tunnel material. The WireGuard peer config is a whole .conf blob
@@ -179,12 +182,7 @@ def _is_sensitive_key(key: str) -> bool:
         return True
     if normalized.startswith("super") and (normalized.endswith("password") or normalized.endswith("url")):
         return True
-    # A plural field holds the same material as its singular (`preshared_keys`,
-    # `psks`, `passwords`), so test the depluralized tail too. Applied only to
-    # the suffix check: depluralizing against the exact list would sweep in
-    # container fields such as `sessions` that are not themselves credentials.
-    candidates = (normalized, normalized[:-1]) if normalized.endswith("s") else (normalized,)
-    return any(c.endswith(suffix) for c in candidates for suffix in _NORMALIZED_SUFFIXES)
+    return any(normalized.endswith(suffix) for suffix in _NORMALIZED_SUFFIXES)
 
 
 def flatten_key_names(value: Any, _prefix: str = "") -> list[str]:
