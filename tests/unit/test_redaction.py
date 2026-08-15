@@ -330,6 +330,32 @@ class TestRedactSecretsEmbeddedKeyMaterial:
         out = redact_secrets({"data": [{"name": "Home", "security": "wpapsk"}]})
         assert out["data"][0]["security"] == "wpapsk"
 
+    @pytest.mark.parametrize(
+        "key",
+        ["psks", "preshared_keys", "sharedKeys", "passwords", "secrets", "privateKeys"],
+    )
+    def test_plural_credential_names_redacted(self, key):
+        """A plural field holds the same material as its singular."""
+        out = redact_secrets({key: "EXAMPLE7777777777="})
+        assert out[key] == REDACTED
+
+    @pytest.mark.parametrize("key", ["sessions", "keys", "networks", "devices", "tags"])
+    def test_plural_container_names_pass_through(self, key):
+        """Depluralizing must not reach the exact list and swallow containers."""
+        out = redact_secrets({key: ["a", "b"]})
+        assert out[key] == ["a", "b"]
+
+    def test_double_encoded_config_blob_redacted(self):
+        """An extra round of JSON encoding leaves literal `\\n` where newlines were."""
+        value = "[Peer]\\nPresharedKey = EXAMPLE8888888888=\\nPublicKey = PUB="
+        out = redact_secrets({"blob": value})
+        assert out["blob"] == REDACTED
+
+    def test_psk_assignment_in_peer_section_redacted(self):
+        value = "[Peer]\nPSK = EXAMPLE9999999999="
+        out = redact_secrets({"peer_config": value})
+        assert out["peer_config"] == REDACTED
+
 
 class TestRedactSecretsProperties:
     def test_does_not_mutate_input(self):

@@ -135,11 +135,13 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
 # key matching cannot help. Both forms are unambiguous enough to match on the
 # value: a WireGuard peer config assigns `PrivateKey = <base64>`, and a PEM
 # block is self-labelling. A `[Peer]` section can also carry a `PresharedKey`
-# without any `PrivateKey` line, so that assignment counts too. Deliberately
-# narrow — the key name must be a line's first token, so prose mentioning the
-# word is untouched.
+# or `PSK` without any `PrivateKey` line, so those assignments count too.
+# A blob that survived an extra round of JSON encoding has literal `\n` where
+# its newlines were, which is why the escape is a line separator here as well.
+# Deliberately narrow — the key name must be a line's first token, so prose
+# mentioning the word is untouched.
 _EMBEDDED_SECRET_RE = re.compile(
-    r"(?:\A|[\r\n])[ \t]*(?:PrivateKey|PresharedKey)[ \t]*=|-----BEGIN[A-Z ]*PRIVATE KEY-----",
+    r"(?:\A|[\r\n]|\\n)[ \t]*(?:PrivateKey|PresharedKey|PSK)[ \t]*=|-----BEGIN[A-Z ]*PRIVATE KEY-----",
     re.IGNORECASE,
 )
 
@@ -177,7 +179,12 @@ def _is_sensitive_key(key: str) -> bool:
         return True
     if normalized.startswith("super") and (normalized.endswith("password") or normalized.endswith("url")):
         return True
-    return any(normalized.endswith(suffix) for suffix in _NORMALIZED_SUFFIXES)
+    # A plural field holds the same material as its singular (`preshared_keys`,
+    # `psks`, `passwords`), so test the depluralized tail too. Applied only to
+    # the suffix check: depluralizing against the exact list would sweep in
+    # container fields such as `sessions` that are not themselves credentials.
+    candidates = (normalized, normalized[:-1]) if normalized.endswith("s") else (normalized,)
+    return any(c.endswith(suffix) for c in candidates for suffix in _NORMALIZED_SUFFIXES)
 
 
 def flatten_key_names(value: Any, _prefix: str = "") -> list[str]:
