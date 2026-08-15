@@ -309,11 +309,26 @@ class TestRedactSecretsEmbeddedKeyMaterial:
         out = redact_secrets({"peer_config": value})
         assert out["peer_config"] == REDACTED
 
-    @pytest.mark.parametrize("key", ["public_key", "wireguard_public_key", "keys", "keyspace"])
-    def test_public_and_benign_key_names_pass_through(self, key):
-        """The new suffixes must not swallow public material or benign names."""
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "psk_mode",
+            "pskEnabled",
+            "shared_key_id",
+            "public_key",
+            "wireguard_public_key",
+            "keyspace",
+        ],
+    )
+    def test_psk_substring_key_names_pass_through(self, key):
+        """The token has to be the suffix, not merely present, or ids and enums vanish."""
         out = redact_secrets({key: "EXAMPLE6666666666="})
         assert out[key] == "EXAMPLE6666666666="
+
+    def test_wlan_security_mode_value_not_redacted(self):
+        """`wpapsk` is a value on the WLAN read path; matching is key-name only."""
+        out = redact_secrets({"data": [{"name": "Home", "security": "wpapsk"}]})
+        assert out["data"][0]["security"] == "wpapsk"
 
 
 class TestRedactSecretsProperties:
