@@ -277,6 +277,89 @@ class TestRedactSecretsEmbeddedKeyMaterial:
         out = redact_secrets({"notes": value})
         assert out["notes"] == value
 
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "preshared_key",
+            "presharedKey",
+            "pre_shared_key",
+            "psk",
+            "ipsec_psk",
+            "x_wireguard_preshared_key",
+            "shared_key",
+            "ipsecSharedKey",
+        ],
+    )
+    def test_pre_shared_key_names_redacted(self, key):
+        """Only the literal `wpa_psk` matched, so every other spelling leaked."""
+        out = redact_secrets({key: "EXAMPLE2222222222222222222222222="})
+        assert out[key] == REDACTED
+
+    def test_psk_not_leaked_from_site_to_site_tunnel_row(self):
+        """`list_site_to_site_tunnels` is the surface that carries an IPsec PSK."""
+        payload = {"data": [{"name": "Branch", "ipsec_psk": "EXAMPLE3333333333=", "remote_ip": "203.0.113.7"}]}
+        out = redact_secrets(payload)
+        assert "EXAMPLE3333333333=" not in str(out)
+        assert out["data"][0]["name"] == "Branch"
+        assert out["data"][0]["remote_ip"] == "203.0.113.7"
+
+    def test_peer_section_with_preshared_key_redacted(self):
+        """A `[Peer]` fragment carries a PSK with no PrivateKey line to trigger on."""
+        value = "[Peer]\nPresharedKey = EXAMPLE4444444444=\nPublicKey = EXAMPLE5555555555="
+        out = redact_secrets({"peer_config": value})
+        assert out["peer_config"] == REDACTED
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "psk_mode",
+            "pskEnabled",
+            "shared_key_id",
+            "public_key",
+            "wireguard_public_key",
+            "keyspace",
+        ],
+    )
+    def test_psk_substring_key_names_pass_through(self, key):
+        """The token has to be the suffix, not merely present, or ids and enums vanish."""
+        out = redact_secrets({key: "EXAMPLE6666666666="})
+        assert out[key] == "EXAMPLE6666666666="
+
+    def test_wlan_security_mode_value_not_redacted(self):
+        """`wpapsk` is a value on the WLAN read path; matching is key-name only."""
+        out = redact_secrets({"data": [{"name": "Home", "security": "wpapsk"}]})
+        assert out["data"][0]["security"] == "wpapsk"
+
+    def test_multi_psk_list_keeps_its_shape(self):
+        """The real `private_preshared_keys` row: drop the secret, keep the mapping.
+
+        A suffix broad enough to match the plural container redacts the whole
+        list, which costs the vlan/network mapping an agent legitimately reads.
+        """
+        payload = {"private_preshared_keys": [{"password": "EXAMPLE7777=", "vlan": 30, "networkconf_id": "n1"}]}
+        out = redact_secrets(payload)
+        entry = out["private_preshared_keys"][0]
+        assert entry["password"] == REDACTED
+        assert entry["vlan"] == 30
+        assert entry["networkconf_id"] == "n1"
+
+    def test_iapp_key_redacted(self):
+        """`list_wlans` returns this as 32 hex chars on every row."""
+        out = redact_secrets({"data": [{"name": "Home", "x_iapp_key": "cf0d0f3b9a8c0ffe9861f57e1ed96568"}]})
+        assert out["data"][0]["x_iapp_key"] == REDACTED
+        assert out["data"][0]["name"] == "Home"
+
+    def test_double_encoded_config_blob_redacted(self):
+        """An extra round of JSON encoding leaves literal `\\n` where newlines were."""
+        value = "[Peer]\\nPresharedKey = EXAMPLE8888888888=\\nPublicKey = PUB="
+        out = redact_secrets({"blob": value})
+        assert out["blob"] == REDACTED
+
+    def test_psk_assignment_in_peer_section_redacted(self):
+        value = "[Peer]\nPSK = EXAMPLE9999999999="
+        out = redact_secrets({"peer_config": value})
+        assert out["peer_config"] == REDACTED
+
 
 class TestRedactSecretsProperties:
     def test_does_not_mutate_input(self):

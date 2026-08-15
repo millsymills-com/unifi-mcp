@@ -31,6 +31,9 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
         "x_authkey",
         "x_inform_authkey",
         "x_vrrpd_md5_key",
+        # Returned as 32 hex chars on every `list_wlans` row; it is the shared
+        # key APs use for IAPP roaming, and no read path needs its value.
+        "x_iapp_key",
         # Dynamic-DNS credentials
         "x_ddns_pwd",
         # VPN tunnel material. The WireGuard peer config is a whole .conf blob
@@ -89,6 +92,12 @@ _NORMALIZED_SUFFIXES: tuple[str, ...] = (
     # `wireguard_private_key` normalizes to `wireguardprivatekey`, which the
     # exact list misses; match the suffix so any qualifier is covered.
     "privatekey",
+    # Same shape for pre-shared keys: only the literal `wpa_psk` was an exact
+    # match, so `ipsec_psk` / `preshared_key` / `shared_key` reached the agent
+    # in cleartext despite `vpn.py` promising otherwise. `sharedkey` covers the
+    # pre-shared spelling too, so it subsumes `presharedkey`.
+    "psk",
+    "sharedkey",
 )
 
 
@@ -128,10 +137,14 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
 # describes the container ("configuration file") rather than its contents, so
 # key matching cannot help. Both forms are unambiguous enough to match on the
 # value: a WireGuard peer config assigns `PrivateKey = <base64>`, and a PEM
-# block is self-labelling. Deliberately narrow — `PrivateKey` must be a line's
-# first token, so prose mentioning the word is untouched.
+# block is self-labelling. A `[Peer]` section can also carry a `PresharedKey`
+# or `PSK` without any `PrivateKey` line, so those assignments count too.
+# A blob that survived an extra round of JSON encoding has literal `\n` where
+# its newlines were, which is why the escape is a line separator here as well.
+# Deliberately narrow — the key name must be a line's first token, so prose
+# mentioning the word is untouched.
 _EMBEDDED_SECRET_RE = re.compile(
-    r"(?:\A|[\r\n])[ \t]*PrivateKey[ \t]*=|-----BEGIN[A-Z ]*PRIVATE KEY-----",
+    r"(?:\A|[\r\n]|\\n)[ \t]*(?:PrivateKey|PresharedKey|PSK)[ \t]*=|-----BEGIN[A-Z ]*PRIVATE KEY-----",
     re.IGNORECASE,
 )
 
@@ -200,13 +213,14 @@ def redact_secrets(value: Any) -> Any:
     and underscore-insensitive (so ``client_secret`` and ``clientSecret`` are
     both caught). Also matches ``super_*_password`` / ``super_*_url`` callback
     keys that have historically leaked controller config, plus the credential
-    suffixes ``password`` / ``secret`` / ``authkey`` / ``token`` / ``passwd``.
+    suffixes ``password`` / ``secret`` / ``authkey`` / ``token`` / ``passwd`` /
+    ``privatekey`` / ``psk`` / ``sharedkey``.
     String values are redacted regardless of their key name when they are a
     URL carrying an inline credential (userinfo or a credential-bearing query
     param, e.g. an RTSPS ``?token=…`` stream descriptor), or a text blob with
-    key material inside it (a WireGuard ``PrivateKey =`` line or a PEM private
-    key). Other non-container values pass through untouched. Input is not
-    mutated.
+    key material inside it (a WireGuard ``PrivateKey =`` / ``PresharedKey =``
+    line or a PEM private key). Other non-container values pass through
+    untouched. Input is not mutated.
     """
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
