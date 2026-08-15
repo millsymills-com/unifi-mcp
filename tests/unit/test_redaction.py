@@ -277,6 +277,44 @@ class TestRedactSecretsEmbeddedKeyMaterial:
         out = redact_secrets({"notes": value})
         assert out["notes"] == value
 
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "preshared_key",
+            "presharedKey",
+            "pre_shared_key",
+            "psk",
+            "ipsec_psk",
+            "x_wireguard_preshared_key",
+            "shared_key",
+            "ipsecSharedKey",
+        ],
+    )
+    def test_pre_shared_key_names_redacted(self, key):
+        """Only the literal `wpa_psk` matched, so every other spelling leaked."""
+        out = redact_secrets({key: "EXAMPLE2222222222222222222222222="})
+        assert out[key] == REDACTED
+
+    def test_psk_not_leaked_from_site_to_site_tunnel_row(self):
+        """`list_site_to_site_tunnels` is the surface that carries an IPsec PSK."""
+        payload = {"data": [{"name": "Branch", "ipsec_psk": "EXAMPLE3333333333=", "remote_ip": "203.0.113.7"}]}
+        out = redact_secrets(payload)
+        assert "EXAMPLE3333333333=" not in str(out)
+        assert out["data"][0]["name"] == "Branch"
+        assert out["data"][0]["remote_ip"] == "203.0.113.7"
+
+    def test_peer_section_with_preshared_key_redacted(self):
+        """A `[Peer]` fragment carries a PSK with no PrivateKey line to trigger on."""
+        value = "[Peer]\nPresharedKey = EXAMPLE4444444444=\nPublicKey = EXAMPLE5555555555="
+        out = redact_secrets({"peer_config": value})
+        assert out["peer_config"] == REDACTED
+
+    @pytest.mark.parametrize("key", ["public_key", "wireguard_public_key", "keys", "keyspace"])
+    def test_public_and_benign_key_names_pass_through(self, key):
+        """The new suffixes must not swallow public material or benign names."""
+        out = redact_secrets({key: "EXAMPLE6666666666="})
+        assert out[key] == "EXAMPLE6666666666="
+
 
 class TestRedactSecretsProperties:
     def test_does_not_mutate_input(self):
