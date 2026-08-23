@@ -17,6 +17,35 @@ from unifi_mcp.tools._common import (
 )
 
 
+async def _resolve_structural_ids(
+    client: Any, ap_group_ids: list[str] | None, usergroup_id: str | None
+) -> tuple[list[str], str]:
+    """Resolve and validate the site-specific ids the controller demands.
+
+    ``ap_group_ids`` and ``usergroup_id`` are mandatory — a create without
+    them is rejected as ``api.err.ApGroupMissing`` — but their values are
+    per-site ids no caller can know up front. Every WLAN on a site carries the
+    same defaults, so copy them off an existing one when not supplied.
+
+    Raises:
+        UniFiBadRequestError: If neither argument nor site lookup yields a value.
+    """
+    if ap_group_ids is None or usergroup_id is None:
+        wlans = (await client.list_wlans()).get("data") or []
+        template = next((w for w in wlans if w.get("ap_group_ids") and w.get("usergroup_id")), {})
+        ap_group_ids = ap_group_ids or template.get("ap_group_ids")
+        usergroup_id = usergroup_id or template.get("usergroup_id")
+    if not ap_group_ids or not usergroup_id:
+        raise UniFiBadRequestError(
+            "cannot resolve ap_group_ids/usergroup_id from an existing WLAN; "
+            "pass them explicitly (the controller rejects a create without them)"
+        )
+    validate_id(usergroup_id, field="usergroup_id")
+    for group_id in ap_group_ids:
+        validate_id(group_id, field="ap_group_ids")
+    return ap_group_ids, usergroup_id
+
+
 def register_wlan_tools(mcp: FastMCP) -> None:
     """Register WLAN tools."""
 
@@ -69,8 +98,25 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         wpa_mode: str = "wpa2",
         x_passphrase: str = "",
         enabled: bool = True,
+        networkconf_id: str | None = None,
+        is_guest: bool = False,
+        l2_isolation: bool = False,
+        wpa_enc: str = "ccmp",
+        wlan_band: str = "both",
+        ap_group_ids: list[str] | None = None,
+        usergroup_id: str | None = None,
     ) -> dict[str, Any]:
         """Create a new WLAN (Wi-Fi network).
+
+        Omitting ``networkconf_id`` lands the SSID on the site's default
+        network, so a guest SSID must pass the id of a ``purpose="guest"``
+        network explicitly. ``is_guest`` marks the SSID as a guest network;
+        ``l2_isolation`` additionally blocks client-to-client traffic within
+        it, which the guest firewall zone does not cover on its own.
+
+        ``ap_group_ids`` and ``usergroup_id`` are required by the controller
+        but are per-site ids; when omitted they are copied from an existing
+        WLAN on the site.
 
         Args:
             name: SSID name for the wireless network.
@@ -78,18 +124,43 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             wpa_mode: WPA mode — "wpa2" or "wpa3".
             x_passphrase: Wi-Fi password (required for wpapsk).
             enabled: Whether the WLAN is enabled.
+            networkconf_id: Network (VLAN) id to attach the SSID to.
+            is_guest: Whether to mark the SSID as a guest network.
+            l2_isolation: Whether to block client-to-client traffic.
+            wpa_enc: WPA encryption cipher.
+            wlan_band: Radio band — "both", "2g", or "5g".
+            ap_group_ids: AP group ids to broadcast on; copied from the site
+                when omitted.
+            usergroup_id: User group id; copied from the site when omitted.
 
         Returns:
             The upstream API response.
+
+        Raises:
+            ToolError: If write mode is disabled, an id is malformed, or the
+                site's structural ids cannot be resolved.
         """
+        client = get_server_context(ctx).clients["network"]
+        ap_group_ids, usergroup_id = await _resolve_structural_ids(client, ap_group_ids, usergroup_id)
         data: JsonObject = {
             "name": name,
             "security": security,
             "wpa_mode": wpa_mode,
+            "wpa_enc": wpa_enc,
             "x_passphrase": x_passphrase,
             "enabled": enabled,
+            "is_guest": is_guest,
+            "l2_isolation": l2_isolation,
+            "wlan_band": wlan_band,
+            "wlan_bands": ["2g", "5g"] if wlan_band == "both" else [wlan_band],
+            "ap_group_mode": "all",
+            "ap_group_ids": ap_group_ids,
+            "usergroup_id": usergroup_id,
         }
-        return redact_secrets(await get_server_context(ctx).clients["network"].create_wlan(data))
+        if networkconf_id is not None:
+            validate_id(networkconf_id, field="networkconf_id")
+            data["networkconf_id"] = networkconf_id
+        return redact_secrets(await client.create_wlan(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
