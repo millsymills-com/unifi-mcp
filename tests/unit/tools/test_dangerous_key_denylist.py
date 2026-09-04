@@ -24,6 +24,7 @@ from unifi_mcp.tools.network.port_forward import register_port_forward_tools
 from unifi_mcp.tools.network.port_profiles import register_port_profile_tools
 from unifi_mcp.tools.network.routing import register_routing_tools
 from unifi_mcp.tools.network.wlan import register_wlan_tools
+from unifi_mcp.tools.protect.cameras import register_camera_tools
 from unifi_mcp.tools.protect.devices import register_protect_device_tools
 
 # ── Helper: direct denylist tests ──────────────────────────────────────────
@@ -32,7 +33,18 @@ from unifi_mcp.tools.protect.devices import register_protect_device_tools
 class TestRejectDangerousKeysExact:
     @pytest.mark.parametrize(
         "key",
-        ["cmd", "x_cmd", "is_admin", "role", "roles", "permissions", "mac_filter_list", "mac_filter_enabled"],
+        [
+            "cmd",
+            "x_cmd",
+            "is_admin",
+            "role",
+            "roles",
+            "permissions",
+            "mac_filter_list",
+            "mac_filter_enabled",
+            "recordingSettings",
+            "smartDetectSettings",
+        ],
     )
     def test_top_level_exact_key_raises(self, key):
         with pytest.raises(UniFiBadRequestError) as exc:
@@ -86,6 +98,13 @@ class TestRejectDangerousKeysRecursion:
             {"data": [{"name": "g", "subnet": "10.0.0.0/24", "vlan": 10}]},
             tool_name="t",
         )
+
+    def test_nested_recording_settings_raises(self):
+        """Evidence suppression is the payoff for smuggling here (#501), so the
+        key has to be caught at depth, not just at the top level."""
+        with pytest.raises(UniFiBadRequestError) as exc:
+            reject_dangerous_keys({"camera": {"recordingSettings": {"mode": "never"}}}, tool_name="t")
+        assert "camera.recordingSettings" in str(exc.value)
 
     def test_x_passphrase_is_not_on_smuggling_denylist(self):
         """x_passphrase is sensitive on output (see #146) but is the
@@ -230,3 +249,72 @@ async def test_each_write_tool_blocks_radius_secret(tool_name, register_fn, kwar
     with pytest.raises(ToolError) as exc:
         await _call(server, tool_name, ctx, **kwargs)
     assert "radius_secret" in str(exc.value)
+
+
+# ── Protect recording fields: denied on the raw path, open on the named one ──
+
+
+class TestRecordingFieldsBlockedOnRawDataPath:
+    """`recordingSettings` reaches the controller only through a raw ``data``
+    dict, and the denylist closes that route (#501)."""
+
+    @pytest.mark.parametrize("key", ["recordingSettings", "smartDetectSettings"])
+    async def test_update_chime_rejects_recording_keys(self, key):
+        server = FastMCP(name="t")
+        register_protect_device_tools(server)
+
+        protect_client = AsyncMock()
+        protect_client.update_chime.side_effect = AssertionError(
+            "client update_chime() must NOT be called when payload contains a denied key"
+        )
+        ctx = _fake_ctx(protect=protect_client)
+
+        with pytest.raises(ToolError) as exc:
+            await _call(server, "unifi_protect_update_chime", ctx, chime_id="ch-1", data={key: {"mode": "never"}})
+        assert key in str(exc.value)
+
+
+class TestDedicatedRecordingToolsStayOpen:
+    """The denylist must not reach the tools that exist to set these fields.
+    Both build their body from named scalars and never call the guard, so a
+    denied key in the exact-key set cannot block them."""
+
+    @pytest.mark.parametrize("mode", ["always", "motion", "schedule"])
+    async def test_set_recording_mode_still_reaches_client(self, mode):
+        server = FastMCP(name="t")
+        register_camera_tools(server)
+
+        protect_client = AsyncMock()
+        protect_client.set_recording_mode.return_value = {}
+        ctx = _fake_ctx(protect=protect_client)
+
+        assert await _call(server, "unifi_protect_set_recording_mode", ctx, camera_id="c-1", mode=mode) == {}
+        protect_client.set_recording_mode.assert_awaited_once_with("c-1", mode, pre_padding=None, post_padding=None)
+
+    async def test_set_recording_mode_never_still_reaches_client_with_confirm(self):
+        server = FastMCP(name="t")
+        register_camera_tools(server)
+
+        protect_client = AsyncMock()
+        protect_client.set_recording_mode.return_value = {}
+        ctx = _fake_ctx(protect=protect_client)
+
+        assert (
+            await _call(server, "unifi_protect_set_recording_mode", ctx, camera_id="c-1", mode="never", confirm=True)
+            == {}
+        )
+        protect_client.set_recording_mode.assert_awaited_once()
+
+    async def test_set_smart_detection_still_reaches_client(self):
+        server = FastMCP(name="t")
+        register_camera_tools(server)
+
+        protect_client = AsyncMock()
+        protect_client.set_smart_detection.return_value = {}
+        ctx = _fake_ctx(protect=protect_client)
+
+        assert (
+            await _call(server, "unifi_protect_set_smart_detection", ctx, camera_id="c-1", object_types=["person"])
+            == {}
+        )
+        protect_client.set_smart_detection.assert_awaited_once_with("c-1", ["person"])
