@@ -46,6 +46,25 @@ async def _resolve_structural_ids(
     return ap_group_ids, usergroup_id
 
 
+async def _resolve_default_network_id(client: Any) -> str:
+    """Return the id of the site's default LAN, marked ``attr_hidden_id: "LAN"``.
+
+    Sent explicitly rather than omitted: every create payload proven on
+    hardware carries ``networkconf_id``, and the controller's behaviour
+    without it is unverified.
+
+    Raises:
+        UniFiBadRequestError: If the site has no network marked as the default LAN.
+    """
+    networks = (await client.list_networks()).get("data") or []
+    default_id = next((n.get("_id") for n in networks if n.get("attr_hidden_id") == "LAN"), None)
+    if not isinstance(default_id, str):
+        raise UniFiBadRequestError(
+            "cannot find the site's default LAN (attr_hidden_id 'LAN'); pass networkconf_id explicitly"
+        )
+    return default_id
+
+
 def register_wlan_tools(mcp: FastMCP) -> None:
     """Register WLAN tools."""
 
@@ -108,8 +127,8 @@ def register_wlan_tools(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Create a new WLAN (Wi-Fi network).
 
-        Omitting ``networkconf_id`` lands the SSID on the site's default
-        network, so a guest SSID must pass the id of a ``purpose="guest"``
+        Omitting ``networkconf_id`` attaches the SSID to the site's default
+        LAN, so a guest SSID must pass the id of a ``purpose="guest"``
         network explicitly. ``is_guest`` marks the SSID as a guest network;
         ``l2_isolation`` additionally blocks client-to-client traffic within
         it, which the guest firewall zone does not cover on its own.
@@ -124,7 +143,8 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             wpa_mode: WPA mode — "wpa2" or "wpa3".
             x_passphrase: Wi-Fi password (required for wpapsk).
             enabled: Whether the WLAN is enabled.
-            networkconf_id: Network (VLAN) id to attach the SSID to.
+            networkconf_id: Network (VLAN) id to attach the SSID to; the
+                site's default LAN when omitted.
             is_guest: Whether to mark the SSID as a guest network.
             l2_isolation: Whether to block client-to-client traffic.
             wpa_enc: WPA encryption cipher.
@@ -138,10 +158,13 @@ def register_wlan_tools(mcp: FastMCP) -> None:
 
         Raises:
             ToolError: If write mode is disabled, an id is malformed, or the
-                site's structural ids cannot be resolved.
+                site's structural ids or default LAN cannot be resolved.
         """
         client = get_server_context(ctx).clients["network"]
         ap_group_ids, usergroup_id = await _resolve_structural_ids(client, ap_group_ids, usergroup_id)
+        if networkconf_id is None:
+            networkconf_id = await _resolve_default_network_id(client)
+        validate_id(networkconf_id, field="networkconf_id")
         data: JsonObject = {
             "name": name,
             "security": security,
@@ -156,10 +179,8 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             "ap_group_mode": "all",
             "ap_group_ids": ap_group_ids,
             "usergroup_id": usergroup_id,
+            "networkconf_id": networkconf_id,
         }
-        if networkconf_id is not None:
-            validate_id(networkconf_id, field="networkconf_id")
-            data["networkconf_id"] = networkconf_id
         return redact_secrets(await client.create_wlan(data))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})

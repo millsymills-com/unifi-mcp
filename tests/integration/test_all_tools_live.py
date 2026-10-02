@@ -622,7 +622,8 @@ class TestWriteRoundtrips:
         ``usergroup_id`` from an existing WLAN, so the pin is promoted to a
         real create.
 
-        Asserts the structural ids on the read-back, not just ``_id`` — an
+        Asserts the structural ids, both flags, and the default-LAN
+        ``networkconf_id`` on the read-back, not just ``_id`` — an
         unrecognized body key is dropped silently and the POST still returns
         an ``_id``. Created disabled so it never broadcasts, and cleanup is
         registered so a success cannot orphan an SSID.
@@ -647,6 +648,9 @@ class TestWriteRoundtrips:
                 "wpa_mode": "wpa2",
                 "x_passphrase": f"mcp-audit-pass-{uuid.uuid4().hex[:16]}",
                 "enabled": False,
+                # Unequal on purpose so a swapped key shows up on the read-back.
+                "is_guest": False,
+                "l2_isolation": True,
             },
         )
         wlan_id = (_unwrap_list(created) or [{}])[0].get("_id")
@@ -659,6 +663,11 @@ class TestWriteRoundtrips:
         assert found.get("name") == ssid
         assert found.get("ap_group_ids"), "ap_group_ids was dropped — the controller ignored the key"
         assert found.get("usergroup_id"), "usergroup_id was dropped — the controller ignored the key"
+        assert found.get("is_guest") is False
+        assert found.get("l2_isolation") is True, "l2_isolation was dropped — the controller ignored the key"
+        networks = _unwrap_list(await _invoke(live_client, "unifi_network_list_networks"))
+        default_lan = next((n["_id"] for n in networks if n.get("attr_hidden_id") == "LAN"), None)
+        assert found.get("networkconf_id") == default_lan, "omitted networkconf_id did not land on the default LAN"
         artifacts.dump("create_wlan_roundtrip", {"ok": True, "wlan_id": wlan_id, "enabled_wlan_count": enabled_count})
 
     async def test_firewall_rule_crud(self, live_client, artifacts):

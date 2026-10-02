@@ -193,10 +193,16 @@ class TestNetworkWlanHandlers:
 
     @staticmethod
     def _wlan_client() -> AsyncMock:
-        """A client whose site already has one WLAN to copy structural ids from."""
+        """A client whose site has a default LAN and one WLAN to copy structural ids from."""
         client = AsyncMock()
         client.create_wlan.return_value = {}
         client.list_wlans.return_value = {"data": [{"ap_group_ids": ["ap-group-1"], "usergroup_id": "user-group-1"}]}
+        client.list_networks.return_value = {
+            "data": [
+                {"_id": "bbbbbbbbbbbbbbbbbbbbbbbb", "purpose": "corporate"},
+                {"_id": "cccccccccccccccccccccccc", "purpose": "corporate", "attr_hidden_id": "LAN"},
+            ]
+        }
         return client
 
     async def test_create_wlan_assembles_payload(self, server):
@@ -214,7 +220,8 @@ class TestNetworkWlanHandlers:
         # A plain SSID stays non-guest and non-isolated.
         assert payload["is_guest"] is False
         assert payload["l2_isolation"] is False
-        assert "networkconf_id" not in payload
+        # Omitted networkconf_id resolves to the default LAN, not the first network listed.
+        assert payload["networkconf_id"] == "cccccccccccccccccccccccc"
 
     async def test_create_wlan_guest_flag_is_independent_of_isolation(self, server):
         """Asymmetric on purpose — equal values would pass even if the two keys were swapped."""
@@ -224,15 +231,15 @@ class TestNetworkWlanHandlers:
             server,
             "unifi_network_create_wlan",
             ctx,
-            name="mills_guest",
+            name="test-guest",
             x_passphrase="pw",
-            networkconf_id="67b7c5e134d38d3b409ec6e0",
+            networkconf_id="aaaaaaaaaaaaaaaaaaaaaaaa",
             is_guest=True,
             l2_isolation=False,
         )
         args, _ = client.create_wlan.call_args
         payload = args[0]
-        assert payload["networkconf_id"] == "67b7c5e134d38d3b409ec6e0"
+        assert payload["networkconf_id"] == "aaaaaaaaaaaaaaaaaaaaaaaa"
         assert payload["is_guest"] is True
         assert payload["l2_isolation"] is False
 
@@ -243,7 +250,7 @@ class TestNetworkWlanHandlers:
             server,
             "unifi_network_create_wlan",
             ctx,
-            name="mills_guest",
+            name="test-guest",
             x_passphrase="pw",
             is_guest=False,
             l2_isolation=True,
@@ -256,7 +263,7 @@ class TestNetworkWlanHandlers:
         """The controller rejects a create without these, and they are per-site ids."""
         client = self._wlan_client()
         ctx = _fake_ctx(_readwrite_config(), network=client)
-        await _call(server, "unifi_network_create_wlan", ctx, name="mills_guest", x_passphrase="pw")
+        await _call(server, "unifi_network_create_wlan", ctx, name="test-guest", x_passphrase="pw")
         payload = client.create_wlan.call_args[0][0]
         assert payload["ap_group_ids"] == ["ap-group-1"]
         assert payload["usergroup_id"] == "user-group-1"
@@ -272,7 +279,7 @@ class TestNetworkWlanHandlers:
             server,
             "unifi_network_create_wlan",
             ctx,
-            name="mills_guest",
+            name="test-guest",
             ap_group_ids=["ap-explicit"],
             usergroup_id="ug-explicit",
         )
@@ -286,7 +293,24 @@ class TestNetworkWlanHandlers:
         client.list_wlans.return_value = {"data": []}
         ctx = _fake_ctx(_readwrite_config(), network=client)
         with pytest.raises(ToolError, match="ap_group_ids/usergroup_id"):
-            await _call(server, "unifi_network_create_wlan", ctx, name="mills_guest")
+            await _call(server, "unifi_network_create_wlan", ctx, name="test-guest")
+        client.create_wlan.assert_not_awaited()
+
+    async def test_create_wlan_explicit_networkconf_id_skips_the_lookup(self, server):
+        client = self._wlan_client()
+        ctx = _fake_ctx(_readwrite_config(), network=client)
+        await _call(
+            server, "unifi_network_create_wlan", ctx, name="test-guest", networkconf_id="aaaaaaaaaaaaaaaaaaaaaaaa"
+        )
+        client.list_networks.assert_not_awaited()
+        assert client.create_wlan.call_args[0][0]["networkconf_id"] == "aaaaaaaaaaaaaaaaaaaaaaaa"
+
+    async def test_create_wlan_errors_when_site_has_no_default_lan(self, server):
+        client = self._wlan_client()
+        client.list_networks.return_value = {"data": [{"_id": "bbbbbbbbbbbbbbbbbbbbbbbb", "purpose": "corporate"}]}
+        ctx = _fake_ctx(_readwrite_config(), network=client)
+        with pytest.raises(ToolError, match="default LAN"):
+            await _call(server, "unifi_network_create_wlan", ctx, name="test-guest")
         client.create_wlan.assert_not_awaited()
 
     async def test_create_wlan_rejects_malformed_networkconf_id(self, server):
@@ -297,7 +321,7 @@ class TestNetworkWlanHandlers:
                 server,
                 "unifi_network_create_wlan",
                 ctx,
-                name="mills_guest",
+                name="test-guest",
                 networkconf_id="../../self/set_super_mgmt",
             )
         client.create_wlan.assert_not_awaited()

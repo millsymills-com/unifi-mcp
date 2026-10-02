@@ -425,6 +425,7 @@ class TestWriteResponseRedaction:
             x_passphrase="pw",
             ap_group_ids=["ap-1"],
             usergroup_id="ug-1",
+            networkconf_id="net-1",
         )
         assert result["data"][0]["x_passphrase"] == REDACTED
         assert "leak-me" not in str(result)
