@@ -44,7 +44,7 @@ class TestRoutingRegistration:
     async def test_delete_marked_destructive(self, mcp_with_routing):
         tools = await mcp_with_routing.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_route")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestRoutingClientEndpoints:

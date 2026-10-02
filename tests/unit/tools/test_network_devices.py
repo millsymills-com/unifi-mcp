@@ -96,7 +96,7 @@ class TestDeviceToolRegistration:
     async def test_destructive_hints_match_intent(self, mcp_with_devices, name, destructive):
         tools = await mcp_with_devices.list_tools()
         tool = next(t for t in tools if t.name == name)
-        assert tool.annotations.destructiveHint is destructive
+        assert tool.annotations.destructive_hint is destructive
 
 
 class TestDeviceModeGating:
@@ -155,7 +155,7 @@ class TestForgetDevice:
     async def test_forget_device_marked_destructive(self, mcp_with_devices):
         tools = await mcp_with_devices.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_forget_device")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
         assert "write" in tool.tags
 
     @respx.mock
