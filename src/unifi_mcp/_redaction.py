@@ -34,6 +34,8 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
         # Returned as 32 hex chars on every `list_wlans` row; it is the shared
         # key APs use for IAPP roaming, and no read path needs its value.
         "x_iapp_key",
+        # Legacy WEP key on old WLAN configs; too short a name for any suffix.
+        "x_wep",
         # Dynamic-DNS credentials
         "x_ddns_pwd",
         # VPN tunnel material. The WireGuard peer config is a whole .conf blob
@@ -98,6 +100,9 @@ _NORMALIZED_SUFFIXES: tuple[str, ...] = (
     # pre-shared spelling too, so it subsumes `presharedkey`.
     "psk",
     "sharedkey",
+    # `x_openvpn_shared_secret_key` ends in `secretkey`, which neither the
+    # `secret` nor the `sharedkey` suffix reaches.
+    "secretkey",
 )
 
 
@@ -214,7 +219,7 @@ def redact_secrets(value: Any) -> Any:
     both caught). Also matches ``super_*_password`` / ``super_*_url`` callback
     keys that have historically leaked controller config, plus the credential
     suffixes ``password`` / ``secret`` / ``authkey`` / ``token`` / ``passwd`` /
-    ``privatekey`` / ``psk`` / ``sharedkey``.
+    ``privatekey`` / ``psk`` / ``sharedkey`` / ``secretkey``.
     String values are redacted regardless of their key name when they are a
     URL carrying an inline credential (userinfo or a credential-bearing query
     param, e.g. an RTSPS ``?token=…`` stream descriptor), or a text blob with

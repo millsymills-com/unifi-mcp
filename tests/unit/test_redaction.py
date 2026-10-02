@@ -349,6 +349,16 @@ class TestRedactSecretsEmbeddedKeyMaterial:
         assert out["data"][0]["x_iapp_key"] == REDACTED
         assert out["data"][0]["name"] == "Home"
 
+    @pytest.mark.parametrize("key", ["x_openvpn_shared_secret_key", "xOpenvpnSharedSecretKey", "x_wep"])
+    def test_openvpn_and_wep_keys_redacted(self, key):
+        out = redact_secrets({key: "EXAMPLE-NOT-REAL", "name": "Branch"})
+        assert out[key] == REDACTED
+        assert out["name"] == "Branch"
+
+    @pytest.mark.parametrize("key", ["secret_key_id", "x_wep_idx"])
+    def test_secretkey_and_wep_neighbours_pass_through(self, key):
+        assert redact_secrets({key: "1"})[key] == "1"
+
     def test_double_encoded_config_blob_redacted(self):
         """An extra round of JSON encoding leaves literal `\\n` where newlines were."""
         value = "[Peer]\\nPresharedKey = EXAMPLE8888888888=\\nPublicKey = PUB="
