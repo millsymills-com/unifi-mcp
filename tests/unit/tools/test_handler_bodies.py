@@ -324,6 +324,7 @@ class TestNetworkWlanHandlers:
                 name="test-guest",
                 networkconf_id="../../self/set_super_mgmt",
             )
+        client.list_wlans.assert_not_awaited()
         client.create_wlan.assert_not_awaited()
 
     async def test_delete_wlan_readonly_blocked(self, server):

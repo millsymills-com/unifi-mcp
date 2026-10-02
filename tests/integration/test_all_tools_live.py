@@ -676,7 +676,7 @@ class TestWriteRoundtrips:
         assert found.get("is_guest") is False
         assert found.get("l2_isolation") is True, "l2_isolation was dropped — the controller ignored the key"
         networks = _unwrap_list(await _invoke(live_client, "unifi_network_list_networks"))
-        default_lan = next((n["_id"] for n in networks if n.get("attr_hidden_id") == "LAN"), None)
+        default_lan = next((n.get("_id") for n in networks if n.get("attr_hidden_id") == "LAN"), None)
         assert found.get("networkconf_id") == default_lan, "omitted networkconf_id did not land on the default LAN"
         artifacts.dump("create_wlan_roundtrip", {"ok": True, "wlan_id": wlan_id, "enabled_wlan_count": enabled_count})
 

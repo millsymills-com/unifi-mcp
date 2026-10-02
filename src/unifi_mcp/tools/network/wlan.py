@@ -161,10 +161,10 @@ def register_wlan_tools(mcp: FastMCP) -> None:
                 site's structural ids or default LAN cannot be resolved.
         """
         client = get_server_context(ctx).clients["network"]
-        ap_group_ids, usergroup_id = await _resolve_structural_ids(client, ap_group_ids, usergroup_id)
         if networkconf_id is None:
             networkconf_id = await _resolve_default_network_id(client)
         validate_id(networkconf_id, field="networkconf_id")
+        ap_group_ids, usergroup_id = await _resolve_structural_ids(client, ap_group_ids, usergroup_id)
         data: JsonObject = {
             "name": name,
             "security": security,
