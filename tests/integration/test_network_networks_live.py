@@ -44,7 +44,7 @@ async def test_network_crud_roundtrip(
             "purpose": "corporate",
             "vlan": chosen_vlan,
             "vlan_enabled": True,
-            "subnet": f"10.80.{chosen_vlan}.1/24",
+            "ip_subnet": f"10.80.{chosen_vlan}.1/24",
             "dhcpd_enabled": False,
         }
     )
@@ -54,9 +54,14 @@ async def test_network_crud_roundtrip(
 
     cleanup_register(network_live_client.delete_network, network_id)
 
-    # READ-BACK
+    # READ-BACK — assert the subnet survived, not just that an _id came back.
+    # A wrong field name is dropped silently and still yields an _id, so an
+    # existence-only check passes against an unusable network.
     read1 = await network_live_client.get_network(network_id)
-    assert any(n.get("_id") == network_id for n in read1["data"])
+    created_net = next((n for n in read1["data"] if n.get("_id") == network_id), None)
+    assert created_net is not None
+    assert created_net.get("ip_subnet") == f"10.80.{chosen_vlan}.1/24"
+    assert created_net.get("vlan") == chosen_vlan
 
     # UPDATE — change description via attr_no_delete-safe field
     new_name = f"{name}-updated"

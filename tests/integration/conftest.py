@@ -384,7 +384,7 @@ async def test_vlan_id(
                 "purpose": "corporate",
                 "vlan": chosen,
                 "vlan_enabled": True,
-                "subnet": f"10.99.{chosen}.1/24",
+                "ip_subnet": f"10.99.{chosen}.1/24",
                 "dhcpd_enabled": False,
             }
         )
