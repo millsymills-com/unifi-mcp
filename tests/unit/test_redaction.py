@@ -194,6 +194,90 @@ class TestRedactSecretsCredentialUrlValues:
         assert out["url"] == value
 
 
+class TestRedactSecretsEmbeddedKeyMaterial:
+    """A whole config blob returned under a benign-sounding key name."""
+
+    # Shape returned by unifi_network_list_networks for a `purpose: vpn-client`
+    # network. The key reads as a filename, so no key-name rule catches it.
+    WIREGUARD_CONF = (
+        "[Interface]\n"
+        "# Key for unifi_example\n"
+        "PrivateKey = EXAMPLE0000000000000000000000000000000000000=\n"
+        "Address = 10.2.0.2/32\n"
+        "DNS = 10.2.0.1\n"
+        "\n"
+        "[Peer]\n"
+        "PublicKey = EXAMPLE1111111111111111111111111111111111111=\n"
+        "AllowedIPs = 0.0.0.0/0\n"
+        "Endpoint = 203.0.113.10:51820"
+    )
+
+    def test_wireguard_config_blob_redacted_by_key_name(self):
+        out = redact_secrets({"wireguard_client_configuration_file": self.WIREGUARD_CONF})
+        assert out["wireguard_client_configuration_file"] == REDACTED
+
+    def test_wireguard_config_blob_redacted_under_any_key_name(self):
+        """The value-level rule is the backstop when the key name is unknown."""
+        out = redact_secrets({"some_future_vpn_blob": self.WIREGUARD_CONF})
+        assert out["some_future_vpn_blob"] == REDACTED
+
+    def test_private_key_not_leaked_from_realistic_network_row(self):
+        payload = {
+            "data": [
+                {
+                    "name": "Example VPN",
+                    "purpose": "vpn-client",
+                    "wireguard_client_configuration_file": self.WIREGUARD_CONF,
+                    "ip_subnet": "10.2.0.2/32",
+                }
+            ]
+        }
+        out = redact_secrets(payload)
+        assert "EXAMPLE0000000000000000000000000000000000000=" not in str(out)
+        assert out["data"][0]["name"] == "Example VPN"
+        assert out["data"][0]["ip_subnet"] == "10.2.0.2/32"
+
+    @pytest.mark.parametrize(
+        "key",
+        ["wireguard_private_key", "x_private_key", "privateKey", "peerPrivateKey"],
+    )
+    def test_qualified_private_key_names_redacted(self, key):
+        """`private_key` was an exact match only; a qualifier used to slip past."""
+        out = redact_secrets({key: "EXAMPLE0000000000000000000000000="})
+        assert out[key] == REDACTED
+
+    @pytest.mark.parametrize(
+        "pem",
+        [
+            "-----BEGIN PRIVATE KEY-----\nMIIEvQ==\n-----END PRIVATE KEY-----",
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEow==\n-----END RSA PRIVATE KEY-----",
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNz\n-----END OPENSSH PRIVATE KEY-----",
+        ],
+    )
+    def test_pem_private_key_blocks_redacted(self, pem):
+        out = redact_secrets({"cert_blob": pem})
+        assert out["cert_blob"] == REDACTED
+
+    def test_public_key_only_config_passes_through(self):
+        """A peer section with no PrivateKey is not credential-bearing."""
+        value = "[Peer]\nPublicKey = EXAMPLE1111111111111\nAllowedIPs = 0.0.0.0/0"
+        out = redact_secrets({"peer_config": value})
+        assert out["peer_config"] == value
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "The PrivateKey field is required for WireGuard peers.",
+            "see docs for PrivateKey usage",
+            "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
+        ],
+    )
+    def test_prose_and_public_material_pass_through(self, value):
+        """`PrivateKey` must start a line; a certificate is not a private key."""
+        out = redact_secrets({"notes": value})
+        assert out["notes"] == value
+
+
 class TestRedactSecretsProperties:
     def test_does_not_mutate_input(self):
         original = {"x_passphrase": "pw", "nested": {"token": "t"}}
