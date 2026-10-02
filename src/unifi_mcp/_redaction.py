@@ -33,6 +33,10 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
         "x_vrrpd_md5_key",
         # Dynamic-DNS credentials
         "x_ddns_pwd",
+        # VPN tunnel material. The WireGuard peer config is a whole .conf blob
+        # whose key name reads as a filename, not a credential, so neither the
+        # exact list nor the suffixes below would catch it (#519-followup).
+        "wireguard_client_configuration_file",
         # Generic credential keys
         "private_key",
         "ssotoken",
@@ -75,7 +79,17 @@ _NORMALIZED_KEYS: frozenset[str] = frozenset(normalize_key(k) for k in SENSITIVE
 
 # Suffix patterns — match the **normalized** end of a key, so the same rule
 # catches `x_ssh_password`, `xSshPassword`, and `sshPassword`.
-_NORMALIZED_SUFFIXES: tuple[str, ...] = ("password", "secret", "authkey", "token", "passwd")
+_NORMALIZED_SUFFIXES: tuple[str, ...] = (
+    "password",
+    "secret",
+    "authkey",
+    "token",
+    "passwd",
+    # `private_key` alone is an exact match, but a qualified name such as
+    # `wireguard_private_key` normalizes to `wireguardprivatekey`, which the
+    # exact list misses; match the suffix so any qualifier is covered.
+    "privatekey",
+)
 
 
 # Query-param names that carry a credential when present in a URL value.
@@ -108,6 +122,27 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
     r"[?&](?:" + "|".join(re.escape(p) for p in _CREDENTIAL_QUERY_PARAMS) + r")=[^&\s]+",
     re.IGNORECASE,
 )
+
+
+# Key material embedded *inside* a larger text value, where the key name
+# describes the container ("configuration file") rather than its contents, so
+# key matching cannot help. Both forms are unambiguous enough to match on the
+# value: a WireGuard peer config assigns `PrivateKey = <base64>`, and a PEM
+# block is self-labelling. Deliberately narrow — `PrivateKey` must be a line's
+# first token, so prose mentioning the word is untouched.
+_EMBEDDED_SECRET_RE = re.compile(
+    r"(?:\A|[\r\n])[ \t]*PrivateKey[ \t]*=|-----BEGIN[A-Z ]*PRIVATE KEY-----",
+    re.IGNORECASE,
+)
+
+
+def _has_embedded_secret(value: str) -> bool:
+    """True when ``value`` is a text blob with key material inside it.
+
+    Catches the case a key-name denylist structurally cannot: a whole config
+    file returned under a benign-sounding key. See ``_EMBEDDED_SECRET_RE``.
+    """
+    return _EMBEDDED_SECRET_RE.search(value) is not None
 
 
 def _is_credentialed_url(value: str) -> bool:
@@ -166,10 +201,12 @@ def redact_secrets(value: Any) -> Any:
     both caught). Also matches ``super_*_password`` / ``super_*_url`` callback
     keys that have historically leaked controller config, plus the credential
     suffixes ``password`` / ``secret`` / ``authkey`` / ``token`` / ``passwd``.
-    String values that are URLs carrying an inline credential (userinfo or a
-    credential-bearing query param, e.g. an RTSPS ``?token=…`` stream
-    descriptor) are redacted regardless of their key name. Other non-container
-    values pass through untouched. Input is not mutated.
+    String values are redacted regardless of their key name when they are a
+    URL carrying an inline credential (userinfo or a credential-bearing query
+    param, e.g. an RTSPS ``?token=…`` stream descriptor), or a text blob with
+    key material inside it (a WireGuard ``PrivateKey =`` line or a PEM private
+    key). Other non-container values pass through untouched. Input is not
+    mutated.
     """
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
@@ -182,6 +219,6 @@ def redact_secrets(value: Any) -> Any:
         return redacted
     if isinstance(value, list):
         return [redact_secrets(item) for item in value]
-    if isinstance(value, str) and _is_credentialed_url(value):
+    if isinstance(value, str) and (_is_credentialed_url(value) or _has_embedded_secret(value)):
         return REDACTED
     return value
