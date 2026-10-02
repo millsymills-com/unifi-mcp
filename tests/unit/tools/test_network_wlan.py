@@ -50,7 +50,7 @@ class TestWlanToolRegistration:
         # Deleting a WLAN drops every client on that SSID — must flag destructive.
         tools = await mcp_with_wlan.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_wlan")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestWlanModeGating:

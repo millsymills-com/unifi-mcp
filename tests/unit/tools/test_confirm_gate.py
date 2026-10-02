@@ -70,7 +70,7 @@ class TestConfirmInvariant:
         tools = await create_server(_config()).list_tools()
         mismatches: list[str] = []
         for tool in tools:
-            destructive = bool(tool.annotations and tool.annotations.destructiveHint)
+            destructive = bool(tool.annotations and tool.annotations.destructive_hint)
             properties = (tool.parameters or {}).get("properties") or {}
             has_confirm = "confirm" in properties
             if destructive != has_confirm:
