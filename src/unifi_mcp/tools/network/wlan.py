@@ -54,15 +54,17 @@ async def _resolve_default_network_id(client: Any) -> str:
     without it is unverified.
 
     Raises:
-        UniFiBadRequestError: If the site has no network marked as the default LAN.
+        UniFiBadRequestError: If the site does not have exactly one network
+            marked as the default LAN.
     """
     networks = (await client.list_networks()).get("data") or []
-    default_id = next((n.get("_id") for n in networks if n.get("attr_hidden_id") == "LAN"), None)
-    if not isinstance(default_id, str):
+    matches = [n.get("_id") for n in networks if n.get("attr_hidden_id") == "LAN"]
+    if len(matches) != 1 or not isinstance(matches[0], str):
         raise UniFiBadRequestError(
-            "cannot find the site's default LAN (attr_hidden_id 'LAN'); pass networkconf_id explicitly"
+            f"expected exactly one default LAN (attr_hidden_id 'LAN'), found {len(matches)}; "
+            "pass networkconf_id explicitly"
         )
-    return default_id
+    return matches[0]
 
 
 def register_wlan_tools(mcp: FastMCP) -> None:
@@ -128,8 +130,8 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         """Create a new WLAN (Wi-Fi network).
 
         Omitting ``networkconf_id`` attaches the SSID to the site's default
-        LAN, so a guest SSID must pass the id of a ``purpose="guest"``
-        network explicitly. ``is_guest`` marks the SSID as a guest network;
+        LAN, so ``is_guest=True`` is rejected without an explicit
+        ``networkconf_id`` naming the guest network. ``is_guest`` marks the SSID as a guest network;
         ``l2_isolation`` additionally blocks client-to-client traffic within
         it, which the guest firewall zone does not cover on its own.
 
@@ -157,11 +159,18 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             The upstream API response.
 
         Raises:
-            ToolError: If write mode is disabled, an id is malformed, or the
-                site's structural ids or default LAN cannot be resolved.
+            ToolError: If write mode is disabled, an id is malformed,
+                ``is_guest`` is set without ``networkconf_id``, or the site's
+                structural ids or default LAN cannot be resolved.
         """
         client = get_server_context(ctx).clients["network"]
         if networkconf_id is None:
+            if is_guest:
+                # The default LAN sits in the trusted zone, so a guest SSID
+                # defaulted onto it would look isolated and not be.
+                raise UniFiBadRequestError(
+                    "is_guest=True requires networkconf_id: pass the id of the guest network, not the default LAN"
+                )
             networkconf_id = await _resolve_default_network_id(client)
         validate_id(networkconf_id, field="networkconf_id")
         ap_group_ids, usergroup_id = await _resolve_structural_ids(client, ap_group_ids, usergroup_id)
