@@ -345,7 +345,7 @@ class TestRedactSecretsEmbeddedKeyMaterial:
 
     def test_iapp_key_redacted(self):
         """`list_wlans` returns this as 32 hex chars on every row."""
-        out = redact_secrets({"data": [{"name": "Home", "x_iapp_key": "cf0d0f3b9a8c0ffe9861f57e1ed96568"}]})
+        out = redact_secrets({"data": [{"name": "Home", "x_iapp_key": "EXAMPLE-IAPP-KEY-NOT-REAL"}]})
         assert out["data"][0]["x_iapp_key"] == REDACTED
         assert out["data"][0]["name"] == "Home"
 
