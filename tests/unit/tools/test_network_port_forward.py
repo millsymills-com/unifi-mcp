@@ -42,7 +42,7 @@ class TestPortForwardRegistration:
     async def test_delete_marked_destructive(self, mcp_with_pf):
         tools = await mcp_with_pf.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_port_forward")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestPortForwardClientEndpoints:

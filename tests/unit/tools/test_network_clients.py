@@ -63,7 +63,7 @@ class TestClientToolRegistration:
         # Blocking a client is a real disruption — should carry destructiveHint.
         tools = await mcp_with_clients.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_block_client")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestClientModeGating:

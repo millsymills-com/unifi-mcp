@@ -53,7 +53,7 @@ class TestFirewallRegistration:
     async def test_delete_tools_marked_destructive(self, mcp_with_firewall, destructive_tool):
         tools = await mcp_with_firewall.list_tools()
         tool = next(t for t in tools if t.name == destructive_tool)
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestFirewallClientEndpoints:

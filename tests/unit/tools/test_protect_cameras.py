@@ -141,7 +141,7 @@ class TestSetRecordingModeConfirmGate:
     async def test_set_recording_mode_is_destructive_with_confirm_param(self, mcp_with_cameras):
         tool = await mcp_with_cameras.get_tool("unifi_protect_set_recording_mode")
         assert tool.annotations is not None
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
         assert "confirm" in (tool.parameters or {}).get("properties", {})
 
     @pytest.mark.parametrize("confirm", [None, False])
