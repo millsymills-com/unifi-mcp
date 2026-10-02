@@ -55,7 +55,7 @@ class TestSystemToolRegistration:
     async def test_destructive_writes_flagged(self, mcp_with_system, tool_name):
         tools = await mcp_with_system.list_tools()
         tool = next(t for t in tools if t.name == tool_name)
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestSystemCommandEndpoints:

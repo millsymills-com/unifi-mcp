@@ -257,12 +257,12 @@ class TestAclWrites:
     async def test_delete_acl_rule_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_acl_rule")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
     async def test_reorder_acl_rules_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_reorder_acl_rules")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestDnsWrites:
@@ -311,7 +311,7 @@ class TestDnsWrites:
     async def test_delete_dns_policy_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_dns_policy")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestFirewallZoneWrites:
@@ -360,7 +360,7 @@ class TestFirewallZoneWrites:
     async def test_delete_firewall_zone_marked_destructive(self, server):
         tools = await server.list_tools()
         tool = next(t for t in tools if t.name == "unifi_network_delete_firewall_zone")
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestVoucherWrites:
@@ -432,4 +432,4 @@ class TestVoucherWrites:
         tools = await server.list_tools()
         for name in ("unifi_network_delete_vouchers", "unifi_network_delete_voucher"):
             tool = next(t for t in tools if t.name == name)
-            assert tool.annotations.destructiveHint is True
+            assert tool.annotations.destructive_hint is True

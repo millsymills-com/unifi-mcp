@@ -84,7 +84,7 @@ class TestPortProfileRegistration:
     async def test_destructive_flagged(self, mcp_with_profiles, destructive_tool):
         tools = await mcp_with_profiles.list_tools()
         tool = next(t for t in tools if t.name == destructive_tool)
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.destructive_hint is True
 
 
 class TestPortProfileModeGating:

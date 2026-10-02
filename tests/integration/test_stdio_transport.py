@@ -132,7 +132,7 @@ async def test_stdio_handshake_no_apis_configured() -> None:
 
     With no API keys configured the server registers no tools and the lifespan
     logs "No API clients initialized — server will have no tools". The MCP
-    handshake itself must still succeed: ``initialize`` returns ``serverInfo``,
+    handshake itself must still succeed: negotiation returns the server identity,
     ``tools/list`` returns an empty list, and tearing down the client shuts
     the subprocess down cleanly.
     """
@@ -150,11 +150,10 @@ async def test_stdio_handshake_no_apis_configured() -> None:
         async with Client(transport) as client:
             assert client.is_connected(), "client failed to connect over stdio"
 
-            init = client.initialize_result
-            assert init is not None, "no InitializeResult captured after handshake"
-            assert init.serverInfo is not None, "serverInfo missing from initialize result"
-            assert init.serverInfo.name == "unifi-mcp", f"unexpected serverInfo.name: {init.serverInfo.name!r}"
-            assert init.serverInfo.version, "serverInfo.version should be a non-empty string"
+            info = client.server_info
+            assert info is not None, "no server identity captured after negotiation"
+            assert info.name == "unifi-mcp", f"unexpected server name: {info.name!r}"
+            assert info.version, "server version should be a non-empty string"
 
             tools = await client.list_tools()
             assert isinstance(tools, list), f"tools/list returned non-list: {type(tools)!r}"
@@ -819,7 +818,7 @@ def _tool_fingerprint(tools: list[mcp.types.Tool]) -> dict[str, str]:
     """
     return {
         tool.name: json.dumps(
-            {"description": tool.description, "inputSchema": tool.inputSchema},
+            {"description": tool.description, "inputSchema": tool.input_schema},
             sort_keys=True,
         )
         for tool in tools
