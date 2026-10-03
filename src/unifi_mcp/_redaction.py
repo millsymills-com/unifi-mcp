@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote_plus
 
 SENSITIVE_KEYS: frozenset[str] = frozenset(
     {
@@ -183,7 +183,7 @@ _EMBEDDED_SECRET_RE = re.compile(
     r"|-----BEGIN[A-Z0-9 ]*(?:PRIVATE KEY|STATIC KEY)"
     r"|<(?:key|tls-auth|tls-crypt|tls-crypt-v2|secret)>"
     r"|(?:Set-)?Cookie[ \t]*:[ \t]*[^\s=;]{1,128}="
-    r"|(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\."
+    r"|(?<![A-Za-z0-9])eyJ[A-Za-z0-9_-]{8,256}\.eyJ[A-Za-z0-9_-]{8}"
     r"|(?<![:A-Za-z0-9])//[^/\s:@]+:[^/\s@]+@[^@/\s]",
     re.IGNORECASE,
 )
@@ -199,18 +199,18 @@ _LINE_KEY_RE = re.compile(
     r"(?P<rest>(?:[^\r\n\\]|\\(?!n))*)"
 )
 
-# A tight `name=value` pair after whitespace or a `;` / `&` / `,` separator,
+# A tight `name=value` pair after whitespace, a separator (`;&,?|`), a quote or
+# an opening bracket,
 # as in `user=admin password=...` or `a=1;psk=...` (spaces around `=` read as
 # prose mid-line, so only line-leading assignments allow them), and a
-# `--name value` /
-# `--name=value` command-line flag. Names go through the key rules.
+# `--name value` / `--name=value` command-line flag. Names go through the key rules.
 _INLINE_ASSIGN_RE = re.compile(
-    r"(?:(?<=[\s;&,])|\A)(?:export\s+)?(?P<name>[A-Za-z0-9_][A-Za-z0-9_.\[\]\-]{0,127})=[^\s=]"
-    r"|(?:(?<=\s)|\A)--(?P<flag>[A-Za-z][A-Za-z0-9_\-]{0,63})(?:=|[^\S\r\n]+)[^\s\-]"
+    r"(?:(?<=[\s;&,?|\"'(\[{])|\A)(?:export\s+)?(?P<name>[A-Za-z0-9_][A-Za-z0-9_.\[\]\-]{0,127})=[^\s=]"
+    r"|(?:(?<=[\s\"'(\[{,])|\A)--(?P<flag>[A-Za-z][A-Za-z0-9_\-]{0,63})(?:=|[^\S\r\n]+)[^\s\-]"
 )
 
 # An XML element whose tag is a credential name, such as `<password>x</password>`.
-_XML_KEY_RE = re.compile(r"<(?P<name>[A-Za-z_][A-Za-z0-9_.\-]{0,63})>[^<\s]")
+_XML_KEY_RE = re.compile(r"<(?P<name>[A-Za-z_][A-Za-z0-9_.\-]{0,63})>\s*[^<\s]")
 
 # A quoted name followed by `:` and a string, object, array, number, bool or
 # null value — a key
@@ -240,7 +240,24 @@ def _line_assigns_secret(match: re.Match[str], value: str) -> bool:
     if match.group("sep") == "=" or match.group("start") is None:
         return True
     rest = match.group("rest").split()
-    return match.end() == len(value.rstrip("\r\n")) and len(rest) == 1
+    return match.end() == len(_strip_trailing_breaks(value)) and len(rest) == 1
+
+
+def _strip_trailing_breaks(value: str) -> str:
+    """Drop trailing line breaks, real or JSON-escaped (`\\n`, `\\r`).
+
+    Walks back by index so a long run of breaks costs one pass, not one copy
+    per break.
+    """
+    end = len(value)
+    while end > 0:
+        if value[end - 1] in "\r\n":
+            end -= 1
+        elif end >= 2 and value[end - 2] == "\\" and value[end - 1] in "nr":
+            end -= 2
+        else:
+            break
+    return value[:end]
 
 
 def _inline_assigns_secret(match: re.Match[str]) -> bool:
@@ -248,6 +265,8 @@ def _inline_assigns_secret(match: re.Match[str]) -> bool:
 
 
 def _scan_text(text: str) -> bool:
+    # JSON may escape `/` as `\/` and `&` as `\u0026`, hiding a URL's shape.
+    text = text.replace("\\/", "/").replace("\\u0026", "&")
     if _EMBEDDED_SECRET_RE.search(text) is not None:
         return True
     if any(_line_assigns_secret(m, text) for m in _LINE_KEY_RE.finditer(text)):
@@ -258,9 +277,7 @@ def _scan_text(text: str) -> bool:
         return True
     if any(_is_sensitive_name(m.group("name")) for m in _XML_KEY_RE.finditer(text)):
         return True
-    # JSON may escape `/` as `\/` and `&` as `\u0026`, hiding a URL's shape.
-    unescaped = text.replace("\\/", "/").replace("\\u0026", "&")
-    return any(_is_credentialed_url(m.group(0)) for m in _EMBEDDED_URL_RE.finditer(unescaped))
+    return any(_is_credentialed_url(m.group(0)) for m in _EMBEDDED_URL_RE.finditer(text))
 
 
 # Enough for a doubly encoded payload; each pass is a full linear rescan.
@@ -282,7 +299,7 @@ def _has_embedded_secret(value: str) -> bool:
     for _ in range(_URL_DECODE_PASSES):
         if "%" not in decoded:
             break
-        previous, decoded = decoded, unquote(decoded)
+        previous, decoded = decoded, unquote_plus(decoded)
         if decoded == previous:
             break
         if _scan_text(decoded):
@@ -379,9 +396,12 @@ def redact_secrets(value: Any) -> Any:
     String values are redacted regardless of their key name when they are a
     URL carrying an inline credential (userinfo or a credential-bearing query
     param, e.g. an RTSPS ``?token=…`` stream descriptor), or a text blob with
-    key material inside it (a WireGuard ``PrivateKey =`` / ``PresharedKey =``
-    line, an ipsec.secrets ``PSK``, a PEM private key or OpenVPN static key,
-    or serialized JSON carrying a sensitive key). Other non-container values pass through
+    key material inside it: a credential-named line or inline assignment
+    (INI, YAML, hostapd, WireGuard, ``--flag``), an ipsec.secrets ``PSK``, an
+    ``Authorization`` or ``Set-Cookie`` header, a JWT, a PEM private key or
+    OpenVPN key block, an XML credential element, serialized JSON carrying a
+    sensitive key, or an embedded credentialed URL. See
+    ``_has_embedded_secret``. Other non-container values pass through
     untouched. Input is not mutated.
     """
     if isinstance(value, dict):
