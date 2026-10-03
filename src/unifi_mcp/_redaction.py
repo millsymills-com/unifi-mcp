@@ -183,9 +183,12 @@ def _is_json_with_secret(value: str) -> bool:
         return False
     try:
         parsed = json.loads(value)
+        return isinstance(parsed, (dict, list)) and redact_secrets(parsed) != parsed
     except ValueError:
         return False
-    return isinstance(parsed, (dict, list)) and redact_secrets(parsed) != parsed
+    except RecursionError:
+        # Too deeply nested to inspect; fail closed rather than crash the tool.
+        return True
 
 
 def _is_credentialed_url(value: str) -> bool:

@@ -467,3 +467,7 @@ class TestRedactSecretsRemainingPskBypasses:
     )
     def test_benign_strings_pass_through(self, text):
         assert redact_secrets({"note": text})["note"] == text
+
+    def test_json_too_deep_to_inspect_is_redacted_not_raised(self):
+        blob = "[" * 100_000 + "]" * 100_000
+        assert redact_secrets({"payload": blob})["payload"] == REDACTED
