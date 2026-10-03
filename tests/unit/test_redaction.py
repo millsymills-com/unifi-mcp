@@ -572,9 +572,73 @@ class TestRedactSecretsTextBlobShapes:
 
     @pytest.mark.parametrize(
         "blob",
-        ["a" * 400_000 + "://", "\n" + "a" * 400_000, "%" * 400_000, '"' + "a" * 400_000],
+        [
+            "a" * 400_000 + "://",
+            "\n" + "a" * 400_000,
+            "%" * 400_000,
+            '"' + "a" * 400_000,
+            "eyJ" * 130_000,
+            "Cookie:" * 60_000,
+            " --" + "a" * 400_000,
+            "<" + "a" * 400_000,
+        ],
     )
     def test_scans_stay_linear(self, blob):
         start = time.perf_counter()
         redact_secrets({"payload": blob})
         assert time.perf_counter() - start < 2
+
+
+class TestRedactSecretsFinalReviewShapes:
+    """Shapes the last review pair on #521 found leaking."""
+
+    @pytest.mark.parametrize(
+        "blob",
+        [
+            'body {"pin_password": 123456} end',
+            "{'token': 123456}",
+            'log {"x_passphrase": true} end',
+            "x_passphrase: EXAMPLE-NOT-REAL\n",
+            "password: EXAMPLE-NOT-REAL\r\n",
+            "PSK: EXAMPLE-NOT-REAL\n",
+            "Pre-Shared Key: EXAMPLE-NOT-REAL\n",
+            "user=admin password=EXAMPLE-NOT-REAL",
+            "a=1;password=EXAMPLE-NOT-REAL",
+            "export WPA_PSK=EXAMPLE-NOT-REAL",
+            "run --password EXAMPLE-NOT-REAL",
+            "run --token=EXAMPLE-NOT-REAL",
+            "peers[0].preshared_key = EXAMPLE-NOT-REAL",
+            "password\u00a0= EXAMPLE-NOT-REAL",
+            "<config><password>EXAMPLE-NOT-REAL</password></config>",
+            "header eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJleGFtcGxlIn0.c2ln here",
+            "Set-Cookie: sid=EXAMPLE-NOT-REAL; Path=/",
+            "see https://example.com/cb?access_token=EXAMPLE-NOT-REAL",
+            "see https://example.com/cb?pwd=EXAMPLE-NOT-REAL",
+            "mount //user:EXAMPLE-NOT-REAL@192.0.2.1/share",
+            "192.0.2.1-rtsps://EXAMPLEALIAS@192.0.2.1/x",
+            '{"a": 1} {"url": "https://example.com/x?a=1\\u0026token=EXAMPLE-NOT-REAL"}',
+            "payload=%257B%2522x_passphrase%2522%253A%2522EXAMPLE%2522%257D",
+            "<key>\nEXAMPLE\n</key>",
+            "<tls-crypt>\nEXAMPLE\n</tls-crypt>",
+            "<tls-crypt-v2>\nEXAMPLE\n</tls-crypt-v2>",
+            "<secret>\nEXAMPLE\n</secret>",
+            "Authorization: Digest username=admin",
+            "[Peer]\rPresharedKey = EXAMPLE-NOT-REAL",
+        ],
+    )
+    def test_redacted(self, blob):
+        assert redact_secrets({"payload": blob})["payload"] == REDACTED
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The PresharedKey = field is optional",
+            "see the docs for the password option",
+            "Cookie banner shown to the user",
+            "<name>Branch</name>",
+            "path //server/share",
+            "vlan=20 name=Branch",
+        ],
+    )
+    def test_benign_text_passes_through(self, text):
+        assert redact_secrets({"note": text})["note"] == text

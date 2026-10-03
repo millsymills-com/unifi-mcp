@@ -131,6 +131,8 @@ _CREDENTIAL_QUERY_PARAMS: tuple[str, ...] = (
     "secret",
     "apikey",
     "api_key",
+    "access_token",
+    "pwd",
     "auth",
 )
 
@@ -160,9 +162,13 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
 #     (`Pre-Shared Key = ...`, `Private Key: ...`) — see the line rules below;
 #   - the strongSwan ipsec.secrets form `<ids> : PSK "secret"` (or a `0x` hex
 #     / `0s` base64 secret);
-#   - an `Authorization: Bearer|Basic|Digest ...` header;
+#   - an `Authorization: Bearer|Basic|Digest ...` or `Set-Cookie: k=v` header,
+#     or a bare JWT;
+#   - a scheme-relative `//user:pass@host` URL;
 #   - a PEM private key, an OpenVPN static key, or an OpenVPN inline
 #     `<key>` / `<tls-auth>` / `<tls-crypt>` / `<secret>` block.
+# Every repeatable token is anchored or length-capped so no input can make a
+# match restart over a long run, which would be quadratic.
 # A blob that survived an extra round of JSON encoding has literal `\n` / `\t`
 # where its whitespace was, so those escapes count as line breaks and indents.
 _KEY_LINE_NAMES = r"(?:Private[-_ ]?Key|Pre[-_ ]?Shared[-_ ]?Key|PSK)"
@@ -171,11 +177,14 @@ _LINE_START = r"(?:\A|[\r\n]|\\n)"
 _EMBEDDED_SECRET_RE = re.compile(
     rf"{_LINE_START}{_INDENT}{_KEY_LINE_NAMES}[ \t]*="
     rf"|(?:[\r\n]|\\n){_INDENT}{_KEY_LINE_NAMES}[ \t]*:"
-    rf"|\A[ \t]*{_KEY_LINE_NAMES}[ \t]*:[ \t]*\S+[ \t]*\Z"
+    rf"|\A[ \t]*{_KEY_LINE_NAMES}[ \t]*:[ \t]*\S+\s*\Z"
     r"|:[ \t]*PSK[ \t]+(?:[\"']|0[xs])"
     r"|Authorization[ \t]*:[ \t]*(?:Bearer|Basic|Digest)[ \t]+\S"
     r"|-----BEGIN[A-Z0-9 ]*(?:PRIVATE KEY|STATIC KEY)"
-    r"|<(?:key|tls-auth|tls-crypt|tls-crypt-v2|secret)>",
+    r"|<(?:key|tls-auth|tls-crypt|tls-crypt-v2|secret)>"
+    r"|(?:Set-)?Cookie[ \t]*:[ \t]*[^\s=;]{1,128}="
+    r"|(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\."
+    r"|(?<![:A-Za-z0-9])//[^/\s:@]+:[^/\s@]+@[^@/\s]",
     re.IGNORECASE,
 )
 
@@ -185,21 +194,39 @@ _EMBEDDED_SECRET_RE = re.compile(
 # `name: token` pair, so a one-line message like `password: too short` stays
 # readable. `rest` stops at a literal `\n` so escaped lines are seen too.
 _LINE_KEY_RE = re.compile(
-    rf"(?:(?P<start>\A)|[\r\n]|\\n){_INDENT}(?P<name>[A-Za-z0-9_][A-Za-z0-9_.\-]{{0,127}})[ \t]*(?P<sep>[=:])"
+    rf"(?:(?P<start>\A)|[\r\n]|\\n){_INDENT}"
+    r"(?P<name>[A-Za-z0-9_][A-Za-z0-9_.\[\]\-]{0,127})[^\S\r\n]*(?P<sep>[=:])"
     r"(?P<rest>(?:[^\r\n\\]|\\(?!n))*)"
 )
 
-# A quoted name followed by `:` and a quoted, object or array value — a key
+# A tight `name=value` pair after whitespace or a `;` / `&` / `,` separator,
+# as in `user=admin password=...` or `a=1;psk=...` (spaces around `=` read as
+# prose mid-line, so only line-leading assignments allow them), and a
+# `--name value` /
+# `--name=value` command-line flag. Names go through the key rules.
+_INLINE_ASSIGN_RE = re.compile(
+    r"(?:(?<=[\s;&,])|\A)(?:export\s+)?(?P<name>[A-Za-z0-9_][A-Za-z0-9_.\[\]\-]{0,127})=[^\s=]"
+    r"|(?:(?<=\s)|\A)--(?P<flag>[A-Za-z][A-Za-z0-9_\-]{0,63})(?:=|[^\S\r\n]+)[^\s\-]"
+)
+
+# An XML element whose tag is a credential name, such as `<password>x</password>`.
+_XML_KEY_RE = re.compile(r"<(?P<name>[A-Za-z_][A-Za-z0-9_.\-]{0,63})>[^<\s]")
+
+# A quoted name followed by `:` and a string, object, array, number, bool or
+# null value — a key
 # inside JSON, a Python repr, or JSON escaped into another string — wherever
 # it sits in the text. Requiring a value-shaped right-hand side keeps prose
 # such as `Field "token": required` readable.
-_QUOTED_KEY_RE = re.compile(r"""["']([A-Za-z0-9_][A-Za-z0-9_.\- ]{0,127})\\*["']\s*:\s*\\*["'{\[]""")
+_QUOTED_KEY_RE = re.compile(
+    r"""["']([A-Za-z0-9_][A-Za-z0-9_.\- ]{0,127})\\*["']\s*:\s*"""
+    r"""\\*(?:["'{\[]|-?\d|(?:true|false|null|True|False|None)\b)"""
+)
 
 # A URL anywhere inside a larger text value, checked with ``_is_credentialed_url``.
 # The scheme must start at a word boundary and is length-capped: an unbounded
 # scheme lets every position of a long alphanumeric run start a match, which
 # is quadratic.
-_EMBEDDED_URL_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-]{0,31}://[^\s\"'\\]+")
+_EMBEDDED_URL_RE = re.compile(r"(?<![A-Za-z])[A-Za-z][A-Za-z0-9+.\-]{0,31}://[^\s\"'\\]+")
 
 
 def _is_sensitive_name(name: str) -> bool:
@@ -213,7 +240,11 @@ def _line_assigns_secret(match: re.Match[str], value: str) -> bool:
     if match.group("sep") == "=" or match.group("start") is None:
         return True
     rest = match.group("rest").split()
-    return match.end() == len(value) and len(rest) == 1
+    return match.end() == len(value.rstrip("\r\n")) and len(rest) == 1
+
+
+def _inline_assigns_secret(match: re.Match[str]) -> bool:
+    return _is_sensitive_name(match.group("name") or match.group("flag"))
 
 
 def _scan_text(text: str) -> bool:
@@ -221,11 +252,19 @@ def _scan_text(text: str) -> bool:
         return True
     if any(_line_assigns_secret(m, text) for m in _LINE_KEY_RE.finditer(text)):
         return True
+    if any(_inline_assigns_secret(m) for m in _INLINE_ASSIGN_RE.finditer(text)):
+        return True
     if any(_is_sensitive_name(m.group(1)) for m in _QUOTED_KEY_RE.finditer(text)):
         return True
-    # JSON may escape `/` as `\/`, which would hide the `://` from the scan.
-    unescaped = text.replace("\\/", "/")
+    if any(_is_sensitive_name(m.group("name")) for m in _XML_KEY_RE.finditer(text)):
+        return True
+    # JSON may escape `/` as `\/` and `&` as `\u0026`, hiding a URL's shape.
+    unescaped = text.replace("\\/", "/").replace("\\u0026", "&")
     return any(_is_credentialed_url(m.group(0)) for m in _EMBEDDED_URL_RE.finditer(unescaped))
+
+
+# Enough for a doubly encoded payload; each pass is a full linear rescan.
+_URL_DECODE_PASSES = 2
 
 
 def _has_embedded_secret(value: str) -> bool:
@@ -234,14 +273,19 @@ def _has_embedded_secret(value: str) -> bool:
     Catches the case a key-name denylist structurally cannot: a whole config
     file, or serialized JSON, returned under a benign-sounding key. The scans
     run in linear time, cover JSON with text around it, and cannot hit a
-    recursion limit; one URL-decoded pass catches form-encoded payloads, and a
+    recursion limit; up to two URL-decoded passes catch form-encoded payloads, and a
     best-effort JSON decode catches escapes the raw text hides.
     """
     if _scan_text(value):
         return True
-    if "%" in value:
-        decoded = unquote(value)
-        if decoded != value and _scan_text(decoded):
+    decoded = value
+    for _ in range(_URL_DECODE_PASSES):
+        if "%" not in decoded:
+            break
+        previous, decoded = decoded, unquote(decoded)
+        if decoded == previous:
+            break
+        if _scan_text(decoded):
             return True
     return _is_json_with_secret(value)
 
