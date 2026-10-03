@@ -14,6 +14,7 @@ back to the agent, so they are now scrubbed exactly like read responses.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -103,7 +104,13 @@ _NORMALIZED_SUFFIXES: tuple[str, ...] = (
     # `x_openvpn_shared_secret_key` ends in `secretkey`, which neither the
     # `secret` nor the `sharedkey` suffix reaches.
     "secretkey",
+    # Matches `iappKey`, which normalizes without the `x` of `x_iapp_key`.
+    "iappkey",
 )
+
+# A PSK token ahead of a value-ish tail (`psk_value`, `wpa_psk_key`). A bare
+# token is not enough: `psk_mode` and `psk_enabled` are benign settings.
+_PSK_VALUE_TAILS: tuple[str, ...] = ("key", "value", "hex")
 
 
 # Query-param names that carry a credential when present in a URL value.
@@ -146,10 +153,13 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
 # or `PSK` without any `PrivateKey` line, so those assignments count too.
 # A blob that survived an extra round of JSON encoding has literal `\n` where
 # its newlines were, which is why the escape is a line separator here as well.
-# Deliberately narrow — the key name must be a line's first token, so prose
-# mentioning the word is untouched.
+# The same goes for a literal `\t` indent. Both `=` (WireGuard) and `:`
+# (strongSwan-style `PSK: ...`) count as the assignment, and `Pre-Shared-Key`
+# is accepted with or without separators. Deliberately narrow — the key name
+# must be a line's first token, so prose mentioning the word is untouched.
 _EMBEDDED_SECRET_RE = re.compile(
-    r"(?:\A|[\r\n]|\\n)[ \t]*(?:PrivateKey|PresharedKey|PSK)[ \t]*=|-----BEGIN[A-Z ]*PRIVATE KEY-----",
+    r"(?:\A|[\r\n]|\\n)(?:[ \t]|\\t)*(?:PrivateKey|Pre[-_]?Shared[-_]?Key|PSK)[ \t]*[=:]"
+    r"|-----BEGIN[A-Z ]*PRIVATE KEY-----",
     re.IGNORECASE,
 )
 
@@ -160,7 +170,22 @@ def _has_embedded_secret(value: str) -> bool:
     Catches the case a key-name denylist structurally cannot: a whole config
     file returned under a benign-sounding key. See ``_EMBEDDED_SECRET_RE``.
     """
-    return _EMBEDDED_SECRET_RE.search(value) is not None
+    return _EMBEDDED_SECRET_RE.search(value) is not None or _is_json_with_secret(value)
+
+
+def _is_json_with_secret(value: str) -> bool:
+    """True when ``value`` is a JSON object or array that carries a sensitive key.
+
+    A config serialized into a string field hides its keys from the dict walk,
+    so parse it and redact the whole value if anything inside would be.
+    """
+    if not value.lstrip().startswith(("{", "[")):
+        return False
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return False
+    return isinstance(parsed, (dict, list)) and redact_secrets(parsed) != parsed
 
 
 def _is_credentialed_url(value: str) -> bool:
@@ -187,7 +212,13 @@ def _is_sensitive_key(key: str) -> bool:
         return True
     if normalized.startswith("super") and (normalized.endswith("password") or normalized.endswith("url")):
         return True
-    return any(normalized.endswith(suffix) for suffix in _NORMALIZED_SUFFIXES)
+    if any(normalized.endswith(suffix) for suffix in _NORMALIZED_SUFFIXES):
+        return True
+    # UniFi prefixes its hidden secret fields with `x_` (`x_passphrase`,
+    # `x_authkey`), so an `x_` field ending in `key` is key material.
+    if key.lower().startswith("x_") and normalized.endswith("key"):
+        return True
+    return "psk" in normalized and normalized.endswith(_PSK_VALUE_TAILS)
 
 
 def flatten_key_names(value: Any, _prefix: str = "") -> list[str]:
@@ -219,12 +250,14 @@ def redact_secrets(value: Any) -> Any:
     both caught). Also matches ``super_*_password`` / ``super_*_url`` callback
     keys that have historically leaked controller config, plus the credential
     suffixes ``password`` / ``secret`` / ``authkey`` / ``token`` / ``passwd`` /
-    ``privatekey`` / ``psk`` / ``sharedkey`` / ``secretkey``.
+    ``privatekey`` / ``psk`` / ``sharedkey`` / ``secretkey`` / ``iappkey``,
+    any ``x_``-prefixed field ending in ``key``, and a ``psk`` token ahead of a
+    ``key`` / ``value`` / ``hex`` tail.
     String values are redacted regardless of their key name when they are a
     URL carrying an inline credential (userinfo or a credential-bearing query
     param, e.g. an RTSPS ``?token=…`` stream descriptor), or a text blob with
     key material inside it (a WireGuard ``PrivateKey =`` / ``PresharedKey =``
-    line or a PEM private key). Other non-container values pass through
+    line, a PEM private key, or serialized JSON carrying a sensitive key). Other non-container values pass through
     untouched. Input is not mutated.
     """
     if isinstance(value, dict):

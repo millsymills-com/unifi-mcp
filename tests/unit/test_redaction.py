@@ -415,3 +415,55 @@ class TestRedactSecretsProperties:
         assert out["data"][0]["name"] == "Home"
         assert out["data"][0]["security"] == "wpapsk"
         assert out["meta"] == {"rc": "ok"}
+
+
+class TestRedactSecretsRemainingPskBypasses:
+    """Spellings the adversarial review on #521 found still reaching the agent."""
+
+    @pytest.mark.parametrize(
+        "key", ["wpa_psk_key", "psk_value", "pskHex", "iappKey", "x_ipsec_key", "x_ca_key", "x_server_key"]
+    )
+    def test_key_names_redacted(self, key):
+        out = redact_secrets({key: "EXAMPLE-NOT-REAL", "name": "Branch"})
+        assert out[key] == REDACTED
+        assert out["name"] == "Branch"
+
+    @pytest.mark.parametrize("key", ["psk_mode", "psk_enabled", "xKey", "x_ssh_keys", "radius_key_id", "monkey"])
+    def test_neighbouring_names_pass_through(self, key):
+        assert redact_secrets({key: "1"})[key] == "1"
+
+    @pytest.mark.parametrize(
+        "blob",
+        [
+            "[Peer]\\n\\tPresharedKey = EXAMPLE-NOT-REAL",
+            "[Peer]\nPre-Shared-Key = EXAMPLE-NOT-REAL",
+            "conn branch\npre_shared_key=EXAMPLE-NOT-REAL",
+            "PSK: EXAMPLE-NOT-REAL",
+        ],
+    )
+    def test_embedded_assignments_redacted(self, blob):
+        assert redact_secrets({"config": blob})["config"] == REDACTED
+
+    @pytest.mark.parametrize(
+        "blob",
+        [
+            '{"ipsec_psk": "EXAMPLE-NOT-REAL"}',
+            '  [{"name": "Branch", "x_passphrase": "EXAMPLE-NOT-REAL"}]',
+            '{"outer": {"wireguard_private_key": "EXAMPLE-NOT-REAL"}}',
+        ],
+    )
+    def test_json_string_carrying_a_secret_redacted(self, blob):
+        assert redact_secrets({"payload": blob})["payload"] == REDACTED
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            '{"name": "Branch", "psk_mode": "static"}',
+            "[not json",
+            "{}",
+            "Set the PSK: see the docs",
+            "The PresharedKey = field is optional",
+        ],
+    )
+    def test_benign_strings_pass_through(self, text):
+        assert redact_secrets({"note": text})["note"] == text
