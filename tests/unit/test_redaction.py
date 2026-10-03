@@ -590,6 +590,8 @@ class TestRedactSecretsTextBlobShapes:
             " --" + "a" * 400_000,
             "<" + "a" * 400_000,
         ],
+        # Short ids: CI runs pytest -v, and a 400 KB id per case floods the log.
+        ids=lambda blob: f"{blob[:12]!r}x{len(blob)}",
     )
     def test_scans_stay_linear(self, blob):
         start = time.perf_counter()
