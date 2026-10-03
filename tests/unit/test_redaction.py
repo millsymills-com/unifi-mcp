@@ -421,14 +421,32 @@ class TestRedactSecretsRemainingPskBypasses:
     """Spellings the adversarial review on #521 found still reaching the agent."""
 
     @pytest.mark.parametrize(
-        "key", ["wpa_psk_key", "psk_value", "pskHex", "iappKey", "x_ipsec_key", "x_ca_key", "x_server_key"]
+        "key",
+        [
+            "wpa_psk_key",
+            "psk_value",
+            "pskHex",
+            "iappKey",
+            "x_ipsec_key",
+            "x_ca_key",
+            "x_server_key",
+            "xIpsecKey",
+            "x-server-key",
+            "vrrpdMd5Key",
+            "wpa_passphrase",
+            "guestPassphrase",
+            "wep_key",
+        ],
     )
     def test_key_names_redacted(self, key):
         out = redact_secrets({key: "EXAMPLE-NOT-REAL", "name": "Branch"})
         assert out[key] == REDACTED
         assert out["name"] == "Branch"
 
-    @pytest.mark.parametrize("key", ["psk_mode", "psk_enabled", "xKey", "x_ssh_keys", "radius_key_id", "monkey"])
+    @pytest.mark.parametrize(
+        "key",
+        ["psk_mode", "psk_enabled", "xKey", "x_ssh_keys", "radius_key_id", "monkey", "xylophoneKey", "x_key_count"],
+    )
     def test_neighbouring_names_pass_through(self, key):
         assert redact_secrets({key: "1"})[key] == "1"
 
@@ -439,6 +457,16 @@ class TestRedactSecretsRemainingPskBypasses:
             "[Peer]\nPre-Shared-Key = EXAMPLE-NOT-REAL",
             "conn branch\npre_shared_key=EXAMPLE-NOT-REAL",
             "PSK: EXAMPLE-NOT-REAL",
+            "[Peer]\nPre-Shared-Key: EXAMPLE-NOT-REAL",
+            "[Peer]\\n\\tPSK: EXAMPLE-NOT-REAL",
+            "[Peer]\nPre-Shared Key = EXAMPLE-NOT-REAL",
+            'conn a\n%any : PSK "EXAMPLE-NOT-REAL"',
+            '1.2.3.4 %any : PSK "EXAMPLE-NOT-REAL"',
+            ': PSK "EXAMPLE-NOT-REAL"',
+            "-----BEGIN OpenVPN Static key V1-----\nEXAMPLE\n-----END OpenVPN Static key V1-----",
+            "interface=wlan0\nwpa_passphrase=EXAMPLE-NOT-REAL",
+            "[Interface]\nprivate_key = EXAMPLE-NOT-REAL",
+            "Private Key: EXAMPLE-NOT-REAL",
         ],
     )
     def test_embedded_assignments_redacted(self, blob):
@@ -450,6 +478,12 @@ class TestRedactSecretsRemainingPskBypasses:
             '{"ipsec_psk": "EXAMPLE-NOT-REAL"}',
             '  [{"name": "Branch", "x_passphrase": "EXAMPLE-NOT-REAL"}]',
             '{"outer": {"wireguard_private_key": "EXAMPLE-NOT-REAL"}}',
+            '{"x_passphrase": "EXAMPLE-NOT-REAL"} trailing',
+            'config: {"ipsec_psk": "EXAMPLE-NOT-REAL"}',
+            "{'x_passphrase': 'EXAMPLE-NOT-REAL'}",
+            '"{\\"x_passphrase\\": \\"EXAMPLE-NOT-REAL\\"}"',
+            '{"stream": "rtsps://192.0.2.1:7441/EXAMPLEALIAS"}',
+            "see https://user:EXAMPLE-NOT-REAL@example.com/x for details",
         ],
     )
     def test_json_string_carrying_a_secret_redacted(self, blob):
@@ -463,11 +497,14 @@ class TestRedactSecretsRemainingPskBypasses:
             "{}",
             "Set the PSK: see the docs",
             "The PresharedKey = field is optional",
+            "PSK: mismatch on client",
+            "privatekey: none configured here",
+            "docs at https://example.com/guide?page=2",
         ],
     )
     def test_benign_strings_pass_through(self, text):
         assert redact_secrets({"note": text})["note"] == text
 
-    def test_json_too_deep_to_inspect_is_redacted_not_raised(self):
+    def test_deeply_nested_json_does_not_raise(self):
         blob = "[" * 100_000 + "]" * 100_000
-        assert redact_secrets({"payload": blob})["payload"] == REDACTED
+        assert redact_secrets({"payload": blob})["payload"] == blob
