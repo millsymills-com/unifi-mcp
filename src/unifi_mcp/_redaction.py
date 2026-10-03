@@ -14,8 +14,10 @@ back to the agent, so they are now scrubbed exactly like read responses.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
+from urllib.parse import unquote
 
 SENSITIVE_KEYS: frozenset[str] = frozenset(
     {
@@ -116,7 +118,7 @@ _NORMALIZED_SUFFIXES: tuple[str, ...] = (
 # token is not enough: `psk_mode` and `psk_enabled` are benign settings.
 _PSK_VALUE_TAILS: tuple[str, ...] = ("key", "value", "hex")
 
-_X_PREFIX_RE = re.compile(r"[xX](?:[_-]|(?=[A-Z]))")
+_X_PREFIX_RE = re.compile(r"[xX][_-]|x(?=[A-Z])")
 
 
 # Query-param names that carry a credential when present in a URL value.
@@ -153,51 +155,111 @@ _URL_CREDENTIAL_QUERY_RE = re.compile(
 
 # Key material embedded *inside* a larger text value, where the key name
 # describes the container ("configuration file") rather than its contents, so
-# key matching cannot help. Each form is unambiguous enough to match on the
-# value:
-#   - a line-leading `=` assignment: WireGuard `PrivateKey =` /
-#     `PresharedKey =`, a `[Peer]` `PSK =`, hostapd `wpa_passphrase=`, with
-#     any `-`/`_`/space separators in the name;
-#   - the same names with `:`, but only after a line break or as a whole
-#     single-token value (`PSK: hunter2`), so a one-line message such as
-#     `PSK: mismatch on client` is left alone;
-#   - the strongSwan ipsec.secrets form `<ids> : PSK "secret"`;
-#   - a self-labelling PEM private key or OpenVPN static key block.
+# key matching cannot help. Self-labelling forms, matched anywhere:
+#   - WireGuard / hostapd style lines whose name has spaces or separators
+#     (`Pre-Shared Key = ...`, `Private Key: ...`) — see the line rules below;
+#   - the strongSwan ipsec.secrets form `<ids> : PSK "secret"` (or a `0x` hex
+#     / `0s` base64 secret);
+#   - an `Authorization: Bearer|Basic|Digest ...` header;
+#   - a PEM private key, an OpenVPN static key, or an OpenVPN inline
+#     `<key>` / `<tls-auth>` / `<tls-crypt>` / `<secret>` block.
 # A blob that survived an extra round of JSON encoding has literal `\n` / `\t`
 # where its whitespace was, so those escapes count as line breaks and indents.
-_KEY_LINE_NAMES = r"(?:Private[-_ ]?Key|Pre[-_ ]?Shared[-_ ]?Key|PSK|wpa_passphrase)"
+_KEY_LINE_NAMES = r"(?:Private[-_ ]?Key|Pre[-_ ]?Shared[-_ ]?Key|PSK)"
 _INDENT = r"(?:[ \t]|\\t)*"
+_LINE_START = r"(?:\A|[\r\n]|\\n)"
 _EMBEDDED_SECRET_RE = re.compile(
-    rf"(?:\A|[\r\n]|\\n){_INDENT}{_KEY_LINE_NAMES}[ \t]*="
+    rf"{_LINE_START}{_INDENT}{_KEY_LINE_NAMES}[ \t]*="
     rf"|(?:[\r\n]|\\n){_INDENT}{_KEY_LINE_NAMES}[ \t]*:"
     rf"|\A[ \t]*{_KEY_LINE_NAMES}[ \t]*:[ \t]*\S+[ \t]*\Z"
-    r"|:[ \t]*PSK[ \t]+[\"']"
-    r"|-----BEGIN[A-Z0-9 ]*(?:PRIVATE KEY|STATIC KEY)",
+    r"|:[ \t]*PSK[ \t]+(?:[\"']|0[xs])"
+    r"|Authorization[ \t]*:[ \t]*(?:Bearer|Basic|Digest)[ \t]+\S"
+    r"|-----BEGIN[A-Z0-9 ]*(?:PRIVATE KEY|STATIC KEY)"
+    r"|<(?:key|tls-auth|tls-crypt|tls-crypt-v2|secret)>",
     re.IGNORECASE,
 )
 
-# A quoted name followed by `:` — a key inside JSON, a Python repr, or JSON
-# escaped into another string — wherever it sits in the text.
-_QUOTED_KEY_RE = re.compile(r"""["']([A-Za-z][A-Za-z0-9_\-]{0,63})\\*["'][ \t]*:""")
+# A line-leading `name = value` or `name: value` (INI, YAML, hostapd, shell),
+# where the name is checked against the key rules. `=` counts on any line;
+# `:` only after a line break or when the whole value is a single
+# `name: token` pair, so a one-line message like `password: too short` stays
+# readable. `rest` stops at a literal `\n` so escaped lines are seen too.
+_LINE_KEY_RE = re.compile(
+    rf"(?:(?P<start>\A)|[\r\n]|\\n){_INDENT}(?P<name>[A-Za-z0-9_][A-Za-z0-9_.\-]{{0,127}})[ \t]*(?P<sep>[=:])"
+    r"(?P<rest>(?:[^\r\n\\]|\\(?!n))*)"
+)
+
+# A quoted name followed by `:` and a quoted, object or array value — a key
+# inside JSON, a Python repr, or JSON escaped into another string — wherever
+# it sits in the text. Requiring a value-shaped right-hand side keeps prose
+# such as `Field "token": required` readable.
+_QUOTED_KEY_RE = re.compile(r"""["']([A-Za-z0-9_][A-Za-z0-9_.\- ]{0,127})\\*["']\s*:\s*\\*["'{\[]""")
 
 # A URL anywhere inside a larger text value, checked with ``_is_credentialed_url``.
-_EMBEDDED_URL_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://[^\s\"'\\]+")
+# The scheme must start at a word boundary and is length-capped: an unbounded
+# scheme lets every position of a long alphanumeric run start a match, which
+# is quadratic.
+_EMBEDDED_URL_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-]{0,31}://[^\s\"'\\]+")
+
+
+def _is_sensitive_name(name: str) -> bool:
+    """Apply the key rules to a name found in text; `vpn.ipsec_psk` checks `ipsec_psk`."""
+    return _is_sensitive_key(name.rsplit(".", 1)[-1])
+
+
+def _line_assigns_secret(match: re.Match[str], value: str) -> bool:
+    if not _is_sensitive_name(match.group("name")):
+        return False
+    if match.group("sep") == "=" or match.group("start") is None:
+        return True
+    rest = match.group("rest").split()
+    return match.end() == len(value) and len(rest) == 1
+
+
+def _scan_text(text: str) -> bool:
+    if _EMBEDDED_SECRET_RE.search(text) is not None:
+        return True
+    if any(_line_assigns_secret(m, text) for m in _LINE_KEY_RE.finditer(text)):
+        return True
+    if any(_is_sensitive_name(m.group(1)) for m in _QUOTED_KEY_RE.finditer(text)):
+        return True
+    # JSON may escape `/` as `\/`, which would hide the `://` from the scan.
+    unescaped = text.replace("\\/", "/")
+    return any(_is_credentialed_url(m.group(0)) for m in _EMBEDDED_URL_RE.finditer(unescaped))
 
 
 def _has_embedded_secret(value: str) -> bool:
     """True when ``value`` is a text blob with key material inside it.
 
     Catches the case a key-name denylist structurally cannot: a whole config
-    file, or serialized JSON, returned under a benign-sounding key. See
-    ``_EMBEDDED_SECRET_RE``, ``_QUOTED_KEY_RE`` and ``_EMBEDDED_URL_RE``.
+    file, or serialized JSON, returned under a benign-sounding key. The scans
+    run in linear time, cover JSON with text around it, and cannot hit a
+    recursion limit; one URL-decoded pass catches form-encoded payloads, and a
+    best-effort JSON decode catches escapes the raw text hides.
     """
-    if _EMBEDDED_SECRET_RE.search(value) is not None:
+    if _scan_text(value):
         return True
-    # Scans rather than a parse: they also cover JSON with text around it and
-    # cannot hit a recursion limit on deeply nested input.
-    if any(_is_sensitive_key(m.group(1)) for m in _QUOTED_KEY_RE.finditer(value)):
-        return True
-    return any(_is_credentialed_url(m.group(0)) for m in _EMBEDDED_URL_RE.finditer(value))
+    if "%" in value:
+        decoded = unquote(value)
+        if decoded != value and _scan_text(decoded):
+            return True
+    return _is_json_with_secret(value)
+
+
+def _is_json_with_secret(value: str) -> bool:
+    """True when ``value`` parses as JSON that carries a secret the scans missed.
+
+    Decoding catches what the raw-text scans cannot see, such as a key name
+    written with ``\\uXXXX`` escapes. Input too deeply nested to decode falls
+    back to the scans' verdict instead of raising.
+    """
+    if not value.lstrip().startswith(("{", "[")):
+        return False
+    try:
+        parsed = json.loads(value)
+        return isinstance(parsed, (dict, list)) and redact_secrets(parsed) != parsed
+    except (ValueError, RecursionError):
+        return False
 
 
 def _is_credentialed_url(value: str) -> bool:
@@ -267,8 +329,8 @@ def redact_secrets(value: Any) -> Any:
     keys that have historically leaked controller config, plus the credential
     suffixes ``password`` / ``secret`` / ``authkey`` / ``token`` / ``passwd`` /
     ``privatekey`` / ``psk`` / ``sharedkey`` / ``secretkey`` / ``iappkey`` /
-    ``passphrase`` / ``wepkey`` / ``md5key``, any ``x_``-prefixed field
-    ending in ``key``, and a ``psk`` token ahead of a
+    ``passphrase`` / ``wepkey`` / ``md5key``, any ``x_`` / ``x-`` / camelCase
+    ``xFoo`` field ending in ``key``, and a ``psk`` token ahead of a
     ``key`` / ``value`` / ``hex`` tail.
     String values are redacted regardless of their key name when they are a
     URL carrying an inline credential (userinfo or a credential-bearing query

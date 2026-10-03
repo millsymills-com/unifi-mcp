@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from unifi_mcp._redaction import REDACTED, SENSITIVE_KEYS, redact_secrets
@@ -508,3 +510,71 @@ class TestRedactSecretsRemainingPskBypasses:
     def test_deeply_nested_json_does_not_raise(self):
         blob = "[" * 100_000 + "]" * 100_000
         assert redact_secrets({"payload": blob})["payload"] == blob
+
+    def test_long_alphanumeric_run_before_a_scheme_is_linear(self):
+        blob = "a" * 400_000 + "://"
+        start = time.perf_counter()
+        assert redact_secrets({"payload": blob})["payload"] == blob
+        assert time.perf_counter() - start < 2
+
+
+class TestRedactSecretsTextBlobShapes:
+    """Text-blob shapes the final adversarial pass on #521 found leaking."""
+
+    @pytest.mark.parametrize(
+        "blob",
+        [
+            '{"url": "rtsps:\\/\\/192.0.2.1:7441\\/EXAMPLEALIAS"}',
+            '{"\\u0070assword": "EXAMPLE-NOT-REAL"}',
+            '{"password"\n: "EXAMPLE-NOT-REAL"}',
+            '{"_token": "EXAMPLE-NOT-REAL"}',
+            '{"2fa_secret": "EXAMPLE-NOT-REAL"}',
+            '{"wifi password": "EXAMPLE-NOT-REAL"}',
+            '{"vpn.ipsec_psk": "EXAMPLE-NOT-REAL"}',
+            '{"settings.api_key": "EXAMPLE-NOT-REAL"}',
+            "auth.api_key=EXAMPLE-NOT-REAL",
+            "stream at rtsps:\\/\\/192.0.2.1:7441\\/EXAMPLEALIAS today",
+            "%any : PSK 0x0123456789abcdef",
+            ": PSK 0sRVhBTVBMRQ==",
+            "interface=wlan0\nwpa_psk=0123456789abcdef",
+            "x_passphrase: EXAMPLE-NOT-REAL",
+            "vpn:\n  ipsec_psk: EXAMPLE-NOT-REAL",
+            "ipsec_psk=EXAMPLE-NOT-REAL",
+            "user=admin\npassword=EXAMPLE-NOT-REAL",
+            "a=1\\nipsec_psk=EXAMPLE-NOT-REAL",
+            "client radius {\n  secret = EXAMPLE-NOT-REAL\n}",
+            "GET / HTTP/1.1\nAuthorization: Bearer EXAMPLE-NOT-REAL",
+            "Authorization: Basic RVhBTVBMRQ==",
+            "<tls-auth>\nEXAMPLE\n</tls-auth>",
+            "payload=%7B%22x_passphrase%22%3A%22EXAMPLE-NOT-REAL%22%7D",
+        ],
+    )
+    def test_redacted(self, blob):
+        assert redact_secrets({"payload": blob})["payload"] == REDACTED
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Invalid value for 'password': too short",
+            'Field "token": required',
+            "password: too short for this network",
+            "error: PSK mismatch on client",
+            "Basic authentication failed",
+            "name=Branch\nvlan=20",
+            "discount: 50%off",
+        ],
+    )
+    def test_benign_text_passes_through(self, text):
+        assert redact_secrets({"note": text})["note"] == text
+
+    def test_xmlkey_name_passes_through(self):
+        assert redact_secrets({"XMLKey": "1"})["XMLKey"] == "1"
+
+    @pytest.mark.parametrize(
+        "blob",
+        ["a" * 400_000 + "://", "\n" + "a" * 400_000, "%" * 400_000, '"' + "a" * 400_000],
+    )
+    def test_scans_stay_linear(self, blob):
+        start = time.perf_counter()
+        redact_secrets({"payload": blob})
+        assert time.perf_counter() - start < 2
