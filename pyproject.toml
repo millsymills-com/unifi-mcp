@@ -46,8 +46,11 @@ dev = [
 [tool.uv]
 # Patched floors for transitive dependencies reported by the dependency audit.
 constraint-dependencies = [
+    "authlib>=1.9.1",
     "certifi>=2026.10.19",
+    "dnspython>=2.9.0",
     "filelock>=4.2.1",
+    "msgpack>=1.2.3",
     "opentelemetry-api>=1.45.1",
     "virtualenv>=21.14.13",
 ]
