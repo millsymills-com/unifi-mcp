@@ -46,7 +46,7 @@ from unifi_mcp.clients.base import BaseUniFiClient
 from unifi_mcp.errors import UniFiConnectionError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator, Iterator
     from pathlib import Path
 
 _CANNED_BODY = {"data": [{"_id": "abc", "name": "fake-device"}], "meta": {"rc": "ok"}}
@@ -297,7 +297,9 @@ class _LocalHTTPSServer:
 
 
 @contextmanager
-def _running_https_server(cert_pem: bytes, key_pem: bytes, tmp_path: Path, *, name: str) -> Iterator[_LocalHTTPSServer]:
+def _running_https_server(
+    cert_pem: bytes, key_pem: bytes, tmp_path: Path, *, name: str
+) -> Generator[_LocalHTTPSServer]:
     """Start a local HTTPS server presenting ``cert_pem`` and tear it down on exit.
 
     ``cert_pem`` is whatever the server should send during the handshake — a
