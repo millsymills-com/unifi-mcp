@@ -113,11 +113,14 @@ class TestCreateNetworkHandler:
         client.create_network.return_value = {"ok": True}
         ctx = _ctx(UniFiMode.READWRITE, network=client)
         tool = await mcp_with_networks.get_tool("unifi_network_create_network")
-        result = await tool.fn(ctx, name="guest", subnet="192.168.2.0/24", vlan=100)
+        result = await tool.fn(ctx, name="guest", ip_subnet="192.168.2.1/24", vlan=100)
         assert result == {"ok": True}
         (forwarded,), _ = client.create_network.call_args
-        assert forwarded["subnet"] == "192.168.2.0/24"
+        # The controller drops a `subnet` key and creates an unusable network.
+        assert forwarded["ip_subnet"] == "192.168.2.1/24"
+        assert "subnet" not in forwarded
         assert forwarded["vlan"] == 100
+        assert forwarded["vlan_enabled"] is True
 
     async def test_subnet_and_vlan_absent_when_omitted(self, mcp_with_networks):
         client = AsyncMock()
@@ -126,5 +129,6 @@ class TestCreateNetworkHandler:
         tool = await mcp_with_networks.get_tool("unifi_network_create_network")
         await tool.fn(ctx, name="guest")
         (forwarded,), _ = client.create_network.call_args
-        assert "subnet" not in forwarded
+        assert "ip_subnet" not in forwarded
         assert "vlan" not in forwarded
+        assert "vlan_enabled" not in forwarded
