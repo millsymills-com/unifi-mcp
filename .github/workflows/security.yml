@@ -91,5 +91,8 @@ jobs:
           # hypothesis (dev-only) and certifi (runtime, via httpx) are MPL-2.0. File-level
           # copyleft and neither is modified, so exempt them by name rather than allowing
           # MPL-2.0 for every future dependency.
-          allow-dependencies-licenses: pkg:pypi/hypothesis, pkg:pypi/certifi
+          # typing-extensions 4.16.0 declares License-Expression: PSF-2.0 in its
+          # wheel METADATA. Dependency Graph misclassifies the historical Python
+          # license text as including GPL; exempt this package, not GPL licenses.
+          allow-dependencies-licenses: pkg:pypi/hypothesis, pkg:pypi/certifi, pkg:pypi/typing-extensions
           comment-summary-in-pr: on-failure
