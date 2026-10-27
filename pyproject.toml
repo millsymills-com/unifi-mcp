@@ -22,7 +22,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=4.1.1,<4.2",
+    "fastmcp>=4.1.2,<4.2",
     "httpx>=0.28.1,<0.29",
     "pydantic>=2.13.5,<2.14",
     "pydantic-settings>=2.15.0,<2.16",
@@ -44,9 +44,17 @@ dev = [
 ]
 
 [tool.uv]
+# Patched floors for transitive dependencies reported by the dependency audit.
+constraint-dependencies = [
+    "certifi>=2026.10.19",
+    "filelock>=4.2.1",
+    "opentelemetry-api>=1.45.1",
+    "virtualenv>=21.14.13",
+]
+
 # starlette/pyjwt/cryptography arrive transitively via fastmcp; the versions it pins carry
 # advisories pip-audit flags (starlette PYSEC-2026-161, pyjwt PYSEC-2026-175/177/178/179,
-# cryptography PYSEC-2026-3552). Force patched floors without bumping the fastmcp pin.
+# cryptography PYSEC-2026-3552). Retain patched floors for these transitive dependencies.
 override-dependencies = ["starlette>=1.3.1", "pyjwt[crypto]>=2.13.0", "cryptography>=50.0.0"]
 
 [project.scripts]
