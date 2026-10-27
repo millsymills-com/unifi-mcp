@@ -63,9 +63,16 @@ def register_network_config_tools(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Create a new network (VLAN/subnet).
 
+        On zone-based firewall controllers, purpose="guest" alone does not
+        establish guest isolation: the controller may store "corporate" and
+        assign the network to Internal (#522). Read back the network and its
+        firewall-zone membership before using it for guests. See README.md,
+        "Guest networks on zone-based firewalls", for the verification steps.
+
         Args:
             name: Network name.
-            purpose: Purpose — "corporate", "guest", "wan", "vlan-only".
+            purpose: Legacy purpose field: "corporate", "guest", "wan", "vlan-only".
+                "guest" does not guarantee Hotspot zone membership or isolation.
             ip_subnet: Gateway address with prefix, not the network address —
                 "192.168.2.1/24", not "192.168.2.0/24".
             vlan: VLAN ID (optional).
@@ -89,6 +96,10 @@ def register_network_config_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_network_update_network(ctx: Context, network_id: str, data: JsonObject) -> dict[str, Any]:
         """Update an existing network configuration. Pass only fields to change.
+
+        Changing purpose to "guest" may be ignored on zone-based firewall
+        controllers (#522). Read back the network and firewall-zone membership;
+        use unifi_network_update_firewall_zone for explicit zone assignment.
 
         Args:
             network_id: The network configuration ID.
