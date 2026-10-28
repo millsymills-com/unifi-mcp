@@ -77,7 +77,11 @@ def _placeholder_for_schema(prop: dict[str, Any]) -> Any:
     several handlers) doesn't short-circuit the gate. Integers default to 1
     because ``port_idx`` is bounded to ``1..52`` before the gate fires in
     ``unifi_network_assign_port_profile`` and ``unifi_network_power_cycle_port``.
+    Enum arguments use an allowed value so schema validation reaches the gate.
     """
+    enum_values = prop.get("enum")
+    if enum_values:
+        return enum_values[0]
     schema_type = prop.get("type")
     if schema_type is None:
         any_of = prop.get("anyOf") or []
