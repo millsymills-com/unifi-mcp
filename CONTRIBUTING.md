@@ -45,13 +45,15 @@ uv run bandit -r src/unifi_mcp/ -c pyproject.toml
 
 ## Coding Standards
 
-- **Python >=3.13**, strict `ty` type checks, `ruff` for lint and format.
-- **Line length**: 120 characters.
-- **No print statements**: use the `logging` module (enforced by ruff T20).
-- **Clients** use `httpx.AsyncClient` with `tenacity`-based retry. API
+Follow these conventions when changing Python code:
+
+- Use Python 3.13 or newer, strict `ty` type checks, and `ruff` for linting and formatting.
+- Keep lines within 120 characters.
+- Use the `logging` module instead of print statements (enforced by ruff T20).
+- Clients use `httpx.AsyncClient` with `tenacity`-based retry. API
   responses flow through as `dict[str, Any]`; there is no Pydantic validation
   layer between clients and tools.
-- **Errors** propagate as typed `UniFiError` subclasses; tool layer maps them to `ToolError` via `handle_client_error`.
+- Errors propagate as typed `UniFiError` subclasses; the tool layer maps them to `ToolError` via `handle_client_error`.
 
 ## Tool Naming and Registration
 

@@ -38,13 +38,13 @@ mitigation for confirmed High/Critical issues within **30 days** of triage.
 
 ## Scope
 
-In scope:
+This policy covers:
 
 - Code in this repository (`src/unifi_mcp/`, tests, packaging).
 - Documented configuration surfaces (env vars in `README.md` / `.env.example`).
 - The `unifi-mcp` package built from source in this repository.
 
-Out of scope:
+This policy does not cover:
 
 - Vulnerabilities in upstream UniFi firmware or APIs; please report those to
   Ubiquiti directly.
