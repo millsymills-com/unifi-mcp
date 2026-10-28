@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator, AsyncIterator
 
     from pydantic import SecretStr
 
@@ -102,6 +103,13 @@ async def _register_client(context: ServerContext, name: str, client: Any) -> Ba
 
 @lifespan  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
+    """Initialize a standalone lifespan using the process configuration."""
+    async with _configured_lifespan(server, get_config()) as context:
+        yield context
+
+
+@asynccontextmanager
+async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGenerator[ServerContext]:
     """Initialize clients for configured APIs, validate, and yield context.
 
     Tools are registered up front in ``create_server`` based on which API keys
@@ -112,7 +120,6 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
     its tools registered and every invocation raises ``KeyError`` inside the
     handler (see #87).
     """
-    config = get_config()
     context = ServerContext(config=config)
 
     # Lazily import clients to avoid circular deps
@@ -231,6 +238,11 @@ def create_server(config: UniFiConfig | None = None) -> FastMCP:
     if config is None:
         config = get_config()
 
+    @lifespan  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+    async def configured_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
+        async with _configured_lifespan(server, config) as context:
+            yield context
+
     server = FastMCP(
         name="unifi-mcp",
         instructions=(
@@ -238,7 +250,7 @@ def create_server(config: UniFiConfig | None = None) -> FastMCP:
             "Network, and Protect APIs. Use these tools to query and manage "
             "your UniFi network infrastructure."
         ),
-        lifespan=server_lifespan,
+        lifespan=configured_lifespan,
     )
 
     # Register tools for configured APIs. register_all_tools handles the

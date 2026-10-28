@@ -30,6 +30,7 @@ uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 uv run ty check src/ tests/
 uv run pytest tests/unit/ tests/property/ -v
+uv run pytest tests/integration/test_stdio_transport.py tests/integration/test_device_allowlist.py -v
 ```
 
 `uv lock --check` is the one most easily missed: a dependency bump that edits

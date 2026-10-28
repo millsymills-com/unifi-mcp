@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock
@@ -13,6 +14,18 @@ from unifi_mcp.clients.network import NetworkClient
 from unifi_mcp.clients.protect import ProtectClient
 from unifi_mcp.clients.site_manager import SITE_MANAGER_BASE_URL, SiteManagerClient
 from unifi_mcp.config import UniFiConfig, UniFiMode, get_config
+
+
+@pytest.fixture(autouse=True)
+def _isolate_offline_config(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
+    """Make unit/property inputs independent of operator environment and dotenv."""
+    test_dir = request.path.relative_to(request.config.rootpath).parts[:2]
+    if test_dir not in (("tests", "unit"), ("tests", "property")):
+        return
+    for name in tuple(os.environ):
+        if name.upper().startswith("UNIFI_"):
+            monkeypatch.delenv(name)
+    monkeypatch.setitem(UniFiConfig.model_config, "env_file", None)
 
 
 @pytest.fixture(autouse=True)
