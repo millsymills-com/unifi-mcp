@@ -30,6 +30,7 @@ class ProtectClient(BaseUniFiClient):
         cert_fingerprint: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
+        log_raw_bodies: bool = False,
     ) -> None:
         self._path_prefix = "/proxy/protect/integration/v1/"
         super().__init__(
@@ -39,6 +40,7 @@ class ProtectClient(BaseUniFiClient):
             cert_fingerprint=cert_fingerprint,
             timeout=timeout,
             max_retries=max_retries,
+            log_raw_bodies=log_raw_bodies,
         )
 
     # -- HTTP helpers -------------------------------------------------------

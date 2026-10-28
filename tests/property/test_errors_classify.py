@@ -20,8 +20,8 @@ from unifi_mcp.errors import (
     UniFiRateLimitError,
     UniFiServerError,
     UniFiTimeoutError,
-    _classify_error_tag,
 )
+from unifi_mcp.tools._error_adapter import _classify_error_tag
 
 ERROR_CLASSES = (
     UniFiError,

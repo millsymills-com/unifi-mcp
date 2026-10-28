@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import subprocess
+import sys
+
 import pytest
 from fastmcp.exceptions import ToolError
 
@@ -16,8 +20,28 @@ from unifi_mcp.errors import (
     UniFiReadOnlyError,
     UniFiServerError,
     UniFiTimeoutError,
+    UniFiUnsupportedError,
     handle_client_error,
 )
+from unifi_mcp.tools._error_adapter import handle_client_error as direct_handle_client_error
+
+
+@pytest.mark.parametrize(
+    "import_statement",
+    [
+        "from unifi_mcp.errors import handle_client_error",
+        "import unifi_mcp.clients.base",
+        "import unifi_mcp.clients.network",
+        "import unifi_mcp.clients.network_integration",
+        "import unifi_mcp.clients.protect",
+        "import unifi_mcp.clients.site_manager",
+        "import unifi_mcp.clients._pinning",
+    ],
+)
+def test_transport_imports_do_not_load_fastmcp(import_statement: str) -> None:
+    code = f"import sys; {import_statement}; assert 'fastmcp' not in sys.modules"
+    # Statements come only from the fixed parametrized list above.
+    subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)  # noqa: S603
 
 
 class TestExceptionHierarchy:
@@ -53,6 +77,39 @@ class TestExceptionHierarchy:
 
 
 class TestHandleClientError:
+    @pytest.mark.parametrize(
+        "error",
+        [
+            UniFiAuthError("bad key", status_code=401),
+            UniFiBadRequestError("bad payload", status_code=400),
+            UniFiNotFoundError("missing", status_code=404),
+            UniFiUnsupportedError("unsupported"),
+            UniFiRateLimitError("slow", status_code=429, retry_after=2),
+            UniFiServerError("upstream", status_code=502),
+            UniFiTimeoutError("timeout"),
+            UniFiConnectionError("offline"),
+            UniFiReadOnlyError("blocked"),
+            UniFiDeviceAlreadyAdoptedError("adopted"),
+            UniFiError("generic", status_code=418),
+            RuntimeError("private internal detail"),
+        ],
+    )
+    def test_legacy_and_direct_mapping_agree(self, error):
+        with pytest.raises(ToolError) as legacy:
+            handle_client_error(error)
+        with pytest.raises(ToolError) as direct:
+            direct_handle_client_error(error)
+        assert str(legacy.value) == str(direct.value)
+        assert legacy.value.__cause__ is error
+        assert direct.value.__cause__ is error
+
+    @pytest.mark.parametrize("error", [asyncio.CancelledError(), KeyboardInterrupt(), SystemExit(2), GeneratorExit()])
+    def test_legacy_and_direct_mapping_preserve_control_flow(self, error):
+        for mapper in (handle_client_error, direct_handle_client_error):
+            with pytest.raises(type(error)) as raised:
+                mapper(error)
+            assert raised.value is error
+
     def test_auth_error_maps(self):
         with pytest.raises(ToolError, match="Authentication failed"):
             handle_client_error(UniFiAuthError("bad key", status_code=401))
