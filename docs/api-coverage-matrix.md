@@ -73,7 +73,7 @@ early-access rows).
 | API | Covered | Excluded | Gap | Documented total | Coverage |
 |---|---:|---:|---:|---:|---:|
 | Network — official Integration API (functional equivalent + direct reads) | 67 | 1 | 5 | 73 ops | **93%** |
-| Network — legacy controller paths we depend on | 47 paths | — | — | 47 | **100%** of what we call |
+| Network — legacy controller paths we depend on | 47 rows | — | — | 47 rows | **100%** of what we call |
 | Protect — Integration API | 41 (+1 †) | 2 | 30 | 73 ops | **56%** |
 | Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
 
@@ -275,11 +275,9 @@ on a `cmd` body field.
 | POST | `cmd/stamgr` `unauthorize-guest` | `unifi_network_unauthorize_guest` |
 | POST | `cmd/stat` `reset-dpi` | `unifi_network_reset_dpi` |
 
-63 rows, 47 counted: the summary's 47 is the non-`cmd/*` rows. The 16 `cmd/*` rows
-multiplex on a `cmd` body field rather than being separate paths, so they are not
-counted as ones. Rows are method-plus-path pairs, so a path carrying several methods
-appears more than once — the 63 rows resolve to 31 distinct URL paths, 26 of them
-non-`cmd/*` and 5 the `cmd/*` endpoints the 16 subcommands multiplex over.
+The summary counts the 47 non-`cmd/*` method-plus-path rows. The other 16 rows
+select subcommands via a `cmd` body field. The full 63 rows cover 31 distinct URL
+paths: 26 non-`cmd/*` paths and 5 `cmd/*` endpoints.
 
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
