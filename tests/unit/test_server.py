@@ -1,5 +1,9 @@
 """Tests for server creation and mode gating."""
 
+import pytest
+import respx
+from fastmcp import Client
+
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
 
@@ -16,6 +20,36 @@ def _make_config(**overrides):
 
 
 class TestCreateServer:
+    @pytest.mark.parametrize("mode", [UniFiMode.READONLY, UniFiMode.READWRITE])
+    @respx.mock
+    async def test_explicit_config_controls_startup_and_runtime_policy(self, monkeypatch, mode):
+        # The environment deliberately disagrees with the injected settings.
+        monkeypatch.setenv("UNIFI_MODE", "readonly" if mode == UniFiMode.READWRITE else "readwrite")
+        monkeypatch.setenv("UNIFI_NETWORK_API", "environment-key")
+        monkeypatch.setenv("UNIFI_NETWORK_HOST", "192.0.2.20")
+        config = _make_config(
+            unifi_mode=mode,
+            unifi_network_host="192.0.2.10",
+            unifi_network_site="injected",
+            unifi_network_integration_enabled=False,
+            unifi_protect_api=None,
+            unifi_site_manager_api=None,
+        )
+        prefix = "https://192.0.2.10:443/proxy/network/api/s/injected"
+        startup = respx.get(f"{prefix}/stat/sysinfo").respond(200, json={"data": []})
+        respx.get(f"{prefix}/stat/health").respond(200, json={"data": [{"status": "ok"}]})
+        write = respx.post(f"{prefix}/rest/networkconf").respond(200, json={"data": []})
+        server = create_server(config)
+        async with Client(server) as client:
+            result = await client.call_tool("unifi_network_get_health")
+            assert result.data == {"data": [{"status": "ok"}]}
+            names = {tool.name for tool in await client.list_tools()}
+            assert ("unifi_network_create_network" in names) == config.writes_enabled
+            if config.writes_enabled:
+                await client.call_tool("unifi_network_create_network", {"name": "guest"})
+        assert startup.calls[0].request.headers["X-API-Key"] == "test-net-key"
+        assert write.call_count == int(config.writes_enabled)
+
     def test_creates_server_with_all_apis(self):
         config = _make_config()
         server = create_server(config)
