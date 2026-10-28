@@ -451,12 +451,8 @@ class TestErrorBodyExtraction:
 
     @respx.mock
     async def test_raw_body_debug_log_suppressed_by_default(self, client, caplog, monkeypatch):
-        """Without ``UNIFI_LOG_RAW_BODIES=1`` the full body never reaches the
-        DEBUG log — the redacted/summary form goes out instead.
-        """
-        import logging
-
-        monkeypatch.delenv("UNIFI_LOG_RAW_BODIES", raising=False)
+        """A standalone client stays redacted even if the environment changes."""
+        monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "true")
         huge_body = "x" * 500
         respx.get(f"{BASE_URL}/test").mock(return_value=httpx.Response(500, text=huge_body))
         with caplog.at_level(logging.DEBUG, logger="unifi_mcp.clients.base"), pytest.raises(UniFiServerError):
@@ -464,12 +460,19 @@ class TestErrorBodyExtraction:
         for record in caplog.records:
             assert huge_body not in record.getMessage()
 
-    @respx.mock
-    async def test_raw_body_debug_log_emitted_with_opt_in(self, client, caplog, monkeypatch):
-        """``UNIFI_LOG_RAW_BODIES=1`` restores the untouched-body DEBUG log."""
-        import logging
+    def test_standalone_client_defaults_to_redaction_when_environment_opts_in(self, monkeypatch, caplog):
+        monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "true")
+        client = _ConcreteClient(base_url=BASE_URL, api_key="test-api-key")
+        marker = "synthetic-password-marker"
+        with caplog.at_level(logging.DEBUG, logger="unifi_mcp.clients.base"):
+            client._extract_error_body(httpx.Response(400, json={"password": marker}))
+        assert marker not in caplog.text
 
-        monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "1")
+    @respx.mock
+    async def test_raw_body_debug_log_emitted_with_opt_in(self, caplog, monkeypatch):
+        """Explicit opt-in survives a later environment change."""
+        client = _ConcreteClient(base_url=BASE_URL, api_key="test-api-key", log_raw_bodies=True)
+        monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "false")
         huge_body = "x" * 500
         respx.get(f"{BASE_URL}/test").mock(return_value=httpx.Response(500, text=huge_body))
         with caplog.at_level(logging.DEBUG, logger="unifi_mcp.clients.base"), pytest.raises(UniFiServerError):
@@ -479,17 +482,15 @@ class TestErrorBodyExtraction:
         )
 
     @respx.mock
-    async def test_raw_body_debug_log_emitted_with_opt_in_for_json_body(self, client, caplog, monkeypatch):
-        """``UNIFI_LOG_RAW_BODIES=1`` logs the untouched body on the JSON path too.
+    async def test_raw_body_debug_log_emitted_with_opt_in_for_json_body(self, caplog):
+        """Explicit opt-in logs the untouched body on the JSON path too.
 
         The default DEBUG branch logs the redacted form; the opt-in branch
         inside the ``parsed is not None`` block must emit ``response.text``
         verbatim so an operator diagnosing a structured error sees exactly what
         the controller sent.
         """
-        import logging
-
-        monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "1")
+        client = _ConcreteClient(base_url=BASE_URL, api_key="test-api-key", log_raw_bodies=True)
         respx.get(f"{BASE_URL}/test").mock(
             return_value=httpx.Response(500, json={"meta": {"rc": "error", "msg": "api.err.Internal"}}),
         )
@@ -502,6 +503,26 @@ class TestErrorBodyExtraction:
         assert not any("redacted" in m.lower() for m in debug_messages), (
             f"raw opt-in must not take the redacted branch; got {debug_messages!r}"
         )
+
+    @respx.mock
+    async def test_raw_opt_in_does_not_change_error_or_warning_redaction(self, caplog):
+        client = _ConcreteClient(base_url=BASE_URL, api_key="test-api-key", log_raw_bodies=True)
+        marker = "synthetic-password-marker"
+        respx.get(f"{BASE_URL}/test").mock(
+            return_value=httpx.Response(
+                400,
+                json={"meta": {"msg": "invalid api key test-api-key"}, "password": marker},
+            )
+        )
+        with (
+            caplog.at_level(logging.DEBUG, logger="unifi_mcp.clients.base"),
+            pytest.raises(UniFiBadRequestError) as exc_info,
+        ):
+            await client.get("test")
+        assert marker in " ".join(r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG)
+        assert marker not in str(exc_info.value)
+        assert "test-api-key" not in str(exc_info.value)
+        assert all(marker not in r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING)
 
     @respx.mock
     async def test_sensitive_keys_redacted_in_message(self, client):
@@ -533,13 +554,10 @@ class TestErrorBodyExtraction:
             assert secret not in msg, f"secret {secret!r} leaked into error message"
 
     @respx.mock
-    async def test_sensitive_keys_redacted_in_debug_log(self, client, caplog, monkeypatch):
+    async def test_sensitive_keys_redacted_in_debug_log(self, client, caplog):
         """The default DEBUG body log carries the masked structure, not the
         raw secrets — only the opt-in raw log would expose them.
         """
-        import logging
-
-        monkeypatch.delenv("UNIFI_LOG_RAW_BODIES", raising=False)
         respx.get(f"{BASE_URL}/test").mock(
             return_value=httpx.Response(
                 400,
