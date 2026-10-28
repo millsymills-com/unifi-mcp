@@ -144,6 +144,7 @@ async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGen
                 cert_fingerprint=config.unifi_network_cert_fingerprint,
                 timeout=config.unifi_request_timeout,
                 max_retries=config.unifi_max_retries,
+                log_raw_bodies=config.unifi_log_raw_bodies,
             ),
         )
 
@@ -159,6 +160,7 @@ async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGen
                 cert_fingerprint=config.unifi_network_cert_fingerprint,
                 timeout=config.unifi_request_timeout,
                 max_retries=config.unifi_max_retries,
+                log_raw_bodies=config.unifi_log_raw_bodies,
             ),
         )
 
@@ -173,6 +175,7 @@ async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGen
                 cert_fingerprint=config.unifi_protect_cert_fingerprint,
                 timeout=config.unifi_request_timeout,
                 max_retries=config.unifi_max_retries,
+                log_raw_bodies=config.unifi_log_raw_bodies,
             ),
         )
 
@@ -184,6 +187,7 @@ async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGen
                 api_key=_require_api_key("site_manager", config.unifi_site_manager_api),
                 timeout=config.unifi_request_timeout,
                 max_retries=config.unifi_max_retries,
+                log_raw_bodies=config.unifi_log_raw_bodies,
             ),
         )
 
