@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -87,7 +89,7 @@ class TestFirewallClientEndpoints:
     async def test_update_firewall_rule(self, network_client):
         route = respx.put(f"{SITE_PREFIX}/rest/firewallrule/r-1").mock(return_value=httpx.Response(200, json={}))
         await network_client.update_firewall_rule("r-1", {"enabled": False})
-        assert b"enabled" in route.calls[0].request.content
+        assert json.loads(route.calls[0].request.content) == {"enabled": False}
 
     @respx.mock
     async def test_delete_firewall_rule(self, network_client):
