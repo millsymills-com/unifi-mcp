@@ -26,10 +26,10 @@ tools to endpoints, that one maps tools to their arguments.
 
 ## Snapshot
 
-| API | Upstream version pinned | Base path our client uses | Enumeration source |
+| API | Upstream version pinned | Client base path | Enumeration source |
 |---|---|---|---|
 | Network (official Integration API) | v10.4.57, OpenAPI 3.1.0 | n/a — see note | `integration.json` mirror (beezly/unifi-apis) |
-| Network (legacy controller API) | n/a (undocumented) | `/proxy/network/api/s/{site}/` | our client (ground truth) |
+| Network (legacy controller API) | n/a (undocumented) | `/proxy/network/api/s/{site}/` | Client implementation (ground truth) |
 | Protect (Integration API) | v7.1.42, OpenAPI 3.1.0 | `/proxy/protect/integration/v1/` | `7.1.42.json` mirror + developer.ui.com |
 | Site Manager API | v1.0 (+ `/ea/` early access) | `https://api.ui.com/v1/` | developer.ui.com/site-manager |
 
@@ -321,7 +321,7 @@ tools take no `siteId` argument.
 | PUT | `/v1/sites/{siteId}/firewall/policies/ordering` | **Gap** | Reorder policies. |
 | GET | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Covered** | `unifi_network_get_firewall_rule` |
 | PUT | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Covered** | `unifi_network_update_firewall_rule` |
-| PATCH | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Gap** | Partial update; our tool does full-object PUT only. |
+| PATCH | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Gap** | Partial update; no tool targets this endpoint. |
 | DELETE | `/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | **Covered** | `unifi_network_delete_firewall_rule` |
 | GET | `/v1/sites/{siteId}/firewall/zones` | **Covered** | `unifi_network_list_firewall_zones` |
 | POST | `/v1/sites/{siteId}/firewall/zones` | **Covered** | `unifi_network_create_firewall_zone` |
