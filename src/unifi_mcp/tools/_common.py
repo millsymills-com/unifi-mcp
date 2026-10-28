@@ -7,7 +7,8 @@ import re
 from typing import TYPE_CHECKING, Any, Concatenate, cast
 
 from unifi_mcp._redaction import normalize_key, redact_secrets
-from unifi_mcp.errors import UniFiBadRequestError, UniFiReadOnlyError, handle_client_error
+from unifi_mcp.errors import UniFiBadRequestError, UniFiReadOnlyError
+from unifi_mcp.tools._error_adapter import handle_client_error
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
