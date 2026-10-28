@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, get_args
 
 from fastmcp import Context, FastMCP
 
@@ -36,7 +36,8 @@ _CAMERA_FIELD_PATHS: dict[str, tuple[str, ...]] = {
 # Recording modes accepted by the Protect controller. ``"never"`` disables all
 # recording — an evidence-suppression primitive — so it is gated behind
 # ``confirm=True`` per ADR-0001.
-_RECORDING_MODES = ("always", "motion", "never", "schedule")
+RecordingMode = Literal["always", "motion", "never", "schedule"]
+_RECORDING_MODES = get_args(RecordingMode)
 
 
 def register_camera_tools(mcp: FastMCP) -> None:
@@ -134,7 +135,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
         ctx: Context,
         *,
         camera_id: str,
-        mode: str,
+        mode: RecordingMode,
         pre_padding: int | None = None,
         post_padding: int | None = None,
         confirm: bool = False,

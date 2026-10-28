@@ -62,6 +62,19 @@ class TestMatrixMatchesLiveSchemas:
         missing = [tool.name for tool in await _list_all_tools() if f"`{tool.name}`" not in text]
         assert missing == [], f"Tools absent from the schema matrix: {missing}"
 
+    async def test_allowlisted_values_are_schema_enums(self):
+        tools = {tool.name: tool for tool in await _list_all_tools()}
+        expected = {
+            "unifi_site_manager_get_isp_metrics": ("metric_type", ["5m", "1h"]),
+            "unifi_site_manager_query_isp_metrics": ("metric_type", ["5m", "1h"]),
+            "unifi_protect_set_recording_mode": (
+                "mode",
+                ["always", "motion", "never", "schedule"],
+            ),
+        }
+        for name, (parameter, values) in expected.items():
+            assert tools[name].parameters["properties"][parameter]["enum"] == values
+
 
 class TestRendererSemantics:
     """Lock the rendering contract the matrix and test both depend on."""

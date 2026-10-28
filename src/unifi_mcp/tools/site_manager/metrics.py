@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, get_args
 
 from fastmcp import Context, FastMCP
 
@@ -13,7 +13,8 @@ from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_han
 # generic ID regex but any other value 404s upstream, so the window is checked
 # against this explicit allowlist before any HTTP call rather than via
 # ``validate_id``.
-_METRIC_TYPES: frozenset[str] = frozenset({"5m", "1h"})
+MetricType = Literal["5m", "1h"]
+_METRIC_TYPES: frozenset[str] = frozenset(get_args(MetricType))
 
 
 def _validate_metric_type(metric_type: str) -> None:
@@ -29,7 +30,7 @@ def register_site_manager_metrics_tools(mcp: FastMCP) -> None:
     @tool_handler()
     async def unifi_site_manager_get_isp_metrics(
         ctx: Context,
-        metric_type: str,
+        metric_type: MetricType,
         begin_timestamp: str | None = None,
         end_timestamp: str | None = None,
         duration: str | None = None,
@@ -72,7 +73,7 @@ def register_site_manager_metrics_tools(mcp: FastMCP) -> None:
     @tool_handler()
     async def unifi_site_manager_query_isp_metrics(
         ctx: Context,
-        metric_type: str,
+        metric_type: MetricType,
         sites: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Query ISP metrics for specific sites and ranges from UniFi Site Manager.
