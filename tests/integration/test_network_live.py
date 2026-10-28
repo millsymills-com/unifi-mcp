@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import pytest
 
+from unifi_mcp.errors import UniFiUnsupportedError
+
 pytestmark = pytest.mark.integration
 
 
@@ -48,9 +50,11 @@ async def test_get_sysinfo_has_version(network_live_client):
 
 
 async def test_list_events_returns_shape(network_live_client):
-    # #86 regression: stat/event → stat/alarm → list/alarm. #138 fix confirmed
-    # live on current UCG Ultra firmware; xfail dropped.
-    result = await network_live_client.list_events(limit=1)
+    # Some controllers reject legacy alarm reads with 400 or 404 (#543).
+    try:
+        result = await network_live_client.list_events(limit=1)
+    except UniFiUnsupportedError as exc:
+        pytest.skip(str(exc))
     assert "data" in result
     assert isinstance(result["data"], list)
 

@@ -13,6 +13,7 @@ from unifi_mcp.errors import (
     UniFiDeviceAlreadyAdoptedError,
     UniFiError,
     UniFiNotFoundError,
+    UniFiUnsupportedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,16 +55,23 @@ class NetworkClient(BaseUniFiClient):
         return result
 
     async def list_events(self, limit: int = 100) -> dict[str, Any]:
-        """List recent events / alarms.
+        """Read legacy alarm history, where supported (not a general event feed).
 
-        Uses ``list/alarm``. Both legacy ``stat/event`` and ``stat/alarm`` now
-        return 404 on current UniFi controllers; ``list/alarm`` was the
-        surviving path for site-wide alarm history, but UCG Ultra firmware
-        also returns ``api.err.NotFound`` here (tracked in #138). The MCP
-        layer keeps the tool registered behind a strict xfail until either
-        the new path is identified or the tool is retired.
+        ``list/alarm`` returns 404 on some controllers and 400 InvalidObject
+        on Network 10.6.106 with API-key auth (#543). No supported replacement
+        has been verified; do not fall back to a different resource.
         """
-        result: dict[str, Any] = await self.get("list/alarm", params={"_limit": limit})
+        try:
+            result: dict[str, Any] = await self.get("list/alarm", params={"_limit": limit})
+        except (UniFiBadRequestError, UniFiNotFoundError) as exc:
+            if not isinstance(exc, UniFiNotFoundError) and "api.err.InvalidObject" not in str(exc):
+                raise
+            raise UniFiUnsupportedError(
+                "Network event reads are unavailable through the legacy list/alarm endpoint "
+                "on this controller with the configured API key. No supported replacement "
+                "has been verified; use the UniFi Network application to view events (#543).",
+                status_code=exc.status_code,
+            ) from exc
         return result
 
     async def list_devices(self) -> dict[str, Any]:

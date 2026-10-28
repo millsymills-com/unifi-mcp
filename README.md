@@ -293,6 +293,13 @@ uv run pre-commit install
 
 ## Known Issues
 
+- `unifi_network_list_events` reads legacy `list/alarm` alarm history, rather
+  than a general event feed. Some controllers reject that endpoint with 404
+  or 400 `api.err.InvalidObject` (observed on Network 10.6.106 with API-key
+  authentication). The tool reports these as unsupported event reads. No
+  replacement endpoint has been verified; view events in the UniFi Network
+  application ([#543](https://github.com/millsymills-com/unifi-mcp/issues/543)).
+
 - **Protect on a separate device requires explicit `UNIFI_PROTECT_HOST`**
   ([#107](https://github.com/millsymills-com/unifi-mcp/issues/107)). If your
   Protect NVR is on a different IP than your Network controller (common
@@ -300,6 +307,37 @@ uv run pre-commit install
   The default silently inherits `UNIFI_NETWORK_HOST`, which produces a
   startup WARN (`protect tools disabled`) and no `unifi_protect_*` entries
   in the tool list.
+
+### Guest networks on zone-based firewalls
+
+`unifi_network_create_network(purpose="guest")` passes the legacy purpose
+field to the controller. On Network 10.5.67 with zone-based firewalling, the
+controller has been observed to return success while storing
+`purpose: "corporate"` and placing the network in the `Internal` zone
+([#522](https://github.com/millsymills-com/unifi-mcp/issues/522)). Updating
+`purpose` to `"guest"` may also return success without changing it. This tool
+does not assign firewall zones automatically.
+
+Before attaching guest clients:
+
+1. Call `unifi_network_get_network` with the returned `_id`. Check `purpose`,
+   `firewall_zone_id`, and `external_id`; correct VLAN and subnet values alone
+   do not establish guest isolation.
+2. Call `unifi_network_list_firewall_zones` and check which zone contains the
+   network's `external_id` in `networkIds`. A network in `Internal` shares
+   that zone with other internal networks.
+3. If needed, use `unifi_network_update_firewall_zone` to remove the network
+   from its current zone and assign it to `Hotspot`. Read both zones first:
+   `network_ids` replaces the entire membership, so preserve every other
+   member in each submitted list. Zone changes are separate operations;
+   keep guest clients disconnected until both complete.
+4. Read back the network and both zone memberships, and verify the zone
+   firewall policies provide the intended separation before enabling guest
+   access.
+
+An SSID's `is_guest=True` does not move its network out of `Internal`.
+`l2_isolation=True` blocks client-to-client traffic within the SSID; it does
+not establish separation from other networks in the same firewall zone.
 
 ## License
 
