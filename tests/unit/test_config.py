@@ -8,7 +8,7 @@ import time
 import pytest
 from pydantic import ValidationError
 
-from unifi_mcp.config import _DNS_LOOKUP_TIMEOUT_S, UniFiConfig, UniFiMode, _resolve_host, get_config
+from unifi_mcp.config import _DNS_LOOKUP_TIMEOUT_S, ToolProfile, UniFiConfig, UniFiMode, _resolve_host, get_config
 from unifi_mcp.errors import (
     UniFiAuthError,
     UniFiConnectionError,
@@ -67,6 +67,23 @@ class TestUniFiMode:
     def test_invalid_mode_raises_validation_error(self):
         with pytest.raises(ValidationError):
             UniFiConfig(_env_file=None, unifi_mode="invalid")
+
+
+class TestToolProfile:
+    def test_default_and_environment(self, monkeypatch):
+        monkeypatch.delenv("UNIFI_TOOLS", raising=False)
+        assert UniFiConfig(_env_file=None).unifi_tools == ToolProfile.ALL
+        monkeypatch.setenv("UNIFI_TOOLS", "protect")
+        assert UniFiConfig(_env_file=None).unifi_tools == ToolProfile.PROTECT
+        assert UniFiConfig(_env_file=None, unifi_tools="network").unifi_tools == ToolProfile.NETWORK
+
+    def test_dotenv_and_invalid_value(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("UNIFI_TOOLS", raising=False)
+        env_file = tmp_path / ".env"
+        env_file.write_text("UNIFI_TOOLS=site_manager\n")
+        assert UniFiConfig(_env_file=env_file).unifi_tools == ToolProfile.SITE_MANAGER
+        with pytest.raises(ValidationError):
+            UniFiConfig(_env_file=None, unifi_tools="invalid")
 
 
 class TestAPIEnabled:

@@ -157,6 +157,7 @@ See [.env.example](.env.example) for all configuration options.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `UNIFI_MODE` | `readonly` | `readonly` or `readwrite`; see [Write safety](#write-safety) before enabling writes |
+| `UNIFI_TOOLS` | `all` | Tool profile: `all`, `network`, `network_integration`, `protect`, or `site_manager` |
 | `UNIFI_NETWORK_HOST` | `192.168.1.1` | Hostname or IP of the UniFi Network controller |
 | `UNIFI_PROTECT_HOST` | `UNIFI_NETWORK_HOST` | Hostname or IP of the Protect NVR; defaults to the Network host if not set |
 | `UNIFI_NETWORK_API` | none | Network API key |
@@ -174,6 +175,13 @@ trusted directory so an unrelated `.env` cannot override your API keys.
 
 Rotating UniFi API keys requires restarting the server process; there is no
 hot-reload.
+
+Set `UNIFI_TOOLS` to one API family to expose only that family's tools. The
+default `all` exposes tools for every configured API. The profile controls
+the tool list; configured clients still undergo startup connection checks.
+`UNIFI_MODE=readonly` continues to hide write tools in every profile.
+Network Integration tools keep their existing `unifi_network_*` names even
+when selected through the `network_integration` profile.
 
 ## Troubleshooting
 

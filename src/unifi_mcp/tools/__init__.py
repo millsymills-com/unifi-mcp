@@ -1,15 +1,17 @@
 """MCP tool definitions for UniFi APIs.
 
 ``register_all_tools`` is the single entry point used by
-``server.create_server``: it registers every configured API's tools, then
-hides the write-tagged ones unless ``UNIFI_MODE=readwrite`` (PROTO-005 /
-PROTO-006).
+``server.create_server``: it registers tools from the selected API family
+for configured APIs, then hides write-tagged tools unless
+``UNIFI_MODE=readwrite`` (PROTO-005 / PROTO-006).
 """
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+
+from unifi_mcp.config import ToolProfile
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -20,25 +22,26 @@ logger = logging.getLogger(__name__)
 
 
 def _register_for_each_api(mcp: FastMCP, config: UniFiConfig) -> None:
-    if config.network_enabled:
+    profile = config.unifi_tools
+    if config.network_enabled and profile in (ToolProfile.ALL, ToolProfile.NETWORK):
         from unifi_mcp.tools.network import register_network_tools
 
         register_network_tools(mcp)
         logger.info("Registered Network tools")
 
-    if config.network_integration_enabled:
+    if config.network_integration_enabled and profile in (ToolProfile.ALL, ToolProfile.NETWORK_INTEGRATION):
         from unifi_mcp.tools.network_integration import register_network_integration_tools
 
         register_network_integration_tools(mcp)
         logger.info("Registered Network Integration tools")
 
-    if config.protect_enabled:
+    if config.protect_enabled and profile in (ToolProfile.ALL, ToolProfile.PROTECT):
         from unifi_mcp.tools.protect import register_protect_tools
 
         register_protect_tools(mcp)
         logger.info("Registered Protect tools")
 
-    if config.site_manager_enabled:
+    if config.site_manager_enabled and profile in (ToolProfile.ALL, ToolProfile.SITE_MANAGER):
         from unifi_mcp.tools.site_manager import register_site_manager_tools
 
         register_site_manager_tools(mcp)
@@ -46,7 +49,7 @@ def _register_for_each_api(mcp: FastMCP, config: UniFiConfig) -> None:
 
 
 def register_all_tools(mcp: FastMCP, config: UniFiConfig) -> None:
-    """Register every configured API's tools, hiding writes in readonly mode.
+    """Register the selected configured API tools, hiding writes in readonly mode.
 
     Write-tagged tools are disabled unless ``config.writes_enabled`` (the
     explicit ``UNIFI_MODE=readwrite`` opt-in of PROTO-005 / PROTO-006), so the
