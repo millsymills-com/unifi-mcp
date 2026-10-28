@@ -293,6 +293,13 @@ uv run pre-commit install
 
 ## Known Issues
 
+- `unifi_network_list_events` reads legacy `list/alarm` alarm history, rather
+  than a general event feed. Some controllers reject that endpoint with 404
+  or 400 `api.err.InvalidObject` (observed on Network 10.6.106 with API-key
+  authentication). The tool reports these as unsupported event reads. No
+  replacement endpoint has been verified; view events in the UniFi Network
+  application ([#543](https://github.com/millsymills-com/unifi-mcp/issues/543)).
+
 - **Protect on a separate device requires explicit `UNIFI_PROTECT_HOST`**
   ([#107](https://github.com/millsymills-com/unifi-mcp/issues/107)). If your
   Protect NVR is on a different IP than your Network controller (common

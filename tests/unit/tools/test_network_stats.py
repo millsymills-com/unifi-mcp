@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from unifi_mcp.clients.network import NetworkClient
+from unifi_mcp.errors import (
+    UniFiAuthError,
+    UniFiBadRequestError,
+    UniFiNotFoundError,
+    UniFiServerError,
+    UniFiUnsupportedError,
+)
 from unifi_mcp.tools.network.stats import register_stats_tools
 
 BASE_URL = "https://10.0.0.1:443"
@@ -104,3 +115,53 @@ class TestStatsClientEndpoints:
         respx.get(f"{SITE_PREFIX}/stat/sysinfo").mock(return_value=httpx.Response(200, json=payload))
         result = await network_client.get_sysinfo()
         assert result == payload
+
+
+class TestEventReadCompatibility:
+    @pytest.mark.parametrize(
+        ("status", "message"),
+        [(400, "api.err.InvalidObject"), (404, "api.err.NotFound")],
+    )
+    @respx.mock
+    async def test_unsupported_controller_reports_capability_error(self, network_client, status, message):
+        route = respx.get(f"{SITE_PREFIX}/list/alarm").mock(
+            return_value=httpx.Response(status, json={"meta": {"rc": "error", "msg": message}})
+        )
+        with pytest.raises(UniFiUnsupportedError, match="Network event reads are unavailable") as caught:
+            await network_client.list_events(limit=3)
+        assert caught.value.status_code == status
+        assert isinstance(caught.value.__cause__, (UniFiBadRequestError, UniFiNotFoundError))
+        assert route.call_count == 1  # No retries or fallback to a different resource.
+
+    @pytest.mark.parametrize(
+        ("status", "message", "error_type"),
+        [
+            (400, "api.err.InvalidValue", UniFiBadRequestError),
+            (401, "api.err.LoginRequired", UniFiAuthError),
+            (403, "api.err.NoPermission", UniFiAuthError),
+            (500, "api.err.InternalServerError", UniFiServerError),
+        ],
+    )
+    @respx.mock
+    async def test_other_errors_keep_their_classification(self, network_client, status, message, error_type):
+        respx.get(f"{SITE_PREFIX}/list/alarm").mock(
+            return_value=httpx.Response(status, json={"meta": {"rc": "error", "msg": message}})
+        )
+        with pytest.raises(error_type) as caught:
+            await network_client.list_events()
+        assert caught.value.status_code == status
+
+    @pytest.mark.parametrize("status", [400, 404])
+    @respx.mock
+    async def test_unsupported_error_reaches_tool_caller(self, mcp_with_stats, network_client, status):
+        message = "api.err.InvalidObject" if status == 400 else "api.err.NotFound"
+        respx.get(f"{SITE_PREFIX}/list/alarm").mock(
+            return_value=httpx.Response(status, json={"meta": {"rc": "error", "msg": message}})
+        )
+        ctx = AsyncMock()
+        ctx.lifespan_context = SimpleNamespace(
+            config=SimpleNamespace(unifi_max_list_items=1000), clients={"network": network_client}
+        )
+        tool = await mcp_with_stats.get_tool("unifi_network_list_events")
+        with pytest.raises(ToolError, match=rf"\[HTTP {status}\] Unsupported operation: Network event reads"):
+            await tool.fn(ctx, limit=3)

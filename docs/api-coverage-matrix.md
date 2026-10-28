@@ -212,7 +212,7 @@ on a `cmd` body field.
 | Method | Path (+ cmd) | Tool(s) |
 |---|---|---|
 | GET | `stat/health` | `unifi_network_get_health` |
-| GET | `list/alarm` | `unifi_network_list_events` |
+| GET | `list/alarm` | `unifi_network_list_events` (legacy alarm history; unsupported on some controllers, #543) |
 | GET | `stat/device` | `unifi_network_list_devices`, `unifi_network_get_device` |
 | GET | `stat/device-basic` | `unifi_network_list_devices_basic` |
 | GET | `stat/sta` | `unifi_network_list_active_clients` |

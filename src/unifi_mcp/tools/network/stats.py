@@ -29,7 +29,11 @@ def register_stats_tools(mcp: FastMCP) -> None:
     @mcp.tool(tags={"network"})
     @tool_handler()
     async def unifi_network_list_events(ctx: Context, limit: int = 100) -> dict[str, Any]:
-        """List recent network events and alerts.
+        """Read legacy network alarm history where supported, not a general event feed.
+
+        The legacy list/alarm endpoint is unavailable on some controllers,
+        including Network 10.6.106 with API-key auth. Unsupported controllers
+        return an explicit error; no replacement event endpoint is verified (#543).
 
         Args:
             limit: Maximum number of events to return (default: 100). Capped
