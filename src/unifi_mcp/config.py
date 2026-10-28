@@ -58,6 +58,16 @@ class UniFiMode(enum.StrEnum):
     READWRITE = "readwrite"
 
 
+class ToolProfile(enum.StrEnum):
+    """API family whose tools are exposed to MCP clients."""
+
+    ALL = "all"
+    NETWORK = "network"
+    NETWORK_INTEGRATION = "network_integration"
+    PROTECT = "protect"
+    SITE_MANAGER = "site_manager"
+
+
 class UniFiConfig(BaseSettings):
     """Configuration loaded from environment variables and .env file."""
 
@@ -65,6 +75,7 @@ class UniFiConfig(BaseSettings):
 
     # Mode
     unifi_mode: UniFiMode = UniFiMode.READONLY
+    unifi_tools: ToolProfile = ToolProfile.ALL
 
     # Network API
     unifi_network_host: str = "192.168.1.1"

@@ -4,7 +4,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from unifi_mcp.config import UniFiConfig, UniFiMode
+from unifi_mcp.config import ToolProfile, UniFiConfig, UniFiMode
 from unifi_mcp.server import create_server
 
 
@@ -130,3 +130,28 @@ class TestModeGating:
         readwrite_tools = await server_rw.list_tools()
 
         assert len(readonly_tools) < len(readwrite_tools)
+
+
+class TestToolProfiles:
+    @pytest.mark.parametrize("mode", [UniFiMode.READONLY, UniFiMode.READWRITE])
+    async def test_each_profile_exposes_exactly_its_family(self, mode):
+        all_server = create_server(_make_config(unifi_mode=mode, unifi_tools=ToolProfile.ALL))
+        all_tools = await all_server.list_tools()
+        all_names = {tool.name for tool in all_tools}
+
+        for profile in ToolProfile:
+            server = create_server(_make_config(unifi_mode=mode, unifi_tools=profile))
+            names = {tool.name for tool in await server.list_tools()}
+            expected = (
+                all_names
+                if profile == ToolProfile.ALL
+                else {tool.name for tool in all_tools if profile.value in tool.tags}
+            )
+            assert names == expected
+            assert names
+            if mode == UniFiMode.READONLY:
+                assert all("write" not in tool.tags for tool in await server.list_tools())
+
+    async def test_profile_does_not_enable_unconfigured_api(self):
+        config = _make_config(unifi_network_api=None, unifi_tools=ToolProfile.NETWORK)
+        assert await create_server(config).list_tools() == []
