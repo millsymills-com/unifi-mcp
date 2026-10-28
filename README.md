@@ -4,7 +4,7 @@
 
 # unifi-mcp
 
-Production-grade Python MCP server for UniFi Site Manager, Network, and Protect APIs.
+Python MCP server for UniFi Site Manager, Network, and Protect APIs.
 
 **[Live demo →](https://millsymills.com/unifi)**
 
@@ -21,10 +21,12 @@ breakdown. Installed from source, not published to PyPI. See
 
 ## Features
 
-- **160 MCP tools** covering UniFi Network (106), Protect (45), and Site Manager (9) APIs, all under the `unifi_*` namespace
-- **Read/write mode separation**: write tools invisible in readonly mode
-- **Graceful per-API degradation**: only registers tools for configured APIs
-- **Typed, linted, tested**: strict `ty`, `ruff`, `pytest` with CI on Python 3.13
+The server registers tools for configured APIs and checks code quality in CI.
+
+- It provides 160 MCP tools for UniFi Network (106), Protect (45), and Site Manager (9), all under the `unifi_*` namespace.
+- Write tools are invisible in readonly mode.
+- Only tools for configured APIs are registered.
+- CI on Python 3.13 type-checks with strict `ty`, lints and formats with `ruff`, and runs `pytest`.
 
 ## Write safety
 

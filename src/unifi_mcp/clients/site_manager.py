@@ -35,6 +35,7 @@ class SiteManagerClient(BaseUniFiClient):
         *,
         timeout: int = 30,
         max_retries: int = 3,
+        log_raw_bodies: bool = False,
     ) -> None:
         super().__init__(
             base_url=SITE_MANAGER_BASE_URL,
@@ -42,6 +43,7 @@ class SiteManagerClient(BaseUniFiClient):
             verify_ssl=True,
             timeout=timeout,
             max_retries=max_retries,
+            log_raw_bodies=log_raw_bodies,
         )
 
     async def list_hosts(self) -> dict[str, Any]:

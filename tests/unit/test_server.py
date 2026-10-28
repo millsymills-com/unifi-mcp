@@ -4,8 +4,12 @@ import pytest
 import respx
 from fastmcp import Client
 
+from unifi_mcp.clients.network import NetworkClient
+from unifi_mcp.clients.network_integration import NetworkIntegrationClient
+from unifi_mcp.clients.protect import ProtectClient
+from unifi_mcp.clients.site_manager import SiteManagerClient
 from unifi_mcp.config import ToolProfile, UniFiConfig, UniFiMode
-from unifi_mcp.server import create_server
+from unifi_mcp.server import _configured_lifespan, create_server
 
 
 def _make_config(**overrides):
@@ -20,6 +24,31 @@ def _make_config(**overrides):
 
 
 class TestCreateServer:
+    @pytest.mark.parametrize("source", ["default", "environment", "dotenv", "explicit"])
+    async def test_resolved_raw_body_policy_reaches_every_client(self, monkeypatch, tmp_path, source):
+        async def valid_connection(self):
+            return True
+
+        for client_type in (NetworkClient, NetworkIntegrationClient, ProtectClient, SiteManagerClient):
+            monkeypatch.setattr(client_type, "validate_connection", valid_connection)
+
+        if source in {"environment", "explicit"}:
+            monkeypatch.setenv("UNIFI_LOG_RAW_BODIES", "true")
+        else:
+            monkeypatch.delenv("UNIFI_LOG_RAW_BODIES", raising=False)
+        env_file = tmp_path / ".env"
+        env_file.write_text("UNIFI_LOG_RAW_BODIES=true\n")
+        kwargs = {"_env_file": env_file if source == "dotenv" else None}
+        if source == "explicit":
+            kwargs["unifi_log_raw_bodies"] = False
+        config = _make_config(**kwargs)
+        expected = source in {"environment", "dotenv"}
+        assert config.unifi_log_raw_bodies is expected
+
+        async with _configured_lifespan(None, config) as context:
+            assert set(context.clients) == {"network", "network_integration", "protect", "site_manager"}
+            assert all(client._log_raw_bodies is expected for client in context.clients.values())
+
     @pytest.mark.parametrize("mode", [UniFiMode.READONLY, UniFiMode.READWRITE])
     @respx.mock
     async def test_explicit_config_controls_startup_and_runtime_policy(self, monkeypatch, mode):

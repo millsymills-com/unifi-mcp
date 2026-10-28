@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
@@ -60,21 +59,12 @@ _TOTAL_ELAPSED_TIMEOUT_MULTIPLIER = 5
 _MIN_SCRUBBABLE_SECRET_LEN = 8
 
 
-def _log_raw_bodies_enabled() -> bool:
-    """Whether the operator opted into untouched-body DEBUG logging.
-
-    Read from the environment directly (rather than through ``UniFiConfig``)
-    so the helper stays available to callers that construct clients without
-    a config object — notably tests. Truthy values: ``1``, ``true``, ``yes``
-    (case-insensitive).
-    """
-    return os.environ.get("UNIFI_LOG_RAW_BODIES", "").strip().lower() in {"1", "true", "yes"}
-
-
 class BaseUniFiClient(ABC):
     """Base client for UniFi APIs with retry, auth, and error mapping.
 
     Subclasses must set ``_path_prefix`` and implement ``validate_connection()``.
+    ``log_raw_bodies`` is fixed at construction; standalone callers must opt in
+    explicitly to log untouched HTTP error bodies at DEBUG level.
     """
 
     _path_prefix: str = ""
@@ -88,9 +78,11 @@ class BaseUniFiClient(ABC):
         cert_fingerprint: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
+        log_raw_bodies: bool = False,
     ) -> None:
         self._max_retries = max_retries
         self._timeout = timeout
+        self._log_raw_bodies = log_raw_bodies
         # Multi-phase timeout: short connect/pool waits keep startup snappy
         # against unreachable hosts while leaving the operator-configured
         # ``timeout`` to bound the read/write phases (the slow ones on UniFi
@@ -211,13 +203,13 @@ class BaseUniFiClient(ABC):
 
         Sensitive keys (passphrases, secrets, tokens) are masked at this
         boundary so downstream WARN logs and ``ToolError`` strings never
-        carry reflected credentials (#148). When ``UNIFI_LOG_RAW_BODIES`` is
-        unset (default), the DEBUG body log receives the key-name-redacted
+        carry reflected credentials (#148). Unless ``log_raw_bodies`` was
+        enabled at construction, the DEBUG body log receives the key-name-redacted
         form with the configured API-key value additionally scrubbed, so a
         value reflected into a free-text field never lands in the log either;
         operators that need the untouched body for diagnosis must opt in.
         """
-        raw_log_enabled = _log_raw_bodies_enabled()
+        raw_log_enabled = self._log_raw_bodies
         try:
             parsed = response.json()
         except ValueError:
