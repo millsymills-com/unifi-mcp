@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -89,7 +91,7 @@ class TestWlanClientEndpoints:
     async def test_update_wlan_puts_to_id(self, network_client):
         route = respx.put(f"{SITE_PREFIX}/rest/wlanconf/w-1").mock(return_value=httpx.Response(200, json={}))
         await network_client.update_wlan("w-1", {"enabled": False})
-        assert route.calls[0].request.content == b'{"enabled":false}' or b"enabled" in route.calls[0].request.content
+        assert json.loads(route.calls[0].request.content) == {"enabled": False}
 
     @respx.mock
     async def test_delete_wlan_deletes_to_id(self, network_client):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock
@@ -69,7 +70,7 @@ class TestNetworkConfigClientEndpoints:
     async def test_update_network(self, network_client):
         route = respx.put(f"{SITE_PREFIX}/rest/networkconf/n-1").mock(return_value=httpx.Response(200, json={}))
         await network_client.update_network("n-1", {"enabled": False})
-        assert b"enabled" in route.calls[0].request.content
+        assert json.loads(route.calls[0].request.content) == {"enabled": False}
 
     @respx.mock
     async def test_delete_network(self, network_client):

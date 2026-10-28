@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -130,7 +132,7 @@ class TestCrudMethods:
         route = getattr(respx, verb)(f"{API_PREFIX}{endpoint}").mock(return_value=httpx.Response(200, json={}))
         await getattr(client, method_name)({"name": "x"})
         assert route.call_count == 1
-        assert b"name" in route.calls[0].request.content
+        assert json.loads(route.calls[0].request.content) == {"name": "x"}
 
     @pytest.mark.parametrize(
         ("method_name", "endpoint"),
@@ -147,6 +149,7 @@ class TestCrudMethods:
         route = respx.put(f"{API_PREFIX}{endpoint}/abc").mock(return_value=httpx.Response(200, json={}))
         await getattr(client, method_name)("abc", {"enabled": False})
         assert route.call_count == 1
+        assert json.loads(route.calls[0].request.content) == {"enabled": False}
 
     @pytest.mark.parametrize(
         ("method_name", "endpoint"),

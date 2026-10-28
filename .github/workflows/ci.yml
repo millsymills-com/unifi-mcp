@@ -105,6 +105,29 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+  offline-transport:
+    name: Offline Transport & Allowlist
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run simulated transport and allowlist tests
+        run: >
+          uv run pytest tests/integration/test_stdio_transport.py
+          tests/integration/test_device_allowlist.py -v
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
@@ -131,7 +154,7 @@ jobs:
   ci-pass:
     name: CI Pass
     if: always()
-    needs: [lint, typecheck, test, audit]
+    needs: [lint, typecheck, test, offline-transport, audit]
     runs-on: ubuntu-latest
     steps:
       - name: Check results
@@ -139,6 +162,7 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.typecheck.result }}" != "success" ]] || \
              [[ "${{ needs.test.result }}" != "success" ]] || \
+             [[ "${{ needs.offline-transport.result }}" != "success" ]] || \
              [[ "${{ needs.audit.result }}" != "success" ]]; then
             echo "::error::One or more CI jobs failed"
             exit 1
