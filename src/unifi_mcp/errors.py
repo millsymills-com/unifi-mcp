@@ -54,6 +54,10 @@ class UniFiNotFoundError(UniFiError):
     """Resource not found (404)."""
 
 
+class UniFiUnsupportedError(UniFiError):
+    """Operation unavailable on this controller or API surface."""
+
+
 class UniFiRateLimitError(UniFiError):
     """Rate limit exceeded (429)."""
 
@@ -138,6 +142,8 @@ def handle_client_error(error: BaseException) -> NoReturn:
         raise ToolError(f"{tag}Invalid request: {error}.") from error
     if isinstance(error, UniFiNotFoundError):
         raise ToolError(f"{tag}Resource not found: {error}") from error
+    if isinstance(error, UniFiUnsupportedError):
+        raise ToolError(f"{tag}Unsupported operation: {error}") from error
     if isinstance(error, UniFiRateLimitError):
         raise ToolError(f"{tag}Rate limit exceeded: {error}. Try again later.") from error
     if isinstance(error, UniFiServerError):

@@ -273,10 +273,9 @@ class TestReadTools:
     async def test_list_events_tool_boundary(self, live_client, artifacts):
         """``list_events`` through the MCP boundary with an explicit ``limit``.
 
-        The backing ``list/alarm`` path 404s on current UCG firmware (#138);
-        the tool stays registered, so the boundary contract is "returns a dict
-        envelope, or maps the documented 404 to a ``ToolError``". Either outcome
-        validates the argument schema and the error mapping.
+        Legacy alarm reads may be unsupported with 400 or 404 (#543).
+        Skip only the explicit unsupported-operation error; other failures
+        must remain visible.
         """
         tool_defs = {t.name for t in await live_client.list_tools()}
         if "unifi_network_list_events" not in tool_defs:
@@ -285,7 +284,9 @@ class TestReadTools:
             payload = await _invoke(live_client, "unifi_network_list_events", {"limit": 5})
         except ToolError as exc:
             artifacts.dump("unifi_network_list_events", {"ok": False, "error": f"{type(exc).__name__}: {exc}"})
-            pytest.skip(f"list_events unavailable on this controller (#138): {exc}")
+            if "Unsupported operation: Network event reads are unavailable" not in str(exc):
+                raise
+            pytest.skip(f"list_events unavailable on this controller (#543): {exc}")
         artifacts.dump("unifi_network_list_events", {"ok": True, "payload": payload})
         assert isinstance(payload, dict), f"list_events must return dict, got {type(payload).__name__}"
         assert "data" in payload or "meta" in payload, f"Unexpected list_events shape: {sorted(payload)}"
