@@ -181,7 +181,7 @@ Backing surface: `/proxy/protect/integration/v1/`. 45 tools.
 | `unifi_protect_list_users` | R | — |
 | `unifi_protect_list_viewers` | R | — |
 | `unifi_protect_set_light_mode` | W | `light_id: string, mode: string` |
-| `unifi_protect_set_recording_mode` | W | `camera_id: string, mode: string, pre_padding?: integer \| null = null, post_padding?: integer \| null = null, confirm?: boolean = false` |
+| `unifi_protect_set_recording_mode` | W | `camera_id: string, mode: "always" \| "motion" \| "never" \| "schedule", pre_padding?: integer \| null = null, post_padding?: integer \| null = null, confirm?: boolean = false` |
 | `unifi_protect_set_smart_detection` | W | `camera_id: string, object_types: array<string>` |
 | `unifi_protect_set_viewer_liveview` | W | `viewer_id: string, liveview_id: string` |
 | `unifi_protect_update_camera` | W | `camera_id: string, name?: string \| null = null, led_settings_is_enabled?: boolean \| null = null, osd_settings_is_name_enabled?: boolean \| null = null, osd_settings_is_date_enabled?: boolean \| null = null, osd_settings_is_logo_enabled?: boolean \| null = null, osd_settings_is_debug_enabled?: boolean \| null = null` |
@@ -198,14 +198,14 @@ Backing surface: `https://api.ui.com/v1/`. 9 tools.
 | Tool | Mode | Parameters |
 |---|:--:|---|
 | `unifi_site_manager_get_host` | R | `host_id: string` |
-| `unifi_site_manager_get_isp_metrics` | R | `metric_type: string, begin_timestamp?: string \| null = null, end_timestamp?: string \| null = null, duration?: string \| null = null` |
+| `unifi_site_manager_get_isp_metrics` | R | `metric_type: "5m" \| "1h", begin_timestamp?: string \| null = null, end_timestamp?: string \| null = null, duration?: string \| null = null` |
 | `unifi_site_manager_get_sdwan_config` | R | `config_id: string` |
 | `unifi_site_manager_get_sdwan_config_status` | R | `config_id: string` |
 | `unifi_site_manager_list_devices` | R | `host_id?: string \| null = null` |
 | `unifi_site_manager_list_hosts` | R | — |
 | `unifi_site_manager_list_sdwan_configs` | R | — |
 | `unifi_site_manager_list_sites` | R | — |
-| `unifi_site_manager_query_isp_metrics` | R | `metric_type: string, sites: array<object>` |
+| `unifi_site_manager_query_isp_metrics` | R | `metric_type: "5m" \| "1h", sites: array<object>` |
 
 ---
 
