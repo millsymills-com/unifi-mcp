@@ -105,12 +105,14 @@ class TestDocsCiteCanonicalCounts:
     def test_readme_totals(self):
         text = _doc("README.md")
         assert f"{TOTAL_TOOLS} tools" in text
-        assert (
-            f"{TOTAL_TOOLS} MCP tools** covering UniFi Network "
-            f"({EXPECTED_TOOL_COUNTS['network']}), Protect "
-            f"({EXPECTED_TOOL_COUNTS['protect']}), and Site Manager "
-            f"({EXPECTED_TOOL_COUNTS['site_manager']})"
-        ) in text
+        features = text.split("## Features\n", 1)[1].split("\n## ", 1)[0]
+        assert f"{TOTAL_TOOLS} MCP tools" in features
+        for label, namespace in (
+            ("UniFi Network", "network"),
+            ("Protect", "protect"),
+            ("Site Manager", "site_manager"),
+        ):
+            assert f"{label} ({EXPECTED_TOOL_COUNTS[namespace]})" in features
         assert f"{EXPECTED_WRITE_TOOLS} write tools" in text
 
     def test_claude_md_counts(self):
