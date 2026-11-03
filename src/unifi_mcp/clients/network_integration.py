@@ -121,9 +121,17 @@ class NetworkIntegrationClient(BaseUniFiClient):
         result: dict[str, Any] = await self.get(self._site_path(f"acl-rules/{self._segment(acl_rule_id)}"))
         return result
 
-    async def get_firewall_policies_ordering(self) -> dict[str, Any]:
-        """Get the firewall-policy ordering for the resolved site."""
-        result: dict[str, Any] = await self.get(self._site_path("firewall/policies/ordering"))
+    async def get_firewall_policies_ordering(
+        self, source_firewall_zone_id: str, destination_firewall_zone_id: str
+    ) -> dict[str, Any]:
+        """Get policy ordering for a source/destination zone pair in this site."""
+        result: dict[str, Any] = await self.get(
+            self._site_path("firewall/policies/ordering"),
+            params={
+                "sourceFirewallZoneId": source_firewall_zone_id,
+                "destinationFirewallZoneId": destination_firewall_zone_id,
+            },
+        )
         return result
 
     async def list_firewall_zones(self, offset: int = 0, limit: int = 200) -> dict[str, Any]:
