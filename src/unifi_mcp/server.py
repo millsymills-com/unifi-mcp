@@ -108,6 +108,20 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
         yield context
 
 
+async def _hide_unavailable_backend(server: FastMCP, api_name: str, context: ServerContext) -> None:
+    """Keep dual-surface discovery available without overriding operator visibility."""
+    if api_name == "network" and "network_integration" in context.clients:
+        names = {
+            tool.name
+            for tool in await server.list_tools()
+            if "network" in tool.tags and tool.name != "unifi_network_list_networks"
+        }
+        if names:
+            server.disable(names=names, components={"tool"})
+    else:
+        server.disable(tags={api_name})
+
+
 @asynccontextmanager
 async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGenerator[ServerContext]:
     """Initialize clients for configured APIs, validate, and yield context.
@@ -203,7 +217,7 @@ async def _configured_lifespan(server: FastMCP, config: UniFiConfig) -> AsyncGen
     ):
         if enabled and api_name not in context.clients:
             if server is not None:
-                server.disable(tags={api_name})
+                await _hide_unavailable_backend(server, api_name, context)
             err = failures.get(api_name)
             if err is not None:
                 guidance = getattr(err, "guidance", None)

@@ -158,6 +158,11 @@ class NetworkIntegrationClient(BaseUniFiClient):
         result: dict[str, Any] = await self.get(self._site_path(f"dns/policies/{self._segment(dns_policy_id)}"))
         return result
 
+    async def list_networks(self, offset: int = 0, limit: int = 200) -> dict[str, Any]:
+        """List Integration networks and their UUIDs, distinct from legacy config IDs."""
+        result: dict[str, Any] = await self.get(self._site_path("networks"), params={"offset": offset, "limit": limit})
+        return result
+
     async def get_network_references(self, network_id: str) -> dict[str, Any]:
         """Get dependency references for a network."""
         result: dict[str, Any] = await self.get(self._site_path(f"networks/{self._segment(network_id)}/references"))
