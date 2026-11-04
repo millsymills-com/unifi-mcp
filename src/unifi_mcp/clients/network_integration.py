@@ -84,6 +84,11 @@ class NetworkIntegrationClient(BaseUniFiClient):
         result: dict[str, Any] = await self.get("sites", params={"offset": offset, "limit": limit})
         return result
 
+    async def list_countries(self, offset: int = 0, limit: int = 200) -> dict[str, Any]:
+        """List country codes and names without requiring a resolved site."""
+        result: dict[str, Any] = await self.get("countries", params={"offset": offset, "limit": limit})
+        return result
+
     async def list_pending_devices(self) -> dict[str, Any]:
         """List devices awaiting adoption."""
         result: dict[str, Any] = await self.get("pending-devices")

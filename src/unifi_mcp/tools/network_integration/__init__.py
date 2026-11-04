@@ -1,6 +1,6 @@
 """Network Integration API read and write tools (#409, #423).
 
-28 read tools plus the ACL, DNS, firewall-zone, and voucher write tools over the official
+29 read tools plus the ACL, DNS, firewall-zone, and voucher write tools over the official
 ``/proxy/network/integration/v1/`` surface, consuming
 :class:`~unifi_mcp.clients.network_integration.NetworkIntegrationClient`. Every
 tool is named ``unifi_network_*`` (folding into the existing ``network``
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 def register_network_integration_tools(mcp: FastMCP) -> None:
     """Register every Network Integration read tool on the given server."""
     from unifi_mcp.tools.network_integration.acl import register_acl_tools
+    from unifi_mcp.tools.network_integration.countries import register_countries_tools
     from unifi_mcp.tools.network_integration.devices import register_devices_tools
     from unifi_mcp.tools.network_integration.dns import register_dns_tools
     from unifi_mcp.tools.network_integration.dpi import register_dpi_tools
@@ -34,6 +35,7 @@ def register_network_integration_tools(mcp: FastMCP) -> None:
     from unifi_mcp.tools.network_integration.wan import register_wan_tools
 
     register_sites_tools(mcp)
+    register_countries_tools(mcp)
     register_devices_tools(mcp)
     register_dpi_tools(mcp)
     register_acl_tools(mcp)

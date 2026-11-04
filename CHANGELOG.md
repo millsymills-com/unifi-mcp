@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Read-only `unifi_network_list_countries` for the global Network Integration
+  country-code reference catalog, with bounded pagination and response redaction
+  (#494). Endpoint coverage is doc-derived and not yet live-validated.
+
 ## [0.4.0] - 2026-06-24
 
 ### Added

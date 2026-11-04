@@ -9,7 +9,7 @@ import pytest
 import respx
 
 from unifi_mcp.clients.network_integration import NetworkIntegrationClient
-from unifi_mcp.errors import UniFiError, UniFiNotFoundError
+from unifi_mcp.errors import UniFiAuthError, UniFiBadRequestError, UniFiError, UniFiNotFoundError
 
 BASE_URL = "https://10.0.0.1:443"
 PREFIX = f"{BASE_URL}/proxy/network/integration/v1/"
@@ -422,3 +422,46 @@ class TestConfigUuidValidator:
             unifi_site_manager_api=None,
         )
         assert cfg.network_integration_base_url == cfg.network_base_url
+
+
+class TestCountriesGlobalPath:
+    @respx.mock
+    async def test_global_path_without_resolved_site_and_preserves_envelope(self):
+        client = _make_client(site=None)
+        assert client._resolved_site is None
+        page = {
+            "data": [{"code": "GB", "name": "United Kingdom"}],
+            "offset": 4,
+            "limit": 25,
+            "count": 1,
+            "totalCount": 5,
+        }
+        route = respx.get(f"{PREFIX}countries", params={"offset": 4, "limit": 25}).mock(
+            return_value=httpx.Response(200, json=page)
+        )
+        assert await client.list_countries(offset=4, limit=25) == page
+        assert route.call_count == 1
+        request = route.calls[0].request
+        assert request.url.path == "/proxy/network/integration/v1/countries"
+        assert request.headers["X-API-Key"] == "test-net-key"
+        assert client._resolved_site is None
+
+    @respx.mock
+    async def test_defaults_and_empty_page(self):
+        route = respx.get(f"{PREFIX}countries", params={"offset": 0, "limit": 200}).mock(
+            return_value=httpx.Response(200, json=_PAGE)
+        )
+        assert await _make_client(site=None).list_countries() == _PAGE
+        assert route.call_count == 1
+
+    @pytest.mark.parametrize(
+        ("status", "error"), [(400, UniFiBadRequestError), (401, UniFiAuthError), (404, UniFiNotFoundError)]
+    )
+    @respx.mock
+    async def test_http_errors(self, status, error):
+        route = respx.get(f"{PREFIX}countries").mock(
+            return_value=httpx.Response(status, json={"message": "synthetic refusal"})
+        )
+        with pytest.raises(error):
+            await _make_client(site=None).list_countries()
+        assert route.call_count == 1

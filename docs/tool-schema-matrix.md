@@ -1,6 +1,6 @@
 # Tool ↔ Schema Matrix
 
-The input-schema surface of all **160 MCP tools** (100 read, 60 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
+The input-schema surface of all **161 MCP tools** (101 read, 60 write), one row per tool. This is the companion to the *endpoint* map in [`api-coverage-matrix.md`](api-coverage-matrix.md): that file answers *which UniFi endpoints are covered*; this one answers *what arguments each tool accepts*.
 
 Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test_schema_matrix.py` rebuilds the live server, renders every tool's `parameters` schema, and fails if any row here drifts from the registered schema — a parameter added, removed, renamed, retyped, or re-defaulted without updating this file breaks CI. Regenerate, do not hand-edit, the rows: `python scripts/gen_schema_matrix.py`.
 
@@ -13,10 +13,10 @@ Unlike the endpoint matrix, this table is **machine-asserted**. `tests/unit/test
 
 | API | Read | Write | Total |
 |---|---:|---:|---:|
-| Network API | 54 | 52 | 106 |
+| Network API | 55 | 52 | 107 |
 | Protect API | 37 | 8 | 45 |
 | Site Manager API | 9 | 0 | 9 |
-| **All** | **100** | **60** | **160** |
+| **All** | **101** | **60** | **161** |
 
 Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendered from the live registered schemas.
 
@@ -24,7 +24,7 @@ Counts mirror `src/unifi_mcp/_inventory.py`; the per-tool rows below are rendere
 
 ## Network API
 
-Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
+Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 
 | Tool | Mode | Parameters |
 |---|:--:|---|
@@ -86,6 +86,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_list_active_clients` | R | — |
 | `unifi_network_list_all_clients` | R | — |
 | `unifi_network_list_configured_clients` | R | — |
+| `unifi_network_list_countries` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_device_tags` | R | — |
 | `unifi_network_list_devices` | R | — |
 | `unifi_network_list_devices_basic` | R | — |
