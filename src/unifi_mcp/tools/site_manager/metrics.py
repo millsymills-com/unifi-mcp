@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from fastmcp import Context, FastMCP
+from pydantic import Field
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler
@@ -30,24 +31,20 @@ def register_site_manager_metrics_tools(mcp: FastMCP) -> None:
     @tool_handler()
     async def unifi_site_manager_get_isp_metrics(
         ctx: Context,
-        metric_type: MetricType,
-        begin_timestamp: str | None = None,
-        end_timestamp: str | None = None,
-        duration: str | None = None,
+        metric_type: Annotated[MetricType, Field(description="Metric aggregation window: 5m or 1h.")],
+        begin_timestamp: Annotated[
+            str | None, Field(description="ISO-8601 range start; omitted uses the upstream default range.")
+        ] = None,
+        end_timestamp: Annotated[str | None, Field(description="ISO-8601 range end.")] = None,
+        duration: Annotated[
+            str | None,
+            Field(description="Duration window, e.g. 24h, as an alternative to an explicit begin/end range."),
+        ] = None,
     ) -> dict[str, Any]:
         """Get ISP performance metrics across the account from UniFi Site Manager.
 
         Secret keys are redacted before the response leaves this tool — see
         ``unifi_mcp._redaction`` (#146, #203).
-
-        Args:
-            ctx: FastMCP request context — supplied by the framework.
-            metric_type: Metric aggregation window. Must be ``"5m"`` or ``"1h"``.
-            begin_timestamp: Optional ISO-8601 start of the time range. When
-                omitted, the upstream default range applies.
-            end_timestamp: Optional ISO-8601 end of the time range.
-            duration: Optional duration window (e.g. ``"24h"``) as an
-                alternative to an explicit begin/end range.
 
         Returns:
             The Site Manager API response with sensitive fields redacted,
@@ -73,22 +70,17 @@ def register_site_manager_metrics_tools(mcp: FastMCP) -> None:
     @tool_handler()
     async def unifi_site_manager_query_isp_metrics(
         ctx: Context,
-        metric_type: MetricType,
-        sites: list[dict[str, Any]],
+        metric_type: Annotated[MetricType, Field(description="Metric aggregation window: 5m or 1h.")],
+        sites: Annotated[
+            list[dict[str, Any]],
+            Field(description="Site selectors with hostId, siteId and optional beginTimestamp/endTimestamp ranges."),
+        ],
     ) -> dict[str, Any]:
         """Query ISP metrics for specific sites and ranges from UniFi Site Manager.
 
         This is a read despite using HTTP POST: ``sites`` is a pure selector
         body and mutates nothing upstream. Secret keys are redacted before the
         response leaves this tool — see ``unifi_mcp._redaction`` (#146, #203).
-
-        Args:
-            ctx: FastMCP request context — supplied by the framework.
-            metric_type: Metric aggregation window. Must be ``"5m"`` or ``"1h"``.
-            sites: Site selector list. Each entry identifies a site and its
-                optional begin/end time range, e.g.
-                ``[{"hostId": "...", "siteId": "...", "beginTimestamp": "...",
-                "endTimestamp": "..."}]``.
 
         Returns:
             The Site Manager API response with sensitive fields redacted,

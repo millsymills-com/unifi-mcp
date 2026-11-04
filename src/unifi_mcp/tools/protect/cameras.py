@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from fastmcp import Context, FastMCP
+from pydantic import Field
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
@@ -134,25 +135,24 @@ def register_camera_tools(mcp: FastMCP) -> None:
     async def unifi_protect_set_recording_mode(
         ctx: Context,
         *,
-        camera_id: str,
-        mode: RecordingMode,
-        pre_padding: int | None = None,
-        post_padding: int | None = None,
-        confirm: bool = False,
+        camera_id: Annotated[str, Field(description="The camera ID.")],
+        mode: Annotated[
+            RecordingMode, Field(description="Recording mode. never disables recording and requires confirm=True.")
+        ],
+        pre_padding: Annotated[int | None, Field(description="Pre-event recording padding in seconds.")] = None,
+        post_padding: Annotated[int | None, Field(description="Post-event recording padding in seconds.")] = None,
+        confirm: Annotated[
+            bool,
+            Field(
+                description="Must be True for mode=never; ignored for other modes. Disabled footage is unrecoverable."
+            ),
+        ] = False,
     ) -> dict[str, Any]:
         """Set the recording mode for a camera.
 
         ``mode="never"`` disables all recording: footage during the disabled
         window is unrecoverable, so it requires ``confirm=True``. The other
         modes apply without a confirm gate.
-
-        Args:
-            camera_id: The camera ID.
-            mode: Recording mode — "always", "motion", "never", "schedule".
-            pre_padding: Pre-event recording padding in seconds (optional).
-            post_padding: Post-event recording padding in seconds (optional).
-            confirm: Must be ``True`` to set ``mode="never"``; ignored for the
-                other modes.
 
         Returns:
             The controller acknowledgement. Integration v1 returns an empty
