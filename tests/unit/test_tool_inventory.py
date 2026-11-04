@@ -1,13 +1,14 @@
 """Tool-count drift guard (#363).
 
-Pins the live registered tool surface and the current-state docs (README,
-CLAUDE.md) to the canonical counts in ``unifi_mcp._inventory``. A tool added or
+Pins the live registered tool surface and the README inventory to the canonical
+counts in ``unifi_mcp._inventory``. A tool added or
 removed without updating the constant — or docs left to drift from it — fails
 here. Historical CHANGELOG release counts are point-in-time and excluded.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -115,50 +116,28 @@ class TestDocsCiteCanonicalCounts:
             assert f"{label} ({EXPECTED_TOOL_COUNTS[namespace]})" in features
         assert f"{EXPECTED_WRITE_TOOLS} write tools" in text
 
-    def test_claude_md_counts(self):
-        text = _doc("CLAUDE.md")
-        assert f"{EXPECTED_WRITE_TOOLS} write tools" in text
-        assert f"({EXPECTED_TOOL_COUNTS['network']} total)" in text
-        assert f"({EXPECTED_TOOL_COUNTS['protect']} total" in text
-
-    def test_claude_md_per_api_splits(self):
-        text = _doc("CLAUDE.md")
-        for namespace in ("network", "protect"):
-            split = EXPECTED_NAMESPACE_SPLITS[namespace]
-            total = EXPECTED_TOOL_COUNTS[namespace]
-            assert f"{split['read']} read + {split['write']} write tools ({total} total" in text
-
-    def test_claude_md_prose_paragraph(self):
-        # The prose paragraph restates the tree block's numbers and drifted from it
-        # undetected (#489), because the assertions above are satisfied by whichever
-        # surface happens to be right. Pin the whole sentence, Site Manager included.
-        text = " ".join(_doc("CLAUDE.md").split())
-        network = EXPECTED_NAMESPACE_SPLITS["network"]
-        protect = EXPECTED_NAMESPACE_SPLITS["protect"]
-        sentence = (
-            f"Per-API tool counts: Network {network['read']} read + {network['write']} write tools "
-            f"({EXPECTED_TOOL_COUNTS['network']} total); "
-            f"Protect {protect['read']} read + {protect['write']} write tools "
-            f"({EXPECTED_TOOL_COUNTS['protect']} total); "
-            f"Site Manager {EXPECTED_NAMESPACE_SPLITS['site_manager']['read']} read-only tools."
-        )
-        assert sentence in text, f"CLAUDE.md must contain this sentence verbatim (line breaks free): {sentence}"
-
-    def test_claude_md_network_origin_sub_splits(self):
-        # The sentence that breaks the network namespace into its legacy and
-        # Integration halves, and the per-directory tree comments it restates (#509).
-        text = " ".join(_doc("CLAUDE.md").split())
-        legacy = NETWORK_ORIGIN_SPLITS["legacy"]
-        integration = NETWORK_ORIGIN_SPLITS["integration"]
-        network = EXPECTED_NAMESPACE_SPLITS["network"]
-        for fragment in (
-            f"The Network {network['read']} read splits into {legacy['read']} legacy-controller reads "
-            f"+ {integration['read']} Network Integration reads",
-            f"the Network write {network['write']} splits into {legacy['write']} legacy-controller writes "
-            f"+ {integration['write']} Network Integration writes",
-            f"network/ # legacy controller tools: {legacy['read']} read + {legacy['write']} write",
-            f"network_integration/ # Network Integration tools: {integration['read']} read "
-            f"+ {integration['write']} write",
-            f"site_manager/ # {EXPECTED_NAMESPACE_SPLITS['site_manager']['read']} read-only tools",
+    def test_readme_namespace_inventory(self):
+        inventory = _doc("README.md").split("## Tool inventory\n", 1)[1].split("\n## ", 1)[0]
+        for label, namespace in (
+            ("Network", "network"),
+            ("Protect", "protect"),
+            ("Site Manager", "site_manager"),
         ):
-            assert fragment in text, f"CLAUDE.md must contain: {fragment}"
+            split = EXPECTED_NAMESPACE_SPLITS[namespace]
+            assert (
+                f"| {label} | {split['read']} | {split['write']} | {EXPECTED_TOOL_COUNTS[namespace]} |"
+                in inventory.splitlines()
+            )
+        assert f"| Total | {EXPECTED_READ_TOOLS} | {EXPECTED_WRITE_TOOLS} | {TOTAL_TOOLS} |" in inventory.splitlines()
+
+    def test_readme_network_origin_inventory(self):
+        inventory = _doc("README.md").split("## Tool inventory\n", 1)[1].split("\n## ", 1)[0]
+        for label, origin in (("Legacy controller", "legacy"), ("Network Integration", "integration")):
+            split = NETWORK_ORIGIN_SPLITS[origin]
+            assert f"| {label} | {split['read']} | {split['write']} | {sum(split.values())} |" in inventory.splitlines()
+
+    def test_claude_md_links_inventory_without_repeating_counts(self):
+        text = _doc("CLAUDE.md")
+        assert "[README tool inventory](README.md#tool-inventory)" in text
+        assert "tests/unit/test_tool_inventory.py" in text
+        assert re.search(r"\b\d+\s+(?:read|write|read-only|MCP tools?|tools?)\b", text) is None
