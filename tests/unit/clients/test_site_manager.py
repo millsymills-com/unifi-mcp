@@ -68,7 +68,7 @@ class TestListDevices:
         result = await client.list_devices(host_id="host-1")
         assert route.called
         assert result == {"data": [{"id": "dev-1", "hostId": "host-1"}]}
-        assert route.calls[0].request.url.params["hostId"] == "host-1"
+        assert route.calls[0].request.url.params["hostIds[]"] == "host-1"
 
 
 class TestValidateConnection:

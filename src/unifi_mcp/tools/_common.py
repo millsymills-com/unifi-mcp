@@ -26,6 +26,7 @@ __all__ = [
     "redact_secrets",
     "reject_dangerous_keys",
     "tool_handler",
+    "validate_host_id",
     "validate_id",
     "validate_mac",
 ]
@@ -176,10 +177,11 @@ def reject_dangerous_keys(data: Any, *, tool_name: str) -> None:
 # These tool-layer validators reject the same payloads earlier, with a
 # clearer error message (``invalid id format`` vs. the encoded surface),
 # and prevent surprising IDs from reaching the controller in the first
-# place. Patterns intentionally narrow — UniFi IDs are mongo ObjectIds or
-# similar short tokens, never URL-shaped.
+# place. Resource IDs remain short tokens; Site Manager composite host IDs
+# have a separate bounded pattern. Neither contract permits URL-shaped input.
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_HOST_ID_RE = re.compile(r"[A-Za-z0-9_:-]{1,256}")
 _MAC_RE = re.compile(
     r"(?:^[0-9a-fA-F]{12}$)"
     r"|(?:^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$)"
@@ -203,6 +205,18 @@ def validate_id(value: str, *, field: str) -> None:
         UniFiBadRequestError: If ``value`` doesn't match the ID pattern.
     """
     if not isinstance(value, str) or not _ID_RE.match(value):
+        raise UniFiBadRequestError(f"{field}: invalid id format")
+
+
+def validate_host_id(value: str, *, field: str = "host_id") -> None:
+    """Accept bounded opaque Site Manager IDs, including composite colon IDs.
+
+    The 256-character limit is a local input bound, not a vendor schema limit.
+    Keep the generic resource-ID contract unchanged. URL separators, encoded
+    separators, whitespace and control characters remain invalid; clients
+    still percent-encode accepted IDs when placing them in a path segment.
+    """
+    if not isinstance(value, str) or _HOST_ID_RE.fullmatch(value) is None:
         raise UniFiBadRequestError(f"{field}: invalid id format")
 
 
