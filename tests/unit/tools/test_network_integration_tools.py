@@ -11,10 +11,13 @@ from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
+import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
+from unifi_mcp.clients.network_integration import NetworkIntegrationClient
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.errors import UniFiAuthError, UniFiBadRequestError, UniFiNotFoundError
 from unifi_mcp.tools.network_integration import register_network_integration_tools
@@ -52,7 +55,7 @@ def _config_rw(max_items: int = 1000, max_offset: int = 100_000) -> UniFiConfig:
     )
 
 
-def _ctx(config: UniFiConfig, client: AsyncMock) -> AsyncMock:
+def _ctx(config: UniFiConfig, client: Any) -> AsyncMock:
     ctx = AsyncMock()
     ctx.lifespan_context = _Lifespan(config=config, clients={"network_integration": client})
     return ctx
@@ -483,3 +486,35 @@ class TestCountries:
 
         tools = {tool.name: tool for tool in await create_server(_config()).list_tools()}
         assert set(tools["unifi_network_list_countries"].tags) == {"network_integration"}
+
+    async def test_limit_schema_advertises_endpoint_ceiling(self, server):
+        tool = await server.get_tool("unifi_network_list_countries")
+        limit = tool.parameters["properties"]["limit"]
+        assert limit["minimum"] == 1
+        assert limit["maximum"] == 200
+        assert limit["default"] == 200
+        assert "whichever is lower" in limit["description"]
+
+    @pytest.mark.parametrize(
+        ("max_items", "limit", "accepted"),
+        [(1000, 200, True), (1000, 201, False), (50, 50, True), (50, 51, False), (50, 200, False)],
+    )
+    @respx.mock
+    async def test_effective_limit_checked_before_http(self, server, max_items, limit, accepted):
+        client = NetworkIntegrationClient(base_url="https://192.0.2.1", api_key="synthetic-key")
+        page = {"data": [], "offset": 0, "limit": limit, "count": 0, "totalCount": 0}
+        route = respx.get("https://192.0.2.1/proxy/network/integration/v1/countries").mock(
+            return_value=httpx.Response(200, json=page)
+        )
+        ctx = _ctx(_config(max_items=max_items), client)
+        try:
+            if accepted:
+                assert await _call(server, "unifi_network_list_countries", ctx, limit=limit) == page
+                assert route.call_count == 1
+                assert route.calls[0].request.url.params["limit"] == str(limit)
+            else:
+                with pytest.raises(ToolError, match="limit must be between"):
+                    await _call(server, "unifi_network_list_countries", ctx, limit=limit)
+                assert route.call_count == 0
+        finally:
+            await client.close()

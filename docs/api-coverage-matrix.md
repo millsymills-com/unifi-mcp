@@ -379,8 +379,10 @@ reference](https://developer.ui.com/network/v10.4.57/getcountries) on 2026-11-04
 global `GET /v1/countries`, `offset`/`limit` pagination, and country `code`/`name`
 fields. The tool explicitly requests pages of 200 by default (the upstream
 omitted-parameter default is 25), matching the other Integration reference tools.
-The optional upstream `filter` is not exposed. This documentation check and mocked
-tests do not constitute live endpoint validation or a refresh of the full snapshot.
+The endpoint caps pages at 200; a lower configured `unifi_max_list_items`
+ceiling also applies. The optional upstream `filter` is not exposed. This
+documentation check and mocked tests do not constitute live endpoint validation
+or a refresh of the full snapshot.
 
 **Legacy-only capabilities** (we cover these; the official Integration API does *not*
 document them): port-forwards, static routes, switch-port profiles, controller
