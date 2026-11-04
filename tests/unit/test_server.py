@@ -3,6 +3,7 @@
 import pytest
 import respx
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 from unifi_mcp.clients.network import NetworkClient
 from unifi_mcp.clients.network_integration import NetworkIntegrationClient
@@ -184,3 +185,33 @@ class TestToolProfiles:
     async def test_profile_does_not_enable_unconfigured_api(self):
         config = _make_config(unifi_network_api=None, unifi_tools=ToolProfile.NETWORK)
         assert await create_server(config).list_tools() == []
+
+
+@pytest.mark.parametrize("operator_hidden", [False, True])
+async def test_integration_network_inventory_survives_legacy_failure_without_unhiding(monkeypatch, operator_hidden):
+    from unittest.mock import AsyncMock
+
+    async def valid(self):
+        return True
+
+    async def unavailable(self):
+        return False
+
+    monkeypatch.setattr(NetworkClient, "validate_connection", unavailable)
+    for cls in (NetworkIntegrationClient, ProtectClient, SiteManagerClient):
+        monkeypatch.setattr(cls, "validate_connection", valid)
+    inventory = AsyncMock(return_value={"data": [{"id": "00000000-0000-4000-8000-000000000001"}]})
+    monkeypatch.setattr(NetworkIntegrationClient, "list_networks", inventory)
+    server = create_server(_make_config())
+    if operator_hidden:
+        server.disable(names={"unifi_network_list_networks"}, components={"tool"})
+    async with Client(server) as client:
+        names = {tool.name for tool in await client.list_tools()}
+        assert "unifi_network_get_health" not in names
+        assert "unifi_network_get_network_references" in names
+        assert ("unifi_network_list_networks" in names) is not operator_hidden
+        if not operator_hidden:
+            result = await client.call_tool("unifi_network_list_networks", {"api_surface": "integration"})
+            assert result.data == {"data": [{"id": "00000000-0000-4000-8000-000000000001"}]}
+            with pytest.raises(ToolError, match="Legacy Network backend is unavailable"):
+                await client.call_tool("unifi_network_list_networks")

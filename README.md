@@ -28,6 +28,27 @@ The server registers tools for configured APIs and checks code quality in CI.
 - Only tools for configured APIs are registered.
 - CI on Python 3.13 type-checks with strict `ty`, lints and formats with `ruff`, and runs `pytest`.
 
+## Network read IDs and timeout diagnostics
+
+`unifi_network_list_networks()` retains the legacy configuration response: its
+`_id` values belong to `unifi_network_get_network`. For official Integration
+network UUIDs, use `unifi_network_list_networks(api_surface="integration", offset=0,
+limit=200)` and pass the returned `data[].id` to
+`unifi_network_get_network_references`. This mode needs the Network Integration
+backend; it reports unavailability instead of silently substituting legacy IDs.
+The discovery tool is exposed through the Network or All tool profile.
+
+The two ID namespaces are not interchangeable. Reference reads validate UUID
+syntax before contacting the controller; a valid UUID can still receive an
+upstream error. HTTP 500 remains a server error, not proof of an invalid argument
+or an unsupported endpoint.
+
+Timeout errors identify the HTTPX timeout class (read, connect, write or pool)
+without echoing raw transport messages. A pool timeout need not implicate the
+controller. Where a tunnel uses a single execution slot, submit diagnostic calls
+sequentially: queue wait and backend latency consume different budgets. Increasing
+concurrency or timeouts is not a substitute for identifying the stalled layer.
+
 ## Write safety
 
 The server starts in **readonly mode** by default and only exposes read tools.

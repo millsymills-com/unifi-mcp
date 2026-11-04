@@ -1033,7 +1033,7 @@ class TestGetRaw:
     async def test_get_raw_streaming_maps_timeout(self, client):
         """ReadTimeout in the streaming path must map to UniFiTimeoutError."""
         respx.get(f"{BASE_URL}/clip").mock(side_effect=httpx.ReadTimeout("slow"))
-        with pytest.raises(UniFiTimeoutError, match="slow"):
+        with pytest.raises(UniFiTimeoutError, match="HTTP ReadTimeout during GET"):
             await client.get_raw("clip", max_bytes=1024)
 
     @respx.mock

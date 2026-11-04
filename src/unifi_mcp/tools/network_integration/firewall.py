@@ -16,17 +16,25 @@ def register_firewall_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"network_integration"})
     @tool_handler()
-    async def unifi_network_get_firewall_policies_ordering(ctx: Context) -> dict[str, Any]:
-        """Get the firewall-policy ordering for the resolved site (Network Integration API).
+    async def unifi_network_get_firewall_policies_ordering(
+        ctx: Context, source_firewall_zone_id: str, destination_firewall_zone_id: str
+    ) -> dict[str, Any]:
+        """Get policy ordering for a source/destination zone pair in the resolved site.
 
         Args:
             ctx: FastMCP request context.
+            source_firewall_zone_id: Source zone ID from ``unifi_network_list_firewall_zones``.
+            destination_firewall_zone_id: Destination zone ID from ``unifi_network_list_firewall_zones``.
 
         Returns:
             The upstream API response with sensitive fields redacted.
         """
+        validate_id(source_firewall_zone_id, field="source_firewall_zone_id")
+        validate_id(destination_firewall_zone_id, field="destination_firewall_zone_id")
         return redact_secrets(
-            await get_server_context(ctx).clients["network_integration"].get_firewall_policies_ordering()
+            await get_server_context(ctx)
+            .clients["network_integration"]
+            .get_firewall_policies_ordering(source_firewall_zone_id, destination_firewall_zone_id)
         )
 
     @mcp.tool(tags={"network_integration"})
