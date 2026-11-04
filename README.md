@@ -28,6 +28,29 @@ The server registers tools for configured APIs and checks code quality in CI.
 - Only tools for configured APIs are registered.
 - CI on Python 3.13 type-checks with strict `ty`, lints and formats with `ruff`, and runs `pytest`.
 
+## Tool inventory
+
+Fully configured readwrite registration is shown below. API configuration,
+mode gating and tool profiles determine which tools a client can see. Counts
+are declared in [`src/unifi_mcp/_inventory.py`](src/unifi_mcp/_inventory.py) and
+checked against live registration and this table by
+[`tests/unit/test_tool_inventory.py`](tests/unit/test_tool_inventory.py).
+
+| Namespace | Read | Write | Total |
+| --- | ---: | ---: | ---: |
+| Network | 54 | 52 | 106 |
+| Protect | 37 | 8 | 45 |
+| Site Manager | 9 | 0 | 9 |
+| Total | 100 | 60 | 160 |
+
+The Network namespace combines two origins. Both use `unifi_network_*` names;
+Integration tools carry the `network_integration` tag.
+
+| Network origin | Read | Write | Total |
+| --- | ---: | ---: | ---: |
+| Legacy controller | 26 | 39 | 65 |
+| Network Integration | 28 | 13 | 41 |
+
 ## Network read IDs and timeout diagnostics
 
 `unifi_network_list_networks()` retains the legacy configuration response: its

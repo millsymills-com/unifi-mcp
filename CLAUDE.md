@@ -43,7 +43,7 @@ uv build
 
 # Run the server (after `uv sync`)
 uv run unifi-mcp                       # readonly mode (default, safe)
-UNIFI_MODE=readwrite uv run unifi-mcp  # exposes the 60 write tools
+UNIFI_MODE=readwrite uv run unifi-mcp  # exposes write tools
 ```
 
 ## Live Integration Tests — Hardware Safety
@@ -64,38 +64,13 @@ If the health check fails or any class hangs, stop the sweep and triage before c
 
 Protect **write** tests target only devices the operator approves via `LIVE_TEST_DEVICE_MACS` (comma-separated MACs, any separator/case) and `pytest.skip` when the allowlist is empty or no live camera matches — never `cameras[0]`. Full allowlist + capture/restore + run-protocol rules: `docs/agents/live-test-safety.md`.
 
-## Architecture
+## Inventory and implementation pointers
 
-```
-src/unifi_mcp/
-├── __init__.py          # Package root, exports __version__
-├── __main__.py          # Entry point: creates and runs server
-├── _logging.py          # Structured logging setup
-├── server.py            # FastMCP server creation + lifespan
-├── config.py            # Pydantic settings (env vars, including UNIFI_MODE)
-├── errors.py            # Exception hierarchy + error mapping
-├── clients/                 # API clients (httpx async)
-│   ├── base.py              # BaseUniFiClient with retry/auth/error mapping
-│   ├── network.py           # Legacy Network controller client (/proxy/network/api/s/{site}/)
-│   ├── network_integration.py  # Network Integration client (/proxy/network/integration/v1/)
-│   ├── protect.py           # Protect API client
-│   └── site_manager.py      # Site Manager API client
-└── tools/                   # MCP tool definitions
-    ├── network/             # legacy controller tools: 26 read + 39 write
-    ├── network_integration/ # Network Integration tools: 28 read + 13 write (tagged {"network_integration"})
-    ├── protect/             # 37 read + 8 write tools (45 total, includes 2 media read tools)
-    │                        #   device_reads.py / liveviews.py / access.py add 28 read tools
-    └── site_manager/        # 9 read-only tools (discovery.py + metrics.py + sdwan.py)
-```
-
-Per-API tool counts: Network 54 read + 52 write tools (106 total); Protect 37 read
-+ 8 write tools (45 total); Site Manager 9 read-only tools. The Network 54 read
-splits into 26 legacy-controller reads + 28 Network Integration reads; the
-Network write 52 splits into 39 legacy-controller writes + 13 Network Integration
-writes (ACL + DNS + firewall-zones + vouchers groups). The Network Integration
-tools are named `unifi_network_*`, so they fold into the `network` counting
-namespace; their `{"network_integration"}` tag also drives graceful degradation.
-The 60 write tools stay readonly-gated.
+Use the [README tool inventory](README.md#tool-inventory) for namespace and
+Network-origin counts. The inventory is checked against live registration and
+`src/unifi_mcp/_inventory.py` by `tests/unit/test_tool_inventory.py`.
+Network Integration tools share `unifi_network_*` names with legacy Network
+tools; their `{"network_integration"}` tag also drives graceful degradation.
 
 ## Conventions
 
@@ -143,17 +118,6 @@ if config.protect_enabled:
 - **Security** (`security.yml`): Bandit runs on pushes to main, PRs, and the Monday cron; dependency review is PR-only; this workflow's own pip-audit is cron/manual only. The pip-audit that blocks PRs is CI's `audit` job, not this one
 - **Dependabot**: Weekly updates for Python deps and GitHub Actions
 - **Release**: No automated release pipeline yet — `uv build` produces a wheel locally; PyPI publishing is not wired up
-
-## Canonical MCP standards
-
-Authoritative source: `~/Desktop/Projects/consistency-check/docs/standards/`. This repo is graded against `mcp.md` + the language-specific file (`python.md` for Python repos, `go.md` for Go) + `mcp-protocol.md`.
-
-Run the audit:
-
-```bash
-cd ~/Desktop/Projects/consistency-check
-uv run consistency-check audit --repo $(basename "$PWD")
-```
 
 ## Agent skills
 
