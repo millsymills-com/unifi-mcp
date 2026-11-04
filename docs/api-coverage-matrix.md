@@ -333,7 +333,7 @@ tools take no `siteId` argument.
 | GET | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_get_dns_policy` |
 | PUT | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_update_dns_policy` |
 | DELETE | `/v1/sites/{siteId}/dns/policies/{dnsPolicyId}` | **Covered** | `unifi_network_delete_dns_policy` |
-| GET | `/v1/sites/{siteId}/networks` | **Covered** | `unifi_network_list_networks` (legacy `rest/networkconf`) |
+| GET | `/v1/sites/{siteId}/networks` | **Covered** | `unifi_network_list_networks(api_surface="integration")` returns UUIDs; default remains legacy `rest/networkconf` |
 | POST | `/v1/sites/{siteId}/networks` | **Covered** | `unifi_network_create_network` |
 | GET | `/v1/sites/{siteId}/networks/{networkId}` | **Covered** | `unifi_network_get_network` |
 | PUT | `/v1/sites/{siteId}/networks/{networkId}` | **Covered** | `unifi_network_update_network` |

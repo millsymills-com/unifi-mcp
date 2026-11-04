@@ -6,7 +6,7 @@ from typing import Any
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler, validate_id
+from unifi_mcp.tools._common import get_server_context, redact_secrets, tool_handler, validate_host_id
 
 
 def register_site_manager_tools(mcp: FastMCP) -> None:
@@ -52,7 +52,7 @@ def register_site_manager_tools(mcp: FastMCP) -> None:
             ``data`` is a single host record with ``id``, ``hostName``,
             ``reportedState``, ``userData``, and ``hardwareId``.
         """
-        validate_id(host_id, field="host_id")
+        validate_host_id(host_id)
         return redact_secrets(await get_server_context(ctx).clients["site_manager"].get_host(host_id))
 
     @mcp.tool(tags={"site_manager"})
@@ -95,5 +95,5 @@ def register_site_manager_tools(mcp: FastMCP) -> None:
             ``model``, ``firmwareVersion``, and ``state``.
         """
         if host_id is not None:
-            validate_id(host_id, field="host_id")
+            validate_host_id(host_id)
         return redact_secrets(await get_server_context(ctx).clients["site_manager"].list_devices(host_id=host_id))

@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 from tenacity import (
-    before_sleep_log,
+    RetryCallState,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
@@ -36,6 +36,19 @@ from unifi_mcp.errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _log_retry_summary(state: RetryCallState) -> None:
+    """Log retry metadata without reflecting transport messages or request data."""
+    error = state.outcome.exception() if state.outcome is not None else None
+    delay = state.next_action.sleep if state.next_action is not None else 0
+    logger.warning(
+        "Retrying request after %s (attempt %d, delay %.1fs)",
+        type(error).__name__,
+        state.attempt_number,
+        delay,
+    )
+
 
 # Upper bound on a single Retry-After sleep. Ubiquiti sometimes returns very
 # generous values; capping keeps a single tool call bounded.
@@ -425,7 +438,7 @@ class BaseUniFiClient(ABC):
             stop=stop_after_attempt(self._max_retries),
             wait=wait_exponential(multiplier=1, min=1, max=10),
             retry=retry_if_exception_type(retry_on),
-            before_sleep=before_sleep_log(logger, logging.WARNING),
+            before_sleep=_log_retry_summary,
             reraise=True,
         )
         async def _do() -> httpx.Response:
@@ -436,7 +449,9 @@ class BaseUniFiClient(ABC):
             try:
                 response = await _do()
             except httpx.TimeoutException as exc:
-                raise UniFiTimeoutError(str(exc)) from exc
+                # HTTPX timeouts often have an empty message. Retain the phase
+                # class without reflecting transport text/headers or credentials.
+                raise UniFiTimeoutError(f"HTTP {type(exc).__name__} during {method_upper}") from exc
             except httpx.ConnectError as exc:
                 raise UniFiConnectionError(str(exc)) from exc
 
@@ -592,7 +607,7 @@ class BaseUniFiClient(ABC):
                 )
                 rate_limit_attempts += 1
             except httpx.TimeoutException as exc:
-                raise UniFiTimeoutError(str(exc)) from exc
+                raise UniFiTimeoutError(f"HTTP {type(exc).__name__} during GET") from exc
             except httpx.ConnectError as exc:
                 raise UniFiConnectionError(str(exc)) from exc
 
