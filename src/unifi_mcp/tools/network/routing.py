@@ -9,12 +9,22 @@ from fastmcp import Context, FastMCP
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
+    build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
     tool_handler,
     validate_id,
 )
+
+_ROUTE_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    "name": ("name",),
+    "network": ("static-route_network",),
+    "route_type": ("static-route_type",),
+    "gateway_ip": ("static-route_nexthop",),
+    "interface": ("static-route_interface",),
+    "enabled": ("enabled",),
+}
 
 
 def register_routing_tools(mcp: FastMCP) -> None:
@@ -88,22 +98,50 @@ def register_routing_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_route(ctx: Context, route_id: str, data: JsonObject) -> dict[str, Any]:
+    async def unifi_network_update_route(
+        ctx: Context,
+        route_id: str,
+        *,
+        name: str | None = None,
+        network: str | None = None,
+        route_type: str | None = None,
+        gateway_ip: str | None = None,
+        interface: str | None = None,
+        enabled: bool | None = None,
+    ) -> dict[str, Any]:
         """Update an existing static route. Pass only fields to change.
 
         Args:
             route_id: The route ID.
-            data: Fields to update using controller's prefixed key shape
-                (e.g., {"enabled": false, "static-route_nexthop": "10.0.0.1"}).
-                Flat keys like ``gateway_ip`` / ``network`` are rejected with
-                api.err.InvalidPayload.
+            name: Route name.
+            network: Destination CIDR, mapped to ``static-route_network``.
+            route_type: Route type, mapped to ``static-route_type``.
+            gateway_ip: Next-hop IP, mapped to ``static-route_nexthop``.
+            interface: Interface name, mapped to ``static-route_interface``.
+            enabled: Whether the route is enabled. False is an explicit update.
+
+        At least one named field is required. Omitted or None fields are left
+        unchanged; raw ``data`` and controller-prefixed arguments are unsupported.
 
         Returns:
             The upstream API response.
         """
         validate_id(route_id, field="route_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_route")
-        return redact_secrets(await get_server_context(ctx).clients["network"].update_route(route_id, data))
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_route",
+            field_paths=_ROUTE_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "network": network,
+                "route_type": route_type,
+                "gateway_ip": gateway_ip,
+                "interface": interface,
+                "enabled": enabled,
+            },
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_route")
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_route(route_id, body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)

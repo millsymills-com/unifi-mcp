@@ -20,9 +20,7 @@ from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import reject_dangerous_keys
 from unifi_mcp.tools.network.firewall import register_firewall_tools
 from unifi_mcp.tools.network.networks import register_network_config_tools
-from unifi_mcp.tools.network.port_forward import register_port_forward_tools
 from unifi_mcp.tools.network.port_profiles import register_port_profile_tools
-from unifi_mcp.tools.network.routing import register_routing_tools
 from unifi_mcp.tools.network.wlan import register_wlan_tools
 from unifi_mcp.tools.protect.cameras import register_camera_tools
 from unifi_mcp.tools.protect.devices import register_protect_device_tools
@@ -197,18 +195,12 @@ GUARDED_WRITE_TOOLS = [
     ),
     ("unifi_network_update_firewall_rule", register_firewall_tools, {"rule_id": "r-1", "data": DENIED_PAYLOAD}),
     ("unifi_network_update_firewall_group", register_firewall_tools, {"group_id": "g-1", "data": DENIED_PAYLOAD}),
-    (
-        "unifi_network_update_port_forward",
-        register_port_forward_tools,
-        {"port_forward_id": "p-1", "data": DENIED_PAYLOAD},
-    ),
     ("unifi_network_create_port_profile", register_port_profile_tools, {"data": DENIED_PAYLOAD}),
     (
         "unifi_network_update_port_profile",
         register_port_profile_tools,
         {"profile_id": "p-1", "data": DENIED_PAYLOAD},
     ),
-    ("unifi_network_update_route", register_routing_tools, {"route_id": "r-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_chime", register_protect_device_tools, {"chime_id": "ch-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_light", register_protect_device_tools, {"light_id": "l-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_sensor", register_protect_device_tools, {"sensor_id": "s-1", "data": DENIED_PAYLOAD}),

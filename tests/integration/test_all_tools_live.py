@@ -510,7 +510,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_port_forward",
-                {"port_forward_id": pf_id, "data": {"name": new_name}},
+                {"port_forward_id": pf_id, "name": new_name},
             )
             artifacts.dump(f"update_port_forward-{suffix}", {"ok": True, "payload": updated})
 
@@ -557,7 +557,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_route",
-                {"route_id": route_id, "data": {"name": new_name}},
+                {"route_id": route_id, "name": new_name},
             )
             artifacts.dump(f"update_route-{suffix}", {"ok": True, "payload": updated})
 

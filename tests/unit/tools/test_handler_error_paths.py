@@ -227,7 +227,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_update_port_forward",
         "update_port_forward",
         "network",
-        {"port_forward_id": "pf", "data": {}},
+        {"port_forward_id": "pf", "enabled": False},
     ),
     (
         register_port_forward_tools,
@@ -246,7 +246,13 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "network",
         {"name": "r", "network": "10.0.0.0/24", "gateway_ip": "10.0.0.1"},
     ),
-    (register_routing_tools, "unifi_network_update_route", "update_route", "network", {"route_id": "r", "data": {}}),
+    (
+        register_routing_tools,
+        "unifi_network_update_route",
+        "update_route",
+        "network",
+        {"route_id": "r", "enabled": False},
+    ),
     (
         register_routing_tools,
         "unifi_network_delete_route",

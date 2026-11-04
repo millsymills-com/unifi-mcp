@@ -186,7 +186,7 @@ NETWORK_HAPPY_PATHS = [
         register_port_forward_tools,
         "unifi_network_update_port_forward",
         "update_port_forward",
-        {"port_forward_id": "pf-1", "data": {}},
+        {"port_forward_id": "pf-1", "enabled": False},
         None,
     ),
     (
@@ -206,7 +206,7 @@ NETWORK_HAPPY_PATHS = [
         {"name": "r", "network": "10.0.0.0/24", "gateway_ip": "10.0.0.1"},
         None,
     ),
-    (register_routing_tools, "unifi_network_update_route", "update_route", {"route_id": "r-1", "data": {}}, None),
+    (register_routing_tools, "unifi_network_update_route", "update_route", {"route_id": "r-1", "enabled": False}, None),
     (
         register_routing_tools,
         "unifi_network_delete_route",

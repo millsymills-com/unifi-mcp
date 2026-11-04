@@ -161,7 +161,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_port_forward_tools,
         "unifi_network_update_port_forward",
-        {"port_forward_id": TRAVERSAL, "data": {}},
+        {"port_forward_id": TRAVERSAL, "enabled": False},
         "update_port_forward",
         "network",
     ),
@@ -206,7 +206,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_routing_tools,
         "unifi_network_update_route",
-        {"route_id": TRAVERSAL, "data": {}},
+        {"route_id": TRAVERSAL, "enabled": False},
         "update_route",
         "network",
     ),
