@@ -14,7 +14,7 @@ guarded here.
 from __future__ import annotations
 
 EXPECTED_NAMESPACE_SPLITS: dict[str, dict[str, int]] = {
-    "network": {"read": 54, "write": 52},
+    "network": {"read": 55, "write": 52},
     "protect": {"read": 37, "write": 8},
     "site_manager": {"read": 9, "write": 0},
 }
@@ -35,7 +35,7 @@ NETWORK_INTEGRATION_TAG = "network_integration"
 # tools, so the namespace totals above cannot tell them apart; the tag can.
 NETWORK_ORIGIN_SPLITS: dict[str, dict[str, int]] = {
     "legacy": {"read": 26, "write": 39},
-    "integration": {"read": 28, "write": 13},
+    "integration": {"read": 29, "write": 13},
 }
 
 NAMESPACE_PREFIXES: dict[str, str] = {

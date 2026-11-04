@@ -1,6 +1,6 @@
 # UniFi API Coverage Matrix
 
-Endpoint-by-endpoint map of the three UniFi APIs against the 160 MCP tools this
+Endpoint-by-endpoint map of the three UniFi APIs against the 161 MCP tools this
 server exposes. Every documented endpoint of each official API appears below with
 exactly one disposition:
 
@@ -16,9 +16,9 @@ it, but it is **not counted** on either side of the coverage fraction, because t
 denominator is the pinned spec. Expect a Covered table to have one more row than its
 Covered number for each **†** it carries.
 
-Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 106, Protect 45,
-Site Manager 9 = 160). The Network 106 splits into 65 legacy-controller tools
-(§3a) and 41 Network Integration tools (28 read + 13 write, §3b).
+Tool totals here agree with `src/unifi_mcp/_inventory.py` (Network 107, Protect 45,
+Site Manager 9 = 161). The Network 107 splits into 65 legacy-controller tools
+(§3a) and 42 Network Integration tools (29 read + 13 write, §3b).
 
 For the *input-schema* surface of each tool (parameters, types, defaults), see the
 machine-asserted [`tool-schema-matrix.md`](tool-schema-matrix.md): this file maps
@@ -60,22 +60,26 @@ early-access rows).
 > (legacy `stat/*`, `rest/*`, `cmd/*` paths), which is undocumented by Ubiquiti but
 > exposes a much broader surface (port-forwards, routing, port profiles, settings,
 > firewall groups, device/client commands) that the Integration API still lacks. A
-> separate `NetworkIntegrationClient` adds 28 GET/list tools over the
+> separate `NetworkIntegrationClient` adds 29 GET/list tools over the
 > Integration API for resources the legacy controller doesn't expose (ACL rules,
 > firewall zones, DNS policies, hotspot vouchers, switching/LAGs, VPN, WANs, RADIUS).
 > The Network section below therefore has two tables: (3a) the legacy paths we call,
 > mapping the 65 legacy Network tools; and (3b) the official Integration API, with the
-> 28 read tools and the ACL + DNS + firewall-zone + voucher write groups named, and the
+> 29 read tools and the ACL + DNS + firewall-zone + voucher write groups named, and the
 > remaining writes left as functional-equivalent or gap rows.
 
 ## Coverage summary
 
-| API | Covered | Excluded | Gap | Documented total | Coverage |
-|---|---:|---:|---:|---:|---:|
-| Network — official Integration API (functional equivalent + direct reads) | 67 | 1 | 5 | 73 ops | **93%** |
-| Network — legacy controller paths we depend on | 47 rows | — | — | 47 rows | **100%** of what we call |
-| Protect — Integration API | 41 (+1 †) | 2 | 30 | 73 ops | **56%** |
-| Site Manager API | 9 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
+| API | Covered | Covered (unverified) | Excluded | Gap | Documented total | Coverage |
+|---|---:|---:|---:|---:|---:|---:|
+| Network — official Integration API (functional equivalent + direct reads) | 67 | 1 | 0 | 5 | 73 ops | **93%** |
+| Network — legacy controller paths we depend on | 47 rows | — | — | — | 47 rows | **100%** of what we call |
+| Protect — Integration API | 41 (+1 †) | 0 | 2 | 30 | 73 ops | **56%** |
+| Site Manager API | 6 | 3 | 0 | 0 | 9 | **100% tooled** (6 GA live-validated; 3 EA sd-wan unverified) |
+
+Coverage counts both Covered columns and divides by the documented total,
+including excluded operations. Existing dispositions outside the countries row
+are retained; this slice does not revalidate their live coverage.
 
 The "feature-complete" framing in the README is accurate for the **legacy Network
 controller workflows** the server was built around, and for the *core device classes*
@@ -281,7 +285,7 @@ paths: 26 non-`cmd/*` paths and 5 `cmd/*` endpoints.
 
 ### 3b. Official Network Integration API (`/proxy/network/integration/v1/`)
 
-We now call this surface via `NetworkIntegrationClient` (28 read tools plus the
+We now call this surface via `NetworkIntegrationClient` (29 read tools plus the
 ACL, DNS, firewall-zone, and voucher write groups, all `unifi_network_*`, tagged
 `{"network_integration"}`; write tools also carry `{"write"}`). "Covered" rows are
 backed either by a direct Integration tool (named) or — for resources the legacy
@@ -294,7 +298,7 @@ tools take no `siteId` argument.
 | GET | `/v1/info` | **Covered** | `unifi_network_get_sysinfo` (legacy `stat/sysinfo`) |
 | GET | `/v1/sites` | **Covered** | `unifi_network_list_sites` |
 | GET | `/v1/pending-devices` | **Covered** | `unifi_network_list_pending_devices` |
-| GET | `/v1/countries` | **Excluded** | Reference data (country list) — UI-only. |
+| GET | `/v1/countries` | **Covered (unverified)** | `unifi_network_list_countries` — global country-code reference; doc-derived path, not live-validated. |
 | GET | `/v1/dpi/applications` | **Covered** | `unifi_network_list_dpi_applications` |
 | GET | `/v1/dpi/categories` | **Covered** | `unifi_network_list_dpi_categories` |
 | GET | `/v1/sites/{siteId}/clients` | **Covered** | `unifi_network_list_active_clients` (legacy `stat/sta`) |
@@ -365,10 +369,20 @@ tools take no `siteId` argument.
 | GET | `/v1/sites/{siteId}/wans` | **Covered** | `unifi_network_list_wans` |
 | GET | `/v1/sites/{siteId}/radius/profiles` | **Covered** | `unifi_network_list_radius_profiles` |
 
-Coverage 54/73 ops (75%); 1 excluded; 18 gaps. All 18 remaining gaps are writes
-(POST/PUT/PATCH/DELETE) — the read ceiling for this surface. The 28 direct
+Coverage 68/73 ops (93%, including one unverified read); 0 excluded; 5 gaps. All 5 remaining gaps are writes
+(POST/PUT/PATCH/DELETE) — the read ceiling for this surface. The 29 direct
 Network Integration read tools are named (above); the remaining Covered rows are
 functional-equivalent legacy tools.
+
+The countries contract was checked against the [official Network v10.4.57
+reference](https://developer.ui.com/network/v10.4.57/getcountries) on 2026-11-04:
+global `GET /v1/countries`, `offset`/`limit` pagination, and country `code`/`name`
+fields. The tool explicitly requests pages of 200 by default (the upstream
+omitted-parameter default is 25), matching the other Integration reference tools.
+The endpoint caps pages at 200; a lower configured `unifi_max_list_items`
+ceiling also applies. The optional upstream `filter` is not exposed. This
+documentation check and mocked tests do not constitute live endpoint validation
+or a refresh of the full snapshot.
 
 **Legacy-only capabilities** (we cover these; the official Integration API does *not*
 document them): port-forwards, static routes, switch-port profiles, controller
