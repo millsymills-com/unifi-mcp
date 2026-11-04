@@ -76,7 +76,7 @@ def handle_client_error(error: BaseException) -> NoReturn:
     if isinstance(error, UniFiServerError):
         raise ToolError(f"{tag}UniFi server error: {error}. The controller may be unhealthy.") from error
     if isinstance(error, UniFiTimeoutError):
-        raise ToolError(f"{tag}Request timed out: {error}. The controller did not respond in time.") from error
+        raise ToolError(f"{tag}Request timed out: {error}. The request exceeded a timeout budget.") from error
     if isinstance(error, UniFiConnectionError):
         raise ToolError(f"{tag}Connection failed: {error}. Check host and network.") from error
     if isinstance(error, UniFiReadOnlyError):

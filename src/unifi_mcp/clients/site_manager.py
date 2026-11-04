@@ -60,7 +60,7 @@ class SiteManagerClient(BaseUniFiClient):
         """List all devices, optionally filtered by host ID."""
         params: dict[str, str] = {}
         if host_id is not None:
-            params["hostId"] = host_id
+            params["hostIds[]"] = host_id
         result: dict[str, Any] = await self.get("devices", params=params)
         return result
 

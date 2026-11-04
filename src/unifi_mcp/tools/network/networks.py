@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import Context, FastMCP
 
-from unifi_mcp.errors import UniFiBadRequestError
+from unifi_mcp.errors import UniFiBadRequestError, UniFiUnsupportedError
 from unifi_mcp.tools._common import (
     JsonObject,
     get_server_context,
@@ -15,6 +15,7 @@ from unifi_mcp.tools._common import (
     tool_handler,
     validate_id,
 )
+from unifi_mcp.tools.network_integration._common import bound_pagination
 
 
 def register_network_config_tools(mcp: FastMCP) -> None:
@@ -22,16 +23,43 @@ def register_network_config_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"network"})
     @tool_handler()
-    async def unifi_network_list_networks(ctx: Context) -> dict[str, Any]:
-        """List all network (VLAN/subnet) configurations.
+    async def unifi_network_list_networks(
+        ctx: Context, api_surface: Literal["legacy", "integration"] = "legacy", offset: int = 0, limit: int = 200
+    ) -> dict[str, Any]:
+        """List networks with explicitly selected legacy or Integration IDs.
+
+        The default legacy surface returns configuration ``_id`` values for
+        ``unifi_network_get_network``. Select ``integration`` for the paginated
+        official API inventory: its ``id`` UUIDs are the inputs required by
+        ``unifi_network_get_network_references``. IDs are never guessed or
+        silently translated between the two API surfaces.
 
         Args:
             ctx: FastMCP request context.
+            api_surface: ``legacy`` for configurations, ``integration`` for official UUIDs.
+            offset: Integration pagination offset; must remain zero for the legacy surface.
+            limit: Integration page size; must remain 200 for the legacy surface.
 
         Returns:
             The upstream API response.
         """
-        return redact_secrets(await get_server_context(ctx).clients["network"].list_networks())
+        context = get_server_context(ctx)
+        if api_surface == "legacy":
+            if offset != 0 or limit != 200:
+                raise UniFiBadRequestError("Pagination is available only with api_surface='integration'")
+            client = context.clients.get("network")
+            if client is None:
+                raise UniFiUnsupportedError(
+                    "Legacy Network backend is unavailable; select Integration explicitly if available"
+                )
+            return redact_secrets(await client.list_networks())
+        if api_surface != "integration":
+            raise UniFiBadRequestError("api_surface must be 'legacy' or 'integration'")
+        bound_pagination(context.config, offset=offset, limit=limit)
+        client = context.clients.get("network_integration")
+        if client is None:
+            raise UniFiUnsupportedError("Network Integration backend is unavailable; no legacy-ID fallback was used")
+        return redact_secrets(await client.list_networks(offset=offset, limit=limit))
 
     @mcp.tool(tags={"network"})
     @tool_handler()

@@ -64,7 +64,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_get_dns_policy` | R | `dns_policy_id: string` |
 | `unifi_network_get_dpi_stats` | R | `dpi_type?: string = "by_app"` |
 | `unifi_network_get_firewall_group` | R | `group_id: string` |
-| `unifi_network_get_firewall_policies_ordering` | R | — |
+| `unifi_network_get_firewall_policies_ordering` | R | `source_firewall_zone_id: string, destination_firewall_zone_id: string` |
 | `unifi_network_get_firewall_rule` | R | `rule_id: string` |
 | `unifi_network_get_firewall_zone` | R | `zone_id: string` |
 | `unifi_network_get_health` | R | — |
@@ -98,7 +98,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 106 tools.
 | `unifi_network_list_firewall_zones` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_lags` | R | `offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_mc_lag_domains` | R | `offset?: integer = 0, limit?: integer = 200` |
-| `unifi_network_list_networks` | R | — |
+| `unifi_network_list_networks` | R | `api_surface?: "legacy" \| "integration" = "legacy", offset?: integer = 0, limit?: integer = 200` |
 | `unifi_network_list_pending_devices` | R | — |
 | `unifi_network_list_port_forwards` | R | — |
 | `unifi_network_list_port_profiles` | R | — |
