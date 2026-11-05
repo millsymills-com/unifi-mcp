@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastmcp import Context, FastMCP
+from pydantic import Field
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
-    JsonObject,
     get_server_context,
     redact_secrets,
-    reject_dangerous_keys,
     tool_handler,
     validate_id,
 )
+from unifi_mcp.tools.network_integration._acl_rule import AclAction, AclProtocol, AclRuleType, build_acl_rule_body
 from unifi_mcp.tools.network_integration._common import bound_pagination
 
 
@@ -76,56 +76,192 @@ def register_acl_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_create_acl_rule(ctx: Context, data: JsonObject) -> dict[str, Any]:
-        """Create an L2/L3 ACL rule (Network Integration API).
+    async def unifi_network_create_acl_rule(
+        ctx: Context,
+        *,
+        rule_type: Annotated[AclRuleType, Field(description="IPV4 or MAC; chooses the filter variant.")],
+        enabled: Annotated[bool, Field(description="Whether this complete rule is enabled; False is explicit.")],
+        name: Annotated[str, Field(min_length=1, description="Nonempty rule name.")],
+        action: Annotated[AclAction, Field(description="ALLOW or BLOCK.")],
+        description: Annotated[
+            str | None, Field(description="Optional rule description; empty string is explicit.")
+        ] = None,
+        enforcing_device_ids: Annotated[
+            list[str] | None,
+            Field(
+                description="Unique nonempty switch-device IDs; None omits the filter, without preserving the old one."
+            ),
+        ] = None,
+        network_id: Annotated[
+            str | None, Field(description="Required network ID for MAC rules; forbidden for IPV4.")
+        ] = None,
+        protocol_filter: Annotated[
+            list[AclProtocol] | None,
+            Field(description="IPV4-only nonempty unique TCP/UDP list. None sends no protocol filter."),
+        ] = None,
+        source_ip_addresses_or_subnets: Annotated[
+            list[str] | None, Field(description="IPV4 source addresses/subnets; cannot combine with network IDs.")
+        ] = None,
+        source_network_ids: Annotated[
+            list[str] | None, Field(description="IPV4 source network IDs; cannot combine with addresses/subnets.")
+        ] = None,
+        source_ports: Annotated[
+            list[int] | None, Field(description="IPV4 source ports (1 to 65535), alone or with addresses/networks.")
+        ] = None,
+        source_mac_addresses: Annotated[list[str] | None, Field(description="MAC-only source address list.")] = None,
+        source_mac_prefix_length: Annotated[
+            int | None, Field(description="MAC-only source prefix (1 to 48); requires its address list.")
+        ] = None,
+        destination_ip_addresses_or_subnets: Annotated[
+            list[str] | None, Field(description="IPV4 destination addresses/subnets; cannot combine with network IDs.")
+        ] = None,
+        destination_network_ids: Annotated[
+            list[str] | None, Field(description="IPV4 destination network IDs; cannot combine with addresses/subnets.")
+        ] = None,
+        destination_ports: Annotated[
+            list[int] | None,
+            Field(description="IPV4 destination ports (1 to 65535), alone or with addresses/networks."),
+        ] = None,
+        destination_mac_addresses: Annotated[
+            list[str] | None, Field(description="MAC-only destination address list.")
+        ] = None,
+        destination_mac_prefix_length: Annotated[
+            int | None, Field(description="MAC-only destination prefix (1 to 48); requires its address list.")
+        ] = None,
+    ) -> dict[str, Any]:
+        """Create a complete ACL rule using named fields (Network Integration API).
 
-        The body is a discriminated union on ``type`` (``IPV4`` or ``MAC``).
-        Required keys regardless of variant: ``type``, ``enabled``, ``name``
-        (non-empty), ``action`` (``ALLOW``|``BLOCK``). IPV4 rules use IP
-        source/destination filters and optional ``protocolFilter``
-        (``TCP``/``UDP``); MAC rules use MAC filters and require
-        ``networkIdFilter``. Do not set the deprecated ``index`` field — use
-        ``unifi_network_reorder_acl_rules`` for priority.
-
-        Args:
-            ctx: FastMCP request context.
-            data: Full ACL-rule body matching the controller's ACL-rule schema.
+        Update is a full-object PUT: send the complete desired rule. Omitted
+        filters are not preserved or merged. The API describes unfiltered/null
+        endpoint/protocol defaults and all switches for a null device filter.
+        Never omit a filter merely because it was unchanged. No raw data,
+        deprecated index or explicit null-clearing is exposed. Use the separate
+        reorder tool to set priority. IP and UUID semantics remain controller-validated;
+        MAC syntax uses the shared validator.
 
         Returns:
-            The created rule (server-assigned ``id``), with sensitive fields redacted.
-
-        Raises:
-            ToolError: If write mode is disabled, ``data`` contains a denylisted
-                key, or the controller rejects the body.
+            The upstream policy with sensitive fields redacted.
         """
-        reject_dangerous_keys(data, tool_name="unifi_network_create_acl_rule")
-        return redact_secrets(await get_server_context(ctx).clients["network_integration"].create_acl_rule(data))
+        body = build_acl_rule_body(
+            tool_name="unifi_network_create_acl_rule",
+            values={
+                "rule_type": rule_type,
+                "enabled": enabled,
+                "name": name,
+                "action": action,
+                "description": description,
+                "enforcing_device_ids": enforcing_device_ids,
+                "network_id": network_id,
+                "protocol_filter": protocol_filter,
+                "source_ip_addresses_or_subnets": source_ip_addresses_or_subnets,
+                "source_network_ids": source_network_ids,
+                "source_ports": source_ports,
+                "source_mac_addresses": source_mac_addresses,
+                "source_mac_prefix_length": source_mac_prefix_length,
+                "destination_ip_addresses_or_subnets": destination_ip_addresses_or_subnets,
+                "destination_network_ids": destination_network_ids,
+                "destination_ports": destination_ports,
+                "destination_mac_addresses": destination_mac_addresses,
+                "destination_mac_prefix_length": destination_mac_prefix_length,
+            },
+        )
+        return redact_secrets(await get_server_context(ctx).clients["network_integration"].create_acl_rule(body))
 
     @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_acl_rule(ctx: Context, acl_rule_id: str, data: JsonObject) -> dict[str, Any]:
-        """Update an existing ACL rule (Network Integration API).
+    async def unifi_network_update_acl_rule(
+        ctx: Context,
+        acl_rule_id: Annotated[str, Field(description="ID of the user-defined ACL rule to replace.")],
+        *,
+        rule_type: Annotated[AclRuleType, Field(description="IPV4 or MAC; chooses the filter variant.")],
+        enabled: Annotated[bool, Field(description="Whether this complete rule is enabled; False is explicit.")],
+        name: Annotated[str, Field(min_length=1, description="Nonempty rule name.")],
+        action: Annotated[AclAction, Field(description="ALLOW or BLOCK.")],
+        description: Annotated[
+            str | None, Field(description="Optional rule description; empty string is explicit.")
+        ] = None,
+        enforcing_device_ids: Annotated[
+            list[str] | None,
+            Field(
+                description="Unique nonempty switch-device IDs; None omits the filter, without preserving the old one."
+            ),
+        ] = None,
+        network_id: Annotated[
+            str | None, Field(description="Required network ID for MAC rules; forbidden for IPV4.")
+        ] = None,
+        protocol_filter: Annotated[
+            list[AclProtocol] | None,
+            Field(description="IPV4-only nonempty unique TCP/UDP list. None sends no protocol filter."),
+        ] = None,
+        source_ip_addresses_or_subnets: Annotated[
+            list[str] | None, Field(description="IPV4 source addresses/subnets; cannot combine with network IDs.")
+        ] = None,
+        source_network_ids: Annotated[
+            list[str] | None, Field(description="IPV4 source network IDs; cannot combine with addresses/subnets.")
+        ] = None,
+        source_ports: Annotated[
+            list[int] | None, Field(description="IPV4 source ports (1 to 65535), alone or with addresses/networks.")
+        ] = None,
+        source_mac_addresses: Annotated[list[str] | None, Field(description="MAC-only source address list.")] = None,
+        source_mac_prefix_length: Annotated[
+            int | None, Field(description="MAC-only source prefix (1 to 48); requires its address list.")
+        ] = None,
+        destination_ip_addresses_or_subnets: Annotated[
+            list[str] | None, Field(description="IPV4 destination addresses/subnets; cannot combine with network IDs.")
+        ] = None,
+        destination_network_ids: Annotated[
+            list[str] | None, Field(description="IPV4 destination network IDs; cannot combine with addresses/subnets.")
+        ] = None,
+        destination_ports: Annotated[
+            list[int] | None,
+            Field(description="IPV4 destination ports (1 to 65535), alone or with addresses/networks."),
+        ] = None,
+        destination_mac_addresses: Annotated[
+            list[str] | None, Field(description="MAC-only destination address list.")
+        ] = None,
+        destination_mac_prefix_length: Annotated[
+            int | None, Field(description="MAC-only destination prefix (1 to 48); requires its address list.")
+        ] = None,
+    ) -> dict[str, Any]:
+        """Update a complete ACL rule using named fields (Network Integration API).
 
-        Full-object PUT: the body schema is identical to create, so send every
-        field for the rule, not just the changed keys. Only user-defined rules
-        are editable.
-
-        Args:
-            ctx: FastMCP request context.
-            acl_rule_id: The ACL rule id.
-            data: Full ACL-rule body (same schema as create).
+        Update is a full-object PUT: send the complete desired rule. Omitted
+        filters are not preserved or merged. The API describes unfiltered/null
+        endpoint/protocol defaults and all switches for a null device filter.
+        Never omit a filter merely because it was unchanged. No raw data,
+        deprecated index or explicit null-clearing is exposed. Use the separate
+        reorder tool to set priority. IP and UUID semantics remain controller-validated;
+        MAC syntax uses the shared validator.
 
         Returns:
-            The updated rule with sensitive fields redacted.
-
-        Raises:
-            ToolError: If write mode is disabled, ``acl_rule_id`` is malformed,
-                ``data`` contains a denylisted key, or the controller rejects it.
+            The upstream policy with sensitive fields redacted.
         """
         validate_id(acl_rule_id, field="acl_rule_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_acl_rule")
+        body = build_acl_rule_body(
+            tool_name="unifi_network_update_acl_rule",
+            values={
+                "rule_type": rule_type,
+                "enabled": enabled,
+                "name": name,
+                "action": action,
+                "description": description,
+                "enforcing_device_ids": enforcing_device_ids,
+                "network_id": network_id,
+                "protocol_filter": protocol_filter,
+                "source_ip_addresses_or_subnets": source_ip_addresses_or_subnets,
+                "source_network_ids": source_network_ids,
+                "source_ports": source_ports,
+                "source_mac_addresses": source_mac_addresses,
+                "source_mac_prefix_length": source_mac_prefix_length,
+                "destination_ip_addresses_or_subnets": destination_ip_addresses_or_subnets,
+                "destination_network_ids": destination_network_ids,
+                "destination_ports": destination_ports,
+                "destination_mac_addresses": destination_mac_addresses,
+                "destination_mac_prefix_length": destination_mac_prefix_length,
+            },
+        )
         return redact_secrets(
-            await get_server_context(ctx).clients["network_integration"].update_acl_rule(acl_rule_id, data)
+            await get_server_context(ctx).clients["network_integration"].update_acl_rule(acl_rule_id, body)
         )
 
     @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": True})

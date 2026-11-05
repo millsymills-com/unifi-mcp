@@ -21,6 +21,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_create_acl_rule` and
+  `unifi_network_update_acl_rule` (#500). Pass the complete IPv4/MAC rule through
+  named fields. Update remains a full-object PUT: resupply every desired filter;
+  omitted fields are not preserved or merged. The builder selects fixed filter
+  types from the named selectors and rejects incompatible or empty selectors.
+  Deprecated `index` remains unavailable; use the confirmed reorder tool.
+  See [migration guidance](docs/acl-rule-migration.md). No live writes were run.
+
+
 - **BREAKING:** removed raw `data` from `unifi_network_create_firewall_rule`
   (#500). The same 17-field allowlist used by updates now exposes explicit
   ordering, connection-state flags, selectors and group IDs. Original
