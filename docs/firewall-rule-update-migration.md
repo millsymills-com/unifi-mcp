@@ -29,6 +29,6 @@ explicitly requests an empty list.
 The client still performs the same PUT with only the supplied fields. No GET,
 read/merge cycle or default field injection is added. Fixed endpoint routing,
 readonly registration/runtime gates, dangerous-key defense, response redaction
-and delete confirmation remain intact. Create's existing raw-data interface
-remains pending its separate #500 migration. No live tests or service changes
+and delete confirmation remain intact. Creation uses the same named allowlist, with its original scalar defaults; see
+[creation guidance](firewall-rule-create-migration.md). No live tests or service changes
 were run for this update.

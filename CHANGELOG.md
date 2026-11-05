@@ -21,6 +21,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_create_firewall_rule`
+  (#500). The same 17-field allowlist used by updates now exposes explicit
+  ordering, connection-state flags, selectors and group IDs. Original
+  `action="drop"`, `enabled=True` and `protocol="all"` defaults remain; no
+  ordering or state flags are inferred. Controller-required extra fields must
+  be supplied explicitly. See [creation guidance](docs/firewall-rule-create-migration.md).
+
+
 - **BREAKING:** removed raw `data` from `unifi_network_update_firewall_rule`
   (#500). Pass named rule fields such as `enabled=False`, `rule_index=20000`
   or `src_firewallgroup_ids=[]`. At least one non-null field is required;
