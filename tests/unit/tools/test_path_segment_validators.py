@@ -43,6 +43,8 @@ class TestValidateId:
             "foo#bar",
             "foo bar",
             "foo\nbar",
+            "0\n",
+            "a" * 64 + "\n",
             "foo\x00bar",
             "%2e%2e",  # `%` not in allowlist
             "a" * 65,  # over max length
@@ -82,6 +84,11 @@ class TestValidateMac:
             "../foo",
             "aa:bb:cc:dd:ee:ff/extra",
             "aa:bb:cc",  # too short
+            "aa:bb:cc:dd:ee:ff\n",
+            "AA:BB:CC:DD:EE:FF\n",
+            "aabbccddeeff\n",
+            "aa-bb-cc-dd-ee-ff\n",
+            "aabb.ccdd.eeff\n",
             "aa:bb:cc:dd:ee:ff:gg",  # too long
             "ggggggggggggg",  # non-hex
             "aa bb cc dd ee ff",  # space

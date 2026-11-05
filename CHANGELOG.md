@@ -14,6 +14,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Resource-ID and MAC validators now reject a final newline rather than
+  accepting a prefix match (#605). Valid ID bounds and all four MAC formats
+  are preserved; client path-segment validation remains unchanged.
+
 - Temporary firewall-rule cleanup in the live CRUD test now supplies the
   required delete confirmation (#600). Offline tests execute the real cleanup
   and tool gate after successful, update-failed, read-failed and read-back-failed
