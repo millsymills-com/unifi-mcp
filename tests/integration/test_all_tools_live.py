@@ -737,7 +737,9 @@ class TestWriteRoundtrips:
                 f"Read-back action mismatch: set 'reject', got {found.get('action')!r}"
             )
         finally:
-            deleted = await _invoke(live_client, "unifi_network_delete_firewall_rule", {"rule_id": rule_id})
+            deleted = await _invoke(
+                live_client, "unifi_network_delete_firewall_rule", {"rule_id": rule_id, "confirm": True}
+            )
             artifacts.dump(f"delete_firewall_rule-{suffix}", {"ok": True, "payload": deleted})
 
     async def test_reset_dpi_smoke(self, live_client, artifacts):
