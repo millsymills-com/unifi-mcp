@@ -49,9 +49,6 @@ def register_camera_tools(mcp: FastMCP) -> None:
     async def unifi_protect_list_cameras(ctx: Context) -> list[dict[str, Any]]:
         """List all cameras managed by UniFi Protect.
 
-        Args:
-            ctx: FastMCP request context.
-
         Returns:
             The upstream API response.
         """
@@ -59,14 +56,13 @@ def register_camera_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"protect"})
     @tool_handler()
-    async def unifi_protect_get_camera(ctx: Context, camera_id: str) -> dict[str, Any]:
+    async def unifi_protect_get_camera(
+        ctx: Context, camera_id: Annotated[str, Field(description="The camera ID.")]
+    ) -> dict[str, Any]:
         """Get detailed info for a specific camera.
 
         Camera credentials and token fields are redacted before the
         response leaves this tool — see ``unifi_mcp._redaction`` (#146).
-
-        Args:
-            camera_id: The camera ID.
 
         Returns:
             The upstream API response with sensitive fields redacted.
@@ -78,14 +74,24 @@ def register_camera_tools(mcp: FastMCP) -> None:
     @tool_handler(write=True)
     async def unifi_protect_update_camera(
         ctx: Context,
-        camera_id: str,
+        camera_id: Annotated[str, Field(description="The camera ID.")],
         *,
-        name: str | None = None,
-        led_settings_is_enabled: bool | None = None,
-        osd_settings_is_name_enabled: bool | None = None,
-        osd_settings_is_date_enabled: bool | None = None,
-        osd_settings_is_logo_enabled: bool | None = None,
-        osd_settings_is_debug_enabled: bool | None = None,
+        name: Annotated[str | None, Field(description="Camera display name.")] = None,
+        led_settings_is_enabled: Annotated[
+            bool | None, Field(description="Toggle the status LED (ledSettings.isEnabled).")
+        ] = None,
+        osd_settings_is_name_enabled: Annotated[
+            bool | None, Field(description="Show camera name in the OSD (osdSettings.isNameEnabled).")
+        ] = None,
+        osd_settings_is_date_enabled: Annotated[
+            bool | None, Field(description="Show date in the OSD (osdSettings.isDateEnabled).")
+        ] = None,
+        osd_settings_is_logo_enabled: Annotated[
+            bool | None, Field(description="Show logo in the OSD (osdSettings.isLogoEnabled).")
+        ] = None,
+        osd_settings_is_debug_enabled: Annotated[
+            bool | None, Field(description="Show debug overlay in the OSD (osdSettings.isDebugEnabled).")
+        ] = None,
     ) -> dict[str, Any]:
         """Update camera settings using named scalar args.
 
@@ -94,19 +100,6 @@ def register_camera_tools(mcp: FastMCP) -> None:
         not exposed here — they have dedicated tools (e.g.,
         ``unifi_protect_set_recording_mode``,
         ``unifi_protect_set_smart_detection``).
-
-        Args:
-            camera_id: The camera ID.
-            name: Camera display name.
-            led_settings_is_enabled: Toggle the status LED (``ledSettings.isEnabled``).
-            osd_settings_is_name_enabled: Show camera name in the OSD
-                (``osdSettings.isNameEnabled``).
-            osd_settings_is_date_enabled: Show date in the OSD
-                (``osdSettings.isDateEnabled``).
-            osd_settings_is_logo_enabled: Show logo in the OSD
-                (``osdSettings.isLogoEnabled``).
-            osd_settings_is_debug_enabled: Show debug overlay in the OSD
-                (``osdSettings.isDebugEnabled``).
 
         Returns:
             The controller acknowledgement. Integration v1 returns an empty
@@ -178,13 +171,13 @@ def register_camera_tools(mcp: FastMCP) -> None:
     @mcp.tool(tags={"write", "protect"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
     async def unifi_protect_set_smart_detection(
-        ctx: Context, camera_id: str, object_types: list[str]
+        ctx: Context,
+        camera_id: Annotated[str, Field(description="The camera ID.")],
+        object_types: Annotated[
+            list[str], Field(description='Object types to detect, e.g. ["person", "vehicle", "animal"].')
+        ],
     ) -> dict[str, Any]:
         """Configure smart detection object types for a camera.
-
-        Args:
-            camera_id: The camera ID.
-            object_types: List of object types to detect — e.g., ["person", "vehicle", "animal"].
 
         Returns:
             The controller acknowledgement. Integration v1 returns an empty
