@@ -117,7 +117,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_firewall_tools,
         "unifi_network_update_firewall_group",
-        {"group_id": TRAVERSAL, "data": {}},
+        {"group_id": TRAVERSAL, "group_members": []},
         "update_firewall_group",
         "network",
     ),
@@ -139,7 +139,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_network_config_tools,
         "unifi_network_update_network",
-        {"network_id": TRAVERSAL, "data": {}},
+        {"network_id": TRAVERSAL, "dhcpd_enabled": False},
         "update_network",
         "network",
     ),

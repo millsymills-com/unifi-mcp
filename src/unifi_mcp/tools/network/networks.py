@@ -9,6 +9,7 @@ from fastmcp import Context, FastMCP
 from unifi_mcp.errors import UniFiBadRequestError, UniFiUnsupportedError
 from unifi_mcp.tools._common import (
     JsonObject,
+    build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
@@ -16,6 +17,10 @@ from unifi_mcp.tools._common import (
     validate_id,
 )
 from unifi_mcp.tools.network_integration._common import bound_pagination
+
+_NETWORK_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    name: (name,) for name in ("name", "purpose", "ip_subnet", "vlan", "vlan_enabled", "dhcpd_enabled")
+}
 
 
 def register_network_config_tools(mcp: FastMCP) -> None:
@@ -122,7 +127,17 @@ def register_network_config_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_network(ctx: Context, network_id: str, data: JsonObject) -> dict[str, Any]:
+    async def unifi_network_update_network(
+        ctx: Context,
+        network_id: str,
+        *,
+        name: str | None = None,
+        purpose: str | None = None,
+        ip_subnet: str | None = None,
+        vlan: int | None = None,
+        vlan_enabled: bool | None = None,
+        dhcpd_enabled: bool | None = None,
+    ) -> dict[str, Any]:
         """Update an existing network configuration. Pass only fields to change.
 
         Changing purpose to "guest" may be ignored on zone-based firewall
@@ -131,14 +146,35 @@ def register_network_config_tools(mcp: FastMCP) -> None:
 
         Args:
             network_id: The network configuration ID.
-            data: Fields to update (e.g., {"name": "new-name", "vlan": 100}).
+            name: Network name.
+            purpose: Legacy purpose field; guest does not establish firewall-zone isolation.
+            ip_subnet: Gateway address with prefix, e.g. "192.0.2.1/24".
+            vlan: VLAN ID. Independent of the VLAN enable flag.
+            vlan_enabled: Whether VLAN tagging is enabled. Pass with vlan to explicitly enable it.
+            dhcpd_enabled: Whether DHCP is enabled. False is an explicit update.
+
+        At least one non-null named field is required. Omitted or None fields
+        are unchanged; raw ``data`` and explicit null-clearing are unsupported.
 
         Returns:
             The upstream API response.
         """
         validate_id(network_id, field="network_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_network")
-        return redact_secrets(await get_server_context(ctx).clients["network"].update_network(network_id, data))
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_network",
+            field_paths=_NETWORK_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "purpose": purpose,
+                "ip_subnet": ip_subnet,
+                "vlan": vlan,
+                "vlan_enabled": vlan_enabled,
+                "dhcpd_enabled": dhcpd_enabled,
+            },
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_network")
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_network(network_id, body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)

@@ -9,12 +9,17 @@ from fastmcp import Context, FastMCP
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
+    build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
     tool_handler,
     validate_id,
 )
+
+_FIREWALL_GROUP_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    name: (name,) for name in ("name", "group_type", "group_members")
+}
 
 
 def register_firewall_tools(mcp: FastMCP) -> None:
@@ -200,19 +205,41 @@ def register_firewall_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_firewall_group(ctx: Context, group_id: str, data: JsonObject) -> dict[str, Any]:
+    async def unifi_network_update_firewall_group(
+        ctx: Context,
+        group_id: str,
+        *,
+        name: str | None = None,
+        group_type: str | None = None,
+        group_members: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Update an existing firewall group. Pass only fields to change.
 
         Args:
             group_id: The firewall group ID.
-            data: Fields to update (e.g., {"group_members": ["10.0.0.0/24"]}).
+            name: Group name.
+            group_type: Type: "address-group", "port-group", or "ipv6-address-group".
+            group_members: IPs/CIDRs or ports as strings. An empty list explicitly requests empty membership.
+
+        At least one non-null named field is required. Omitted or None fields
+        are unchanged; raw ``data`` and explicit null-clearing are unsupported.
 
         Returns:
             The upstream API response.
         """
         validate_id(group_id, field="group_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_group")
-        return redact_secrets(await get_server_context(ctx).clients["network"].update_firewall_group(group_id, data))
+        if group_members is not None and (
+            not isinstance(group_members, list) or any(not isinstance(member, str) for member in group_members)
+        ):
+            raise UniFiBadRequestError("group_members must be a list of strings")
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_firewall_group",
+            field_paths=_FIREWALL_GROUP_FIELD_PATHS,
+            named_values={"name": name, "group_type": group_type, "group_members": group_members},
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_firewall_group")
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_firewall_group(group_id, body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)
