@@ -40,7 +40,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 | `unifi_network_create_firewall_zone` | W | `name: string, network_ids: array<string>` |
 | `unifi_network_create_network` | W | `name: string, purpose?: string = "corporate", ip_subnet?: string \| null = null, vlan?: integer \| null = null, dhcpd_enabled?: boolean = true` |
 | `unifi_network_create_port_forward` | W | `name: string, dst_port: string, fwd: string, fwd_port: string, proto?: string = "tcp_udp", enabled?: boolean = true` |
-| `unifi_network_create_port_profile` | W | `data: object` |
+| `unifi_network_create_port_profile` | W | `name: string, poe_mode: string, forward: string, native_networkconf_id?: string \| null = null` |
 | `unifi_network_create_route` | W | `name: string, network: string, route_type?: string = "nexthop-route", gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean = true` |
 | `unifi_network_create_vouchers` | W | `name: string, time_limit_minutes: integer, count?: integer = 1, authorized_guest_limit?: integer \| null = null, data_usage_limit_mbytes?: integer \| null = null, rx_rate_limit_kbps?: integer \| null = null, tx_rate_limit_kbps?: integer \| null = null` |
 | `unifi_network_create_wlan` | W | `name: string, security?: string = "wpapsk", wpa_mode?: string = "wpa2", x_passphrase?: string = "", enabled?: boolean = true, networkconf_id?: string \| null = null, is_guest?: boolean = false, l2_isolation?: boolean = false, wpa_enc?: string = "ccmp", wlan_band?: string = "both", ap_group_ids?: array<string> \| null = null, usergroup_id?: string \| null = null` |
@@ -130,7 +130,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 | `unifi_network_update_firewall_zone` | W | `zone_id: string, name: string, network_ids: array<string>` |
 | `unifi_network_update_network` | W | `network_id: string, name?: string \| null = null, purpose?: string \| null = null, ip_subnet?: string \| null = null, vlan?: integer \| null = null, vlan_enabled?: boolean \| null = null, dhcpd_enabled?: boolean \| null = null` |
 | `unifi_network_update_port_forward` | W | `port_forward_id: string, name?: string \| null = null, dst_port?: string \| null = null, fwd?: string \| null = null, fwd_port?: string \| null = null, proto?: string \| null = null, enabled?: boolean \| null = null` |
-| `unifi_network_update_port_profile` | W | `profile_id: string, data: object` |
+| `unifi_network_update_port_profile` | W | `profile_id: string, name?: string \| null = null, poe_mode?: string \| null = null, forward?: string \| null = null, native_networkconf_id?: string \| null = null` |
 | `unifi_network_update_route` | W | `route_id: string, name?: string \| null = null, network?: string \| null = null, route_type?: string \| null = null, gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean \| null = null` |
 | `unifi_network_update_settings` | W | `ntp_server_1?: string \| null = null, ntp_server_2?: string \| null = null, mgmt_led_enabled?: boolean \| null = null` |
 | `unifi_network_update_wlan` | W | `wlan_id: string, data: object` |

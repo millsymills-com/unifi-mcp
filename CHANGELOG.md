@@ -14,6 +14,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_create_port_profile`
+  and `unifi_network_update_port_profile` (#500). Pass `name`, `poe_mode`,
+  `forward` and optional `native_networkconf_id` as named fields. Create requires
+  the first three and a network ID for `forward="native"`; update requires at
+  least one non-null field. Other controller keys and explicit null-clearing
+  are unsupported; omitted/None fields are unchanged on update. Existing
+  delete/assignment confirmations are unchanged. No live hardware validation
+  was performed for this migration.
+
 - **BREAKING:** removed raw `data` from `unifi_network_update_network` and
   `unifi_network_update_firewall_group` (#500). Pass named fields, for example
   `dhcpd_enabled=False` or `group_members=[]`. The latter sends an explicit

@@ -259,7 +259,7 @@ class TestCreatePortProfileHandler:
         ctx = _ctx(_config(UniFiMode.READONLY), network=client)
         tool = await mcp_with_profiles.get_tool("unifi_network_create_port_profile")
         with pytest.raises(ToolError, match="read-only mode"):
-            await tool.fn(ctx, data={"name": "guest", "poe_mode": "off", "forward": "all"})
+            await tool.fn(ctx, name="guest", poe_mode="off", forward="all")
         client.create_port_profile.assert_not_awaited()
 
     async def test_readwrite_forwards_payload(self, mcp_with_profiles):
@@ -268,7 +268,7 @@ class TestCreatePortProfileHandler:
         ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
         tool = await mcp_with_profiles.get_tool("unifi_network_create_port_profile")
         payload = {"name": "guest", "poe_mode": "off", "forward": "all"}
-        result = await tool.fn(ctx, data=payload)
+        result = await tool.fn(ctx, **payload)
         assert result == {"ok": True}
         client.create_port_profile.assert_awaited_once_with(payload)
 
@@ -279,7 +279,7 @@ class TestUpdatePortProfileHandler:
         ctx = _ctx(_config(UniFiMode.READONLY), network=client)
         tool = await mcp_with_profiles.get_tool("unifi_network_update_port_profile")
         with pytest.raises(ToolError, match="read-only mode"):
-            await tool.fn(ctx, profile_id="p-1", data={"poe_mode": "off"})
+            await tool.fn(ctx, profile_id="p-1", poe_mode="off")
         client.update_port_profile.assert_not_awaited()
 
     async def test_readwrite_forwards_payload(self, mcp_with_profiles):
@@ -287,7 +287,7 @@ class TestUpdatePortProfileHandler:
         client.update_port_profile.return_value = {"ok": True}
         ctx = _ctx(_config(UniFiMode.READWRITE), network=client)
         tool = await mcp_with_profiles.get_tool("unifi_network_update_port_profile")
-        result = await tool.fn(ctx, profile_id="p-1", data={"poe_mode": "off"})
+        result = await tool.fn(ctx, profile_id="p-1", poe_mode="off")
         assert result == {"ok": True}
         client.update_port_profile.assert_awaited_once_with("p-1", {"poe_mode": "off"})
 
