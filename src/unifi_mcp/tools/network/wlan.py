@@ -239,7 +239,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             name: SSID name.
             security: Controller security mode, e.g. wpapsk, wpaeap or open.
             wpa_mode: WPA mode, e.g. wpa2 or wpa3.
-            x_passphrase: Wi-Fi password. An empty string is an explicit update.
+            x_passphrase: Wi-Fi PSK.
             enabled: Whether the WLAN is enabled. False is an explicit update.
             networkconf_id: Explicit legacy network configuration ID.
             is_guest: Guest marker; does not establish firewall-zone isolation.
@@ -250,6 +250,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             ap_group_ids: Explicit AP group IDs. An empty list is forwarded as supplied.
             usergroup_id: Explicit user group ID.
 
+        Empty strings are forwarded as supplied.
         At least one non-null field is required. None omits a field; raw
         ``data``, other controller keys and explicit null-clearing are
         unsupported. No network or structural IDs are inferred. Setting
