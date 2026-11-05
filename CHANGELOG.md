@@ -12,6 +12,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   country-code reference catalog, with bounded pagination and response redaction
   (#494). Endpoint coverage is doc-derived and not yet live-validated.
 
+### Fixed
+
+- Temporary firewall-rule cleanup in the live CRUD test now supplies the
+  required delete confirmation (#600). Offline tests execute the real cleanup
+  and tool gate after successful, update-failed, read-failed and read-back-failed
+  roundtrips. No live hardware tests were run for this correction.
+
 ### Removed
 
 - **BREAKING:** removed raw `data` from `unifi_network_update_firewall_rule`
