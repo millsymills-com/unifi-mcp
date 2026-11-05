@@ -125,10 +125,10 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 | `unifi_network_unlocate_device` | W | `mac: string` |
 | `unifi_network_update_acl_rule` | W | `acl_rule_id: string, data: object` |
 | `unifi_network_update_dns_policy` | W | `dns_policy_id: string, data: object` |
-| `unifi_network_update_firewall_group` | W | `group_id: string, data: object` |
+| `unifi_network_update_firewall_group` | W | `group_id: string, name?: string \| null = null, group_type?: string \| null = null, group_members?: array<string> \| null = null` |
 | `unifi_network_update_firewall_rule` | W | `rule_id: string, data: object` |
 | `unifi_network_update_firewall_zone` | W | `zone_id: string, name: string, network_ids: array<string>` |
-| `unifi_network_update_network` | W | `network_id: string, data: object` |
+| `unifi_network_update_network` | W | `network_id: string, name?: string \| null = null, purpose?: string \| null = null, ip_subnet?: string \| null = null, vlan?: integer \| null = null, vlan_enabled?: boolean \| null = null, dhcpd_enabled?: boolean \| null = null` |
 | `unifi_network_update_port_forward` | W | `port_forward_id: string, name?: string \| null = null, dst_port?: string \| null = null, fwd?: string \| null = null, fwd_port?: string \| null = null, proto?: string \| null = null, enabled?: boolean \| null = null` |
 | `unifi_network_update_port_profile` | W | `profile_id: string, data: object` |
 | `unifi_network_update_route` | W | `route_id: string, name?: string \| null = null, network?: string \| null = null, route_type?: string \| null = null, gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean \| null = null` |

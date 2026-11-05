@@ -19,7 +19,6 @@ from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import reject_dangerous_keys
 from unifi_mcp.tools.network.firewall import register_firewall_tools
-from unifi_mcp.tools.network.networks import register_network_config_tools
 from unifi_mcp.tools.network.port_profiles import register_port_profile_tools
 from unifi_mcp.tools.network.wlan import register_wlan_tools
 from unifi_mcp.tools.protect.cameras import register_camera_tools
@@ -187,14 +186,12 @@ async def _call(server: FastMCP, tool_name: str, ctx: AsyncMock, **kwargs: Any) 
 DENIED_PAYLOAD = {"radius_secret": "boom"}
 GUARDED_WRITE_TOOLS = [
     ("unifi_network_update_wlan", register_wlan_tools, {"wlan_id": "w-1", "data": DENIED_PAYLOAD}),
-    ("unifi_network_update_network", register_network_config_tools, {"network_id": "n-1", "data": DENIED_PAYLOAD}),
     (
         "unifi_network_create_firewall_rule",
         register_firewall_tools,
         {"name": "x", "ruleset": "LAN_IN", "data": DENIED_PAYLOAD},
     ),
     ("unifi_network_update_firewall_rule", register_firewall_tools, {"rule_id": "r-1", "data": DENIED_PAYLOAD}),
-    ("unifi_network_update_firewall_group", register_firewall_tools, {"group_id": "g-1", "data": DENIED_PAYLOAD}),
     ("unifi_network_create_port_profile", register_port_profile_tools, {"data": DENIED_PAYLOAD}),
     (
         "unifi_network_update_port_profile",

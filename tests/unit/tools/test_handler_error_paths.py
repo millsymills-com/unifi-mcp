@@ -173,7 +173,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_update_firewall_group",
         "update_firewall_group",
         "network",
-        {"group_id": "g", "data": {}},
+        {"group_id": "g", "group_members": []},
     ),
     (
         register_firewall_tools,
@@ -197,7 +197,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_update_network",
         "update_network",
         "network",
-        {"network_id": "n", "data": {}},
+        {"network_id": "n", "dhcpd_enabled": False},
     ),
     (
         register_network_config_tools,

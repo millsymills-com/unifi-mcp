@@ -132,7 +132,7 @@ NETWORK_HAPPY_PATHS = [
         register_firewall_tools,
         "unifi_network_update_firewall_group",
         "update_firewall_group",
-        {"group_id": "g-1", "data": {}},
+        {"group_id": "g-1", "group_members": []},
         None,
     ),
     (
@@ -156,7 +156,7 @@ NETWORK_HAPPY_PATHS = [
         register_network_config_tools,
         "unifi_network_update_network",
         "update_network",
-        {"network_id": "n-1", "data": {}},
+        {"network_id": "n-1", "dhcpd_enabled": False},
         None,
     ),
     (

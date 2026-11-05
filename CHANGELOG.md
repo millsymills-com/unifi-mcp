@@ -14,6 +14,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_update_network` and
+  `unifi_network_update_firewall_group` (#500). Pass named fields, for example
+  `dhcpd_enabled=False` or `group_members=[]`. The latter sends an explicit
+  empty membership list. VLAN ID and `vlan_enabled` are independent fields; pass
+  both when explicitly enabling tagging. At least one non-null field is
+  required; omitted/None fields are unchanged, arbitrary controller keys and
+  explicit null-clearing are unsupported. The guest-zone warning still applies.
+
 - **BREAKING:** removed raw `data` from `unifi_network_update_route` and
   `unifi_network_update_port_forward` (#500). Pass named fields instead, for
   example `enabled=False` or `gateway_ip="192.0.2.1"` for a route, and

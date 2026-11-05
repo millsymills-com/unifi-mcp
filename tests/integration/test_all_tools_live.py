@@ -470,7 +470,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_firewall_group",
-                {"group_id": group_id, "data": {"group_members": new_members}},
+                {"group_id": group_id, "group_members": new_members},
             )
             artifacts.dump(f"update_firewall_group-{suffix}", {"ok": True, "payload": updated})
 
@@ -1039,7 +1039,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_network",
-                {"network_id": network_id, "data": {"name": new_name}},
+                {"network_id": network_id, "name": new_name},
             )
             artifacts.dump(f"update_network-{suffix}", {"ok": True, "payload": updated})
 
