@@ -12,6 +12,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   country-code reference catalog, with bounded pagination and response redaction
   (#494). Endpoint coverage is doc-derived and not yet live-validated.
 
+### Removed
+
+- **BREAKING:** removed raw `data` from `unifi_network_update_route` and
+  `unifi_network_update_port_forward` (#500). Pass named fields instead, for
+  example `enabled=False` or `gateway_ip="192.0.2.1"` for a route, and
+  `fwd_port="8080"` for a port forward. Route fields map to the controller's
+  `static-route_*` keys automatically. Supported fields mirror each create
+  tool's named inputs; arbitrary controller keys and explicit null-clearing are
+  no longer exposed. At least one non-null field is required; omitted fields
+  are unchanged. Other raw-data tools remain pending migration.
+
 ## [0.4.0] - 2026-06-24
 
 ### Added

@@ -9,12 +9,17 @@ from fastmcp import Context, FastMCP
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
+    build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
     tool_handler,
     validate_id,
 )
+
+_PORT_FORWARD_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    name: (name,) for name in ("name", "dst_port", "fwd", "fwd_port", "proto", "enabled")
+}
 
 
 def register_port_forward_tools(mcp: FastMCP) -> None:
@@ -84,20 +89,51 @@ def register_port_forward_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_port_forward(ctx: Context, port_forward_id: str, data: JsonObject) -> dict[str, Any]:
+    async def unifi_network_update_port_forward(
+        ctx: Context,
+        port_forward_id: str,
+        *,
+        name: str | None = None,
+        dst_port: str | None = None,
+        fwd: str | None = None,
+        fwd_port: str | None = None,
+        proto: str | None = None,
+        enabled: bool | None = None,
+    ) -> dict[str, Any]:
         """Update an existing port forwarding rule. Pass only fields to change.
 
         Args:
             port_forward_id: The port forward rule ID.
-            data: Fields to update (e.g., {"enabled": false, "fwd_port": "8080"}).
+            name: Rule name.
+            dst_port: External destination port.
+            fwd: Internal forward-to IP address.
+            fwd_port: Internal forward-to port.
+            proto: Protocol: "tcp", "udp", or "tcp_udp".
+            enabled: Whether the rule is enabled. False is an explicit update.
+
+        At least one named field is required. Omitted or None fields are left
+        unchanged; raw ``data`` is unsupported.
 
         Returns:
             The upstream API response.
         """
         validate_id(port_forward_id, field="port_forward_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_port_forward")
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_port_forward",
+            field_paths=_PORT_FORWARD_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "dst_port": dst_port,
+                "fwd": fwd,
+                "fwd_port": fwd_port,
+                "proto": proto,
+                "enabled": enabled,
+            },
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_port_forward")
         return redact_secrets(
-            await get_server_context(ctx).clients["network"].update_port_forward(port_forward_id, data)
+            await get_server_context(ctx).clients["network"].update_port_forward(port_forward_id, body)
         )
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
