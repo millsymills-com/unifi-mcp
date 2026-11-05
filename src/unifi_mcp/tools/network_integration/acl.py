@@ -88,16 +88,14 @@ def register_acl_tools(mcp: FastMCP) -> None:
         ] = None,
         enforcing_device_ids: Annotated[
             list[str] | None,
-            Field(
-                description="Unique nonempty switch-device IDs; None omits the filter, without preserving the old one."
-            ),
+            Field(description="Nonempty unique device IDs; None omits the property. Client does not copy old filters."),
         ] = None,
         network_id: Annotated[
             str | None, Field(description="Required network ID for MAC rules; forbidden for IPV4.")
         ] = None,
         protocol_filter: Annotated[
             list[AclProtocol] | None,
-            Field(description="IPV4-only nonempty unique TCP/UDP list. None sends no protocol filter."),
+            Field(description="IPV4-only nonempty unique TCP/UDP list. None omits protocolFilter from the request."),
         ] = None,
         source_ip_addresses_or_subnets: Annotated[
             list[str] | None, Field(description="IPV4 source addresses/subnets; cannot combine with network IDs.")
@@ -131,13 +129,14 @@ def register_acl_tools(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Create a complete ACL rule using named fields (Network Integration API).
 
-        Update is a full-object PUT: send the complete desired rule. Omitted
-        filters are not preserved or merged. The API describes unfiltered/null
-        endpoint/protocol defaults and all switches for a null device filter.
-        Never omit a filter merely because it was unchanged. No raw data,
-        deprecated index or explicit null-clearing is exposed. Use the separate
-        reorder tool to set priority. IP and UUID semantics remain controller-validated;
-        MAC syntax uses the shared validator.
+        Update is a full-object PUT: resupply the complete desired rule. This
+        client never fetches or merges old fields. The API documents null
+        device/protocol/port defaults, but does not define source/destination
+        filter omission effects. Controller omission behavior is not live
+        verified here. None omits a request property; explicit null-clearing,
+        raw data and deprecated index are unavailable. Use the confirmed reorder
+        tool for priority. IP/UUID semantics remain controller-validated; MAC
+        syntax uses the shared validator.
 
         Returns:
             The upstream policy with sensitive fields redacted.
@@ -182,16 +181,14 @@ def register_acl_tools(mcp: FastMCP) -> None:
         ] = None,
         enforcing_device_ids: Annotated[
             list[str] | None,
-            Field(
-                description="Unique nonempty switch-device IDs; None omits the filter, without preserving the old one."
-            ),
+            Field(description="Nonempty unique device IDs; None omits the property. Client does not copy old filters."),
         ] = None,
         network_id: Annotated[
             str | None, Field(description="Required network ID for MAC rules; forbidden for IPV4.")
         ] = None,
         protocol_filter: Annotated[
             list[AclProtocol] | None,
-            Field(description="IPV4-only nonempty unique TCP/UDP list. None sends no protocol filter."),
+            Field(description="IPV4-only nonempty unique TCP/UDP list. None omits protocolFilter from the request."),
         ] = None,
         source_ip_addresses_or_subnets: Annotated[
             list[str] | None, Field(description="IPV4 source addresses/subnets; cannot combine with network IDs.")
@@ -225,13 +222,14 @@ def register_acl_tools(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Update a complete ACL rule using named fields (Network Integration API).
 
-        Update is a full-object PUT: send the complete desired rule. Omitted
-        filters are not preserved or merged. The API describes unfiltered/null
-        endpoint/protocol defaults and all switches for a null device filter.
-        Never omit a filter merely because it was unchanged. No raw data,
-        deprecated index or explicit null-clearing is exposed. Use the separate
-        reorder tool to set priority. IP and UUID semantics remain controller-validated;
-        MAC syntax uses the shared validator.
+        Update is a full-object PUT: resupply the complete desired rule. This
+        client never fetches or merges old fields. The API documents null
+        device/protocol/port defaults, but does not define source/destination
+        filter omission effects. Controller omission behavior is not live
+        verified here. None omits a request property; explicit null-clearing,
+        raw data and deprecated index are unavailable. Use the confirmed reorder
+        tool for priority. IP/UUID semantics remain controller-validated; MAC
+        syntax uses the shared validator.
 
         Returns:
             The upstream policy with sensitive fields redacted.

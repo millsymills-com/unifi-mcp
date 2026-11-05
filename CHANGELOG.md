@@ -23,8 +23,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **BREAKING:** removed raw `data` from `unifi_network_create_acl_rule` and
   `unifi_network_update_acl_rule` (#500). Pass the complete IPv4/MAC rule through
-  named fields. Update remains a full-object PUT: resupply every desired filter;
-  omitted fields are not preserved or merged. The builder selects fixed filter
+  named fields. Update remains a full-object PUT: resupply every desired filter.
+  The client does not fetch or copy old fields; controller endpoint-filter
+  omission effects are not live verified. The builder selects fixed filter
   types from the named selectors and rejects incompatible or empty selectors.
   Deprecated `index` remains unavailable; use the confirmed reorder tool.
   See [migration guidance](docs/acl-rule-migration.md). No live writes were run.

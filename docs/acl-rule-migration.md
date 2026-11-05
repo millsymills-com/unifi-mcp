@@ -4,8 +4,10 @@
 `data` with named fields. Both require `rule_type` (IPV4 or MAC), `enabled`, a
 nonempty `name`, and `action` (ALLOW or BLOCK). Update also requires
 `acl_rule_id` and remains a full-object PUT. Send the complete desired rule;
-there is no GET/merge and omitted filters are not preserved. Omitting a filter
-can broaden matching or enforcement. Do not omit it because it was unchanged.
+the client builds its body solely from supplied fields, without a GET/merge
+or copying old filters. Resupply every filter you intend to retain. The cited
+schema does not define the controller effect of omitting sourceFilter or
+destinationFilter, and that behavior has not been live verified here.
 
 ## Filter selection
 
@@ -28,10 +30,15 @@ the published schema does not mark them unique.
 MAC rules require `network_id`, mapped to `networkIdFilter`. IPv4 rules forbid
 it and may supply a nonempty unique `protocol_filter` of TCP and/or UDP. Optional
 `enforcing_device_ids` becomes a DEVICES filter. Its list is nonempty and unique;
-None sends no device filter. The API describes null device filters as applying
-to all switches and null protocol filters as applying to all protocols. A
-None/omitted endpoint sends no endpoint filter. These are not preserve-old-value
-operations in a full replacement. Explicit null-clearing is not exposed.
+None omits enforcingDeviceFilter from the request. The API describes null
+device filters as applying to all switches and null IPv4 protocol filters as
+applying to all protocols. For address/subnet and network endpoints, the optional
+null portFilter is described as applying to all ports; PORTS endpoints instead
+require a nonempty port list.
+None for an endpoint selector sends no sourceFilter/destinationFilter property.
+That request shape is tested offline; controller-side omission effects are
+unverified. Explicit null-clearing is not exposed, and omission must not be
+assumed to preserve or clear a filter.
 
 `description` may be omitted; an empty string is sent explicitly. False is also
 sent explicitly. ID path syntax and MAC syntax use the shared validators; IP,
