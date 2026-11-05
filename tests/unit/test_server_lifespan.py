@@ -20,7 +20,7 @@ from unifi_mcp.server import ServerContext, _register_client, create_server, ser
 
 
 def _as_config():
-    """Build a real UniFiConfig with all three APIs enabled."""
+    """Build a real UniFiConfig with all four API clients enabled."""
     from unifi_mcp.config import UniFiConfig, UniFiMode
 
     return UniFiConfig(
@@ -72,8 +72,11 @@ class TestRegisterClient:
 # ── server_lifespan full boot path ────────────────────────────────────────
 
 
-def _setup_env_for_lifespan(monkeypatch, tmp_path=None):
-    """Ensure UniFiConfig() in the lifespan reads a valid full-stack config.
+def _setup_env_for_lifespan(monkeypatch, tmp_path=None, *, integration=False):
+    """Ensure UniFiConfig() reads the explicitly selected backend set.
+
+    Legacy-only cases disable Network Integration; full-stack and Integration
+    cases must opt in and mock its client as well.
 
     ``tmp_path`` (optional): when supplied, ``monkeypatch.chdir(tmp_path)``
     isolates the test from any ``.env`` in cwd. Tests that explicitly set
@@ -82,6 +85,7 @@ def _setup_env_for_lifespan(monkeypatch, tmp_path=None):
     at repo root leaks the "absent" key back in.
     """
     monkeypatch.setenv("UNIFI_MODE", "readonly")
+    monkeypatch.setenv("UNIFI_NETWORK_INTEGRATION_ENABLED", str(integration).lower())
     monkeypatch.setenv("UNIFI_NETWORK_API", "net-k")
     monkeypatch.setenv("UNIFI_PROTECT_API", "prot-k")
     monkeypatch.setenv("UNIFI_SITE_MANAGER_API", "sm-k")
@@ -99,27 +103,32 @@ def _make_validating_client(valid: bool = True) -> AsyncMock:
 
 
 class TestServerLifespan:
-    async def test_yields_context_with_all_three_clients(self, monkeypatch):
-        _setup_env_for_lifespan(monkeypatch)
+    async def test_yields_context_with_all_four_clients(self, monkeypatch):
+        _setup_env_for_lifespan(monkeypatch, integration=True)
 
         net_client = _make_validating_client()
+        ni_client = _make_validating_client()
         prot_client = _make_validating_client()
         sm_client = _make_validating_client()
 
         with (
             patch("unifi_mcp.clients.network.NetworkClient", return_value=net_client),
+            patch("unifi_mcp.clients.network_integration.NetworkIntegrationClient", return_value=ni_client),
             patch("unifi_mcp.clients.protect.ProtectClient", return_value=prot_client),
             patch("unifi_mcp.clients.site_manager.SiteManagerClient", return_value=sm_client),
         ):
             gen = server_lifespan._fn(None)
             async with aclosing(gen):
                 context = await gen.__anext__()
-                assert set(context.clients.keys()) == {"network", "protect", "site_manager"}
+                assert set(context.clients.keys()) == {"network", "network_integration", "protect", "site_manager"}
                 # Drive the generator to completion to exercise the close loop.
                 with pytest.raises(StopAsyncIteration):
                     await gen.__anext__()
 
         # Close loop ran exactly once per registered client.
+        for client in (net_client, ni_client, prot_client, sm_client):
+            client.validate_connection.assert_awaited_once()
+        ni_client.close.assert_awaited_once()
         net_client.close.assert_awaited_once()
         prot_client.close.assert_awaited_once()
         sm_client.close.assert_awaited_once()
@@ -127,6 +136,7 @@ class TestServerLifespan:
     async def test_skips_disabled_apis(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)  # isolate from any .env leaking the "absent" keys
         monkeypatch.setenv("UNIFI_MODE", "readonly")
+        monkeypatch.setenv("UNIFI_NETWORK_INTEGRATION_ENABLED", "false")
         monkeypatch.setenv("UNIFI_NETWORK_API", "k")
         # Protect and Site Manager stay unset.
         monkeypatch.delenv("UNIFI_PROTECT_API", raising=False)
@@ -505,6 +515,7 @@ class TestServerLifespan:
         """
         monkeypatch.chdir(tmp_path)  # isolate from any .env that pre-sets these vars
         monkeypatch.setenv("UNIFI_MODE", "readonly")
+        monkeypatch.setenv("UNIFI_NETWORK_INTEGRATION_ENABLED", "false")
         monkeypatch.setenv("UNIFI_NETWORK_HOST", "10.0.0.1")
         monkeypatch.setenv("UNIFI_NETWORK_API", "n")
         monkeypatch.setenv("UNIFI_PROTECT_HOST", "10.0.0.2")
@@ -543,6 +554,7 @@ class TestServerLifespan:
         """
         monkeypatch.chdir(tmp_path)  # isolate from any .env leaking UNIFI_PROTECT_HOST
         monkeypatch.setenv("UNIFI_MODE", "readonly")
+        monkeypatch.setenv("UNIFI_NETWORK_INTEGRATION_ENABLED", "false")
         monkeypatch.setenv("UNIFI_NETWORK_HOST", "10.0.0.1")
         monkeypatch.setenv("UNIFI_NETWORK_API", "n")
         monkeypatch.setenv("UNIFI_PROTECT_PORT", "7443")
@@ -586,7 +598,7 @@ class TestServerLifespan:
         constructed against the Network key/host; here the legacy one validates
         and the Integration one fails, mirroring old firmware.
         """
-        _setup_env_for_lifespan(monkeypatch)
+        _setup_env_for_lifespan(monkeypatch, integration=True)
         monkeypatch.delenv("UNIFI_PROTECT_API", raising=False)
         monkeypatch.delenv("UNIFI_SITE_MANAGER_API", raising=False)
 
@@ -614,6 +626,11 @@ class TestServerLifespan:
                 assert ni_left == [], f"integration tools should be disabled, still present: {ni_left}"
                 with pytest.raises(StopAsyncIteration):
                     await gen.__anext__()
+
+        failing_ni.validate_connection.assert_awaited_once()
+        failing_ni.close.assert_awaited_once()
+        net_client.validate_connection.assert_awaited_once()
+        net_client.close.assert_awaited_once()
 
     async def test_unreachable_api_does_not_disable_others(self, monkeypatch):
         """Disabling one API's tools must not touch other APIs' tools."""
@@ -685,6 +702,15 @@ class TestEnabledWithoutKeyGuards:
 
         _setup_env_for_lifespan(monkeypatch, tmp_path)
         monkeypatch.delenv(env_var, raising=False)
+        # Earlier enabled APIs must not perform real validation while this test
+        # reaches the selected API's missing-key guard.
+        for constructor in (
+            "unifi_mcp.clients.network.NetworkClient",
+            "unifi_mcp.clients.network_integration.NetworkIntegrationClient",
+            "unifi_mcp.clients.protect.ProtectClient",
+            "unifi_mcp.clients.site_manager.SiteManagerClient",
+        ):
+            monkeypatch.setattr(constructor, lambda **_kwargs: _make_validating_client())
 
         property_name = f"{api}_enabled"
         monkeypatch.setattr(UniFiConfig, property_name, property(lambda _self: True))

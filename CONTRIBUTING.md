@@ -65,6 +65,12 @@ Follow these conventions when changing Python code:
 ## Testing
 
 - Unit tests use `pytest` + `pytest-asyncio` + `respx` for HTTP mocking.
+- Unit/property tests refuse unmocked DNS lookups and TCP connections. Mock HTTP
+  with `respx` or `httpx.MockTransport`, and explicitly select/mock every enabled
+  backend in lifespan tests. Local TLS-handshake fixtures register only their
+  test-owned `127.0.0.1` port through `allow_loopback_tcp`; no other address or
+  port is permitted. This guard does not apply to integration tests or authorize
+  live hardware operations.
 - Integration tests live under `tests/integration/` and require live UniFi hardware. Mark them with `@pytest.mark.integration`.
 - When adding a tool, add at least one happy-path test and one error-path test. Cover mode gating for any write tool.
 

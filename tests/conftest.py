@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import socket
 from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock
@@ -26,6 +27,67 @@ def _isolate_offline_config(request: pytest.FixtureRequest, monkeypatch: pytest.
         if name.upper().startswith("UNIFI_"):
             monkeypatch.delenv(name)
     monkeypatch.setitem(UniFiConfig.model_config, "env_file", None)
+
+
+@pytest.fixture
+def _offline_tcp_ports() -> set[int]:
+    return set()
+
+
+@pytest.fixture
+def allow_loopback_tcp(_offline_tcp_ports):
+    """Permit only an explicitly registered test-owned 127.0.0.1 TCP port."""
+
+    def allow(port):
+        if type(port) is not int or not 1 <= port <= 65535:
+            raise ValueError("a test-owned loopback TCP port must be an integer from 1 to 65535")
+        _offline_tcp_ports.add(port)
+
+    return allow
+
+
+@pytest.fixture(autouse=True)
+def _block_offline_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, _offline_tcp_ports):
+    """Refuse offline DNS/TCP except fixture-registered loopback endpoints."""
+    test_dir = request.path.relative_to(request.config.rootpath).parts[:2]
+    if test_dir not in (("tests", "unit"), ("tests", "property")):
+        return
+
+    def allowed(address):
+        return (
+            isinstance(address, tuple)
+            and len(address) >= 2
+            and address[0] in ("127.0.0.1", b"127.0.0.1")
+            and type(address[1]) is int
+            and address[1] in _offline_tcp_ports
+        )
+
+    def refuse(*_args, **_kwargs):
+        raise AssertionError("unmocked DNS/TCP access in an offline unit/property test")
+
+    def guard(original, *, method=False):
+        def checked(*args, **kwargs):
+            index = 1 if method else 0
+            address = args[index] if len(args) > index else kwargs.get("address")
+            if not allowed(address):
+                refuse()
+            return original(*args, **kwargs)
+
+        return checked
+
+    original_resolve = socket.getaddrinfo
+
+    def resolve(host, port, *args, **kwargs):
+        if not allowed((host, port)):
+            refuse()
+        return original_resolve(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "create_connection", guard(socket.create_connection))
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    for name in ("gethostbyname", "gethostbyname_ex"):
+        monkeypatch.setattr(socket, name, refuse)
+    for name in ("connect", "connect_ex"):
+        monkeypatch.setattr(socket.socket, name, guard(getattr(socket.socket, name), method=True))
 
 
 @pytest.fixture(autouse=True)
