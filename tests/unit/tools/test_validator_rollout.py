@@ -96,7 +96,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_firewall_tools,
         "unifi_network_update_firewall_rule",
-        {"rule_id": TRAVERSAL, "data": {}},
+        {"rule_id": TRAVERSAL, "enabled": False},
         "update_firewall_rule",
         "network",
     ),

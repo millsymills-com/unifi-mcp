@@ -726,7 +726,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_firewall_rule",
-                {"rule_id": rule_id, "data": {"action": "reject"}},
+                {"rule_id": rule_id, "action": "reject"},
             )
             artifacts.dump(f"update_firewall_rule-{suffix}", {"ok": True, "payload": updated})
 

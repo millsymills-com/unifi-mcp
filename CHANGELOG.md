@@ -14,6 +14,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_update_firewall_rule`
+  (#500). Pass named rule fields such as `enabled=False`, `rule_index=20000`
+  or `src_firewallgroup_ids=[]`. At least one non-null field is required;
+  None omits a field, and explicit null-clearing/arbitrary controller keys
+  are unsupported. Empty match lists are explicit and can broaden matching.
+  Create retains its existing interface pending separate migration. See
+  [migration guidance](docs/firewall-rule-update-migration.md).
+
+
 - **BREAKING:** removed raw `data` from `unifi_network_create_dns_policy` and
   `unifi_network_update_dns_policy` (#500). Pass the complete selected policy
   through named fields; all seven variants remain available. Update is still a

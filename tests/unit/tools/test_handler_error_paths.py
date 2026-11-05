@@ -152,7 +152,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "unifi_network_update_firewall_rule",
         "update_firewall_rule",
         "network",
-        {"rule_id": "r", "data": {}},
+        {"rule_id": "r", "enabled": False},
     ),
     (
         register_firewall_tools,

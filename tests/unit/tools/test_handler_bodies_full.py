@@ -111,7 +111,7 @@ NETWORK_HAPPY_PATHS = [
         register_firewall_tools,
         "unifi_network_update_firewall_rule",
         "update_firewall_rule",
-        {"rule_id": "r-1", "data": {}},
+        {"rule_id": "r-1", "enabled": False},
         None,
     ),
     (
