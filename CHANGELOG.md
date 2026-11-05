@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Read-only `unifi_network_list_countries` for the global Network Integration
+  country-code reference catalog, with bounded pagination and response redaction
+  (#494). Endpoint coverage is doc-derived and not yet live-validated.
+
 ### Removed
 
 - **BREAKING:** removed raw `data` from `unifi_network_update_route` and

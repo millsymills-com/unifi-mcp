@@ -11,12 +11,15 @@ from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
+import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
+from unifi_mcp.clients.network_integration import NetworkIntegrationClient
 from unifi_mcp.config import UniFiConfig, UniFiMode
-from unifi_mcp.errors import UniFiNotFoundError
+from unifi_mcp.errors import UniFiAuthError, UniFiBadRequestError, UniFiNotFoundError
 from unifi_mcp.tools.network_integration import register_network_integration_tools
 
 _REDACTED = "***REDACTED***"
@@ -52,7 +55,7 @@ def _config_rw(max_items: int = 1000, max_offset: int = 100_000) -> UniFiConfig:
     )
 
 
-def _ctx(config: UniFiConfig, client: AsyncMock) -> AsyncMock:
+def _ctx(config: UniFiConfig, client: Any) -> AsyncMock:
     ctx = AsyncMock()
     ctx.lifespan_context = _Lifespan(config=config, clients={"network_integration": client})
     return ctx
@@ -74,7 +77,7 @@ class TestAllTaggedNetworkIntegration:
     async def test_read_tools_tagged_and_named(self, server):
         tools = await server.list_tools()
         reads = [t for t in tools if "network_integration" in set(t.tags) and "write" not in set(t.tags)]
-        assert len(reads) == 28
+        assert len(reads) == 29
         for t in reads:
             assert t.name.startswith("unifi_network_")
 
@@ -433,3 +436,85 @@ class TestVoucherWrites:
         for name in ("unifi_network_delete_vouchers", "unifi_network_delete_voucher"):
             tool = next(t for t in tools if t.name == name)
             assert tool.annotations.destructive_hint is True
+
+
+class TestCountries:
+    async def test_passes_pagination_and_redacts_without_losing_country_fields(self, server):
+        client = AsyncMock()
+        client.list_countries.return_value = {
+            "data": [{"code": "GB", "name": "United Kingdom", "apiKey": "synthetic-secret"}],
+            "offset": 10,
+            "limit": 25,
+            "count": 1,
+            "totalCount": 11,
+        }
+        result = await _call(server, "unifi_network_list_countries", _ctx(_config(), client), offset=10, limit=25)
+        client.list_countries.assert_awaited_once_with(offset=10, limit=25)
+        assert result == {
+            "data": [{"code": "GB", "name": "United Kingdom", "apiKey": _REDACTED}],
+            "offset": 10,
+            "limit": 25,
+            "count": 1,
+            "totalCount": 11,
+        }
+
+    async def test_defaults_and_empty_page(self, server):
+        client = AsyncMock()
+        client.list_countries.return_value = {"data": [], "offset": 0, "limit": 200, "count": 0, "totalCount": 0}
+        result = await _call(server, "unifi_network_list_countries", _ctx(_config(), client))
+        client.list_countries.assert_awaited_once_with(offset=0, limit=200)
+        assert result == client.list_countries.return_value
+
+    @pytest.mark.parametrize(("offset", "limit"), [(-1, 25), (101, 25), (0, 0), (0, 26)])
+    async def test_pagination_refused_before_client_call(self, server, offset, limit):
+        client = AsyncMock()
+        with pytest.raises(ToolError, match="must be between"):
+            await _call(
+                server, "unifi_network_list_countries", _ctx(_config(25, 100), client), offset=offset, limit=limit
+            )
+        client.list_countries.assert_not_awaited()
+
+    @pytest.mark.parametrize("error", [UniFiAuthError, UniFiBadRequestError, UniFiNotFoundError])
+    async def test_error_funnel(self, server, error):
+        client = AsyncMock()
+        client.list_countries.side_effect = error("Countries endpoint unavailable")
+        with pytest.raises(ToolError, match="Countries endpoint unavailable"):
+            await _call(server, "unifi_network_list_countries", _ctx(_config(), client))
+
+    async def test_visible_readonly_and_tagged_for_backend_degradation(self):
+        from unifi_mcp.server import create_server
+
+        tools = {tool.name: tool for tool in await create_server(_config()).list_tools()}
+        assert set(tools["unifi_network_list_countries"].tags) == {"network_integration"}
+
+    async def test_limit_schema_advertises_endpoint_ceiling(self, server):
+        tool = await server.get_tool("unifi_network_list_countries")
+        limit = tool.parameters["properties"]["limit"]
+        assert limit["minimum"] == 1
+        assert limit["maximum"] == 200
+        assert limit["default"] == 200
+        assert "whichever is lower" in limit["description"]
+
+    @pytest.mark.parametrize(
+        ("max_items", "limit", "accepted"),
+        [(1000, 200, True), (1000, 201, False), (50, 50, True), (50, 51, False), (50, 200, False)],
+    )
+    @respx.mock
+    async def test_effective_limit_checked_before_http(self, server, max_items, limit, accepted):
+        client = NetworkIntegrationClient(base_url="https://192.0.2.1", api_key="synthetic-key")
+        page = {"data": [], "offset": 0, "limit": limit, "count": 0, "totalCount": 0}
+        route = respx.get("https://192.0.2.1/proxy/network/integration/v1/countries").mock(
+            return_value=httpx.Response(200, json=page)
+        )
+        ctx = _ctx(_config(max_items=max_items), client)
+        try:
+            if accepted:
+                assert await _call(server, "unifi_network_list_countries", ctx, limit=limit) == page
+                assert route.call_count == 1
+                assert route.calls[0].request.url.params["limit"] == str(limit)
+            else:
+                with pytest.raises(ToolError, match="limit must be between"):
+                    await _call(server, "unifi_network_list_countries", ctx, limit=limit)
+                assert route.call_count == 0
+        finally:
+            await client.close()

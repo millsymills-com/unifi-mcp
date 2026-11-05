@@ -12,7 +12,7 @@ Python MCP server for UniFi Site Manager, Network, and Protect APIs.
 
 Stage: S3
 
-Actively maintained. 160 tools spanning all three UniFi APIs — complete for the
+Actively maintained. 161 tools spanning all three UniFi APIs — complete for the
 core Network controller workflows it targets, with documented gaps against the
 official Network/Protect/Site Manager API surfaces. See the
 [API coverage matrix](docs/api-coverage-matrix.md) for the endpoint-by-endpoint
@@ -23,10 +23,33 @@ breakdown. Installed from source, not published to PyPI. See
 
 The server registers tools for configured APIs and checks code quality in CI.
 
-- It provides 160 MCP tools for UniFi Network (106), Protect (45), and Site Manager (9), all under the `unifi_*` namespace.
+- It provides 161 MCP tools for UniFi Network (107), Protect (45), and Site Manager (9), all under the `unifi_*` namespace.
 - Write tools are invisible in readonly mode.
 - Only tools for configured APIs are registered.
 - CI on Python 3.13 type-checks with strict `ty`, lints and formats with `ruff`, and runs `pytest`.
+
+## Tool inventory
+
+Fully configured readwrite registration is shown below. API configuration,
+mode gating and tool profiles determine which tools a client can see. Counts
+are declared in [`src/unifi_mcp/_inventory.py`](src/unifi_mcp/_inventory.py) and
+checked against live registration and this table by
+[`tests/unit/test_tool_inventory.py`](tests/unit/test_tool_inventory.py).
+
+| Namespace | Read | Write | Total |
+| --- | ---: | ---: | ---: |
+| Network | 55 | 52 | 107 |
+| Protect | 37 | 8 | 45 |
+| Site Manager | 9 | 0 | 9 |
+| Total | 101 | 60 | 161 |
+
+The Network namespace combines two origins. Both use `unifi_network_*` names;
+Integration tools carry the `network_integration` tag.
+
+| Network origin | Read | Write | Total |
+| --- | ---: | ---: | ---: |
+| Legacy controller | 26 | 39 | 65 |
+| Network Integration | 29 | 13 | 42 |
 
 ## Network read IDs and timeout diagnostics
 
