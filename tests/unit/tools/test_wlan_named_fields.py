@@ -145,3 +145,20 @@ async def test_tools_list_exposes_only_id_and_named_types(wlan_tool):
         assert {item["type"] for item in spec["anyOf"]} == {kind, "null"}
         if kind == "array":
             assert next(item for item in spec["anyOf"] if item["type"] == "array")["items"] == {"type": "string"}
+
+
+@pytest.mark.parametrize(
+    ("name", "description", "default"),
+    [
+        ("unifi_network_create_wlan", "Wi-Fi password (required for wpapsk).", ""),
+        ("unifi_network_update_wlan", "Wi-Fi PSK.", None),
+    ],
+)
+async def test_wireless_credential_guidance_remains_in_parameter_metadata(name, description, default):
+    server = FastMCP(name="offline WLAN parameter guidance")
+    register_wlan_tools(server)
+    async with Client(server) as client:
+        tools = {tool.name: tool for tool in await client.list_tools()}
+    parameter = tools[name].input_schema["properties"]["x_passphrase"]
+    assert parameter["description"] == description
+    assert parameter["default"] == default

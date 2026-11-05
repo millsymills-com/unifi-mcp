@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastmcp import Context, FastMCP
+from pydantic import Field
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
@@ -137,7 +138,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         name: str,
         security: str = "wpapsk",
         wpa_mode: str = "wpa2",
-        x_passphrase: str = "",
+        x_passphrase: Annotated[str, Field(description="Wi-Fi password (required for wpapsk).")] = "",
         enabled: bool = True,
         networkconf_id: str | None = None,
         is_guest: bool = False,
@@ -163,7 +164,6 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             name: SSID name for the wireless network.
             security: Security mode — "wpapsk", "wpaeap", or "open".
             wpa_mode: WPA mode — "wpa2" or "wpa3".
-            x_passphrase: Wi-Fi password (required for wpapsk).
             enabled: Whether the WLAN is enabled.
             networkconf_id: Network (VLAN) id to attach the SSID to; the
                 site's default LAN when omitted.
@@ -221,7 +221,7 @@ def register_wlan_tools(mcp: FastMCP) -> None:
         name: str | None = None,
         security: str | None = None,
         wpa_mode: str | None = None,
-        x_passphrase: str | None = None,
+        x_passphrase: Annotated[str | None, Field(description="Wi-Fi PSK.")] = None,
         enabled: bool | None = None,
         networkconf_id: str | None = None,
         is_guest: bool | None = None,
@@ -239,7 +239,6 @@ def register_wlan_tools(mcp: FastMCP) -> None:
             name: SSID name.
             security: Controller security mode, e.g. wpapsk, wpaeap or open.
             wpa_mode: WPA mode, e.g. wpa2 or wpa3.
-            x_passphrase: Wi-Fi PSK.
             enabled: Whether the WLAN is enabled. False is an explicit update.
             networkconf_id: Explicit legacy network configuration ID.
             is_guest: Guest marker; does not establish firewall-zone isolation.
