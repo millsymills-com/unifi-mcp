@@ -405,7 +405,7 @@ class TestWriteResponseRedaction:
             return_value={"_id": "w-1", "name": "Home", "x_passphrase": "super-secret", "radius_secret": "r-sec"},
         )
         ctx = _fake_rw_ctx(network=network_client)
-        result = await _call(server, "unifi_network_update_wlan", ctx, wlan_id="w-1", data={"name": "Home"})
+        result = await _call(server, "unifi_network_update_wlan", ctx, wlan_id="w-1", name="Home")
         assert result["x_passphrase"] == REDACTED
         assert result["radius_secret"] == REDACTED
         assert result["name"] == "Home"

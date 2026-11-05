@@ -80,7 +80,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_wlan_tools,
         "unifi_network_update_wlan",
-        {"wlan_id": TRAVERSAL, "data": {}},
+        {"wlan_id": TRAVERSAL, "name": "fixture"},
         "update_wlan",
         "network",
     ),

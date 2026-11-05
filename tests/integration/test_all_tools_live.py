@@ -601,7 +601,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_wlan",
-                {"wlan_id": wlan_id, "data": {"name": target_name}},
+                {"wlan_id": wlan_id, "name": target_name},
             )
             artifacts.dump(
                 "wlan_update_applied",
@@ -619,7 +619,7 @@ class TestWriteRoundtrips:
             await _invoke(
                 live_client,
                 "unifi_network_update_wlan",
-                {"wlan_id": wlan_id, "data": {"name": original_name}},
+                {"wlan_id": wlan_id, "name": original_name},
             )
             artifacts.dump("wlan_update_restored", {"wlan_id": wlan_id, "restored_name": original_name})
 
