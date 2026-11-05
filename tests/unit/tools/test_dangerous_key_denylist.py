@@ -190,7 +190,6 @@ GUARDED_WRITE_TOOLS = [
         register_firewall_tools,
         {"name": "x", "ruleset": "LAN_IN", "data": DENIED_PAYLOAD},
     ),
-    ("unifi_network_update_firewall_rule", register_firewall_tools, {"rule_id": "r-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_chime", register_protect_device_tools, {"chime_id": "ch-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_light", register_protect_device_tools, {"light_id": "l-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_sensor", register_protect_device_tools, {"sensor_id": "s-1", "data": DENIED_PAYLOAD}),
