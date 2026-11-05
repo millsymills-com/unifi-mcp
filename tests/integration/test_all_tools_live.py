@@ -686,8 +686,8 @@ class TestWriteRoundtrips:
 
         Modern controllers reject scalar-only create payloads with
         ``api.err.FirewallRuleFieldsRequired`` (#90), so this test passes the
-        full payload via the tool's ``data`` escape hatch — exercising the
-        same path agents use for non-trivial rules. ``192.0.2.0/24``
+        full payload through named tool arguments, exercising the same
+        path agents use for non-trivial rules. ``192.0.2.0/24``
         (RFC5737 TEST-NET-1) keeps the rule inert against real traffic and
         the rule is created disabled.
         """
@@ -715,7 +715,7 @@ class TestWriteRoundtrips:
         created = await _invoke(
             live_client,
             "unifi_network_create_firewall_rule",
-            {"name": name, "ruleset": "LAN_IN", "data": payload},
+            payload,
         )
         artifacts.dump(f"create_firewall_rule-{suffix}", {"ok": True, "payload": created})
         items = _unwrap_list(created)
