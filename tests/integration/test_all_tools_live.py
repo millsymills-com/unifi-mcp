@@ -1152,7 +1152,9 @@ class TestWriteRoundtrips:
                 f"Read-back poe_mode mismatch: set 'auto', got {found.get('poe_mode')!r}"
             )
         finally:
-            deleted = await _invoke(live_client, "unifi_network_delete_port_profile", {"profile_id": profile_id})
+            deleted = await _invoke(
+                live_client, "unifi_network_delete_port_profile", {"profile_id": profile_id, "confirm": True}
+            )
             artifacts.dump(f"delete_port_profile-{suffix}", {"ok": True, "payload": deleted})
 
     async def test_provision_device_smoke(self, live_client, artifacts, touched_devices):
