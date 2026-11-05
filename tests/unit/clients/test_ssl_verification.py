@@ -320,7 +320,7 @@ def _running_https_server(
 
 
 @pytest.fixture
-def tls_server(tmp_path: Path) -> Iterator[tuple[_LocalHTTPSServer, Path]]:
+def tls_server(tmp_path: Path, allow_loopback_tcp) -> Iterator[tuple[_LocalHTTPSServer, Path]]:
     """Stand up a local HTTPS server signed by an in-test CA.
 
     Yields the running server and the path to the CA-bundle PEM. Both are torn
@@ -335,6 +335,7 @@ def tls_server(tmp_path: Path) -> Iterator[tuple[_LocalHTTPSServer, Path]]:
     ca_path.write_bytes(ca_pem)
 
     with _running_https_server(server_cert_pem, server_key_pem, tmp_path, name="tls-server") as server:
+        allow_loopback_tcp(server.port)
         yield server, ca_path
 
 
@@ -468,6 +469,7 @@ class TestVerifySslIntermediateChain:
         self,
         tmp_path: Path,
         trailing_order: tuple[str, ...],
+        allow_loopback_tcp,
     ) -> None:
         root_pem, intermediate_pem, leaf_pem, leaf_key_pem = _generate_three_tier_chain("127.0.0.1")
         root_path = tmp_path / "root.pem"
@@ -479,6 +481,7 @@ class TestVerifySslIntermediateChain:
         trailing_pems = {"intermediate": intermediate_pem, "root": root_pem}
         server_chain_pem = leaf_pem + b"".join(trailing_pems[name] for name in trailing_order)
         with _running_https_server(server_chain_pem, leaf_key_pem, tmp_path, name="full-chain") as server:
+            allow_loopback_tcp(server.port)
             verify_arg: Any = str(root_path)
             client = _ConcreteClient(
                 base_url=server.base_url,
@@ -493,7 +496,7 @@ class TestVerifySslIntermediateChain:
             finally:
                 await client.close()
 
-    async def test_missing_intermediate_breaks_chain(self, tmp_path: Path) -> None:
+    async def test_missing_intermediate_breaks_chain(self, tmp_path: Path, allow_loopback_tcp) -> None:
         root_pem, _intermediate_pem, leaf_pem, leaf_key_pem = _generate_three_tier_chain("127.0.0.1")
         root_path = tmp_path / "root.pem"
         root_path.write_bytes(root_pem)
@@ -504,6 +507,7 @@ class TestVerifySslIntermediateChain:
         # intermediate-chain building, not a lenient fallback that would also
         # accept an incomplete chain.
         with _running_https_server(leaf_pem, leaf_key_pem, tmp_path, name="leaf-only") as server:
+            allow_loopback_tcp(server.port)
             verify_arg: Any = str(root_path)
             client = _ConcreteClient(
                 base_url=server.base_url,

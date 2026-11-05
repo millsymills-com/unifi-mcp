@@ -104,6 +104,7 @@ def _clear_api_env(monkeypatch, tmp_path) -> None:
     for var in ("UNIFI_NETWORK_API", "UNIFI_PROTECT_API", "UNIFI_SITE_MANAGER_API"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("UNIFI_NETWORK_INTEGRATION_ENABLED", "false")
 
 
 def _stub_client(valid: bool = True) -> AsyncMock:
@@ -187,6 +188,7 @@ class TestBadAuthDisablesAnyAPI:
     )
     async def test_failing_api_tools_disabled(self, monkeypatch, failing_api, prefix):
         monkeypatch.setenv("UNIFI_MODE", "readonly")
+        monkeypatch.setenv("UNIFI_NETWORK_INTEGRATION_ENABLED", "false")
         monkeypatch.setenv("UNIFI_NETWORK_API", "n")
         monkeypatch.setenv("UNIFI_PROTECT_API", "p")
         monkeypatch.setenv("UNIFI_SITE_MANAGER_API", "s")
