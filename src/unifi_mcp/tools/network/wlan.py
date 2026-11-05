@@ -9,12 +9,32 @@ from fastmcp import Context, FastMCP
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
     JsonObject,
+    build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
     tool_handler,
     validate_id,
 )
+
+_WLAN_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    name: (name,)
+    for name in (
+        "name",
+        "security",
+        "wpa_mode",
+        "x_passphrase",
+        "enabled",
+        "networkconf_id",
+        "is_guest",
+        "l2_isolation",
+        "wpa_enc",
+        "wlan_band",
+        "wlan_bands",
+        "ap_group_ids",
+        "usergroup_id",
+    )
+}
 
 
 async def _resolve_structural_ids(
@@ -194,19 +214,83 @@ def register_wlan_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_wlan(ctx: Context, wlan_id: str, data: JsonObject) -> dict[str, Any]:
-        """Update an existing WLAN configuration. Pass only fields to change.
+    async def unifi_network_update_wlan(
+        ctx: Context,
+        wlan_id: str,
+        *,
+        name: str | None = None,
+        security: str | None = None,
+        wpa_mode: str | None = None,
+        x_passphrase: str | None = None,
+        enabled: bool | None = None,
+        networkconf_id: str | None = None,
+        is_guest: bool | None = None,
+        l2_isolation: bool | None = None,
+        wpa_enc: str | None = None,
+        wlan_band: str | None = None,
+        wlan_bands: list[str] | None = None,
+        ap_group_ids: list[str] | None = None,
+        usergroup_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Update named WLAN fields without resolving or changing omitted fields.
 
         Args:
             wlan_id: The WLAN configuration ID to update.
-            data: Fields to update (e.g., {"name": "new-name", "enabled": false}).
+            name: SSID name.
+            security: Controller security mode, e.g. wpapsk, wpaeap or open.
+            wpa_mode: WPA mode, e.g. wpa2 or wpa3.
+            x_passphrase: Wi-Fi password. An empty string is an explicit update.
+            enabled: Whether the WLAN is enabled. False is an explicit update.
+            networkconf_id: Explicit legacy network configuration ID.
+            is_guest: Guest marker; does not establish firewall-zone isolation.
+            l2_isolation: Whether to block client-to-client traffic.
+            wpa_enc: WPA encryption cipher.
+            wlan_band: Legacy radio band field, e.g. both, 2g or 5g.
+            wlan_bands: Radio band list. Independent of wlan_band; pass both for a paired change.
+            ap_group_ids: Explicit AP group IDs. An empty list is forwarded as supplied.
+            usergroup_id: Explicit user group ID.
+
+        At least one non-null field is required. None omits a field; raw
+        ``data``, other controller keys and explicit null-clearing are
+        unsupported. No network or structural IDs are inferred. Setting
+        is_guest does not attach the WLAN to a guest network or firewall zone;
+        the operator must select the appropriate network explicitly.
 
         Returns:
-            The upstream API response.
+            The upstream API response with sensitive fields redacted.
         """
         validate_id(wlan_id, field="wlan_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_wlan")
-        return redact_secrets(await get_server_context(ctx).clients["network"].update_wlan(wlan_id, data))
+        for field, value in (("networkconf_id", networkconf_id), ("usergroup_id", usergroup_id)):
+            if value is not None:
+                validate_id(value, field=field)
+        for field, items in (("ap_group_ids", ap_group_ids), ("wlan_bands", wlan_bands)):
+            if items is not None and (not isinstance(items, list) or any(not isinstance(item, str) for item in items)):
+                raise UniFiBadRequestError(f"{field} must be a list of strings")
+        if ap_group_ids is not None:
+            for group_id in ap_group_ids:
+                validate_id(group_id, field="ap_group_ids")
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_wlan",
+            field_paths=_WLAN_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "security": security,
+                "wpa_mode": wpa_mode,
+                "x_passphrase": x_passphrase,
+                "enabled": enabled,
+                "networkconf_id": networkconf_id,
+                "is_guest": is_guest,
+                "l2_isolation": l2_isolation,
+                "wpa_enc": wpa_enc,
+                "wlan_band": wlan_band,
+                "wlan_bands": wlan_bands,
+                "ap_group_ids": ap_group_ids,
+                "usergroup_id": usergroup_id,
+            },
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_wlan")
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_wlan(wlan_id, body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)

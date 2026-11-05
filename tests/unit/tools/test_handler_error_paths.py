@@ -133,7 +133,7 @@ ERROR_PATH_CASES: list[tuple[Any, str, str, str, dict[str, Any]]] = [
         "network",
         {"name": "n", "ap_group_ids": ["ap-1"], "usergroup_id": "ug-1", "networkconf_id": "net-1"},
     ),
-    (register_wlan_tools, "unifi_network_update_wlan", "update_wlan", "network", {"wlan_id": "w-1", "data": {}}),
+    (register_wlan_tools, "unifi_network_update_wlan", "update_wlan", "network", {"wlan_id": "w-1", "name": "fixture"}),
     (register_wlan_tools, "unifi_network_delete_wlan", "delete_wlan", "network", {"wlan_id": "w-1", "confirm": True}),
     # Firewall
     (register_firewall_tools, "unifi_network_list_firewall_rules", "list_firewall_rules", "network", {}),

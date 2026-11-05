@@ -14,6 +14,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_update_wlan` (#500).
+  Pass named WLAN fields instead, e.g. `name="fixture"` or `enabled=False`.
+  Supported fields cover SSID/security, guest/isolation flags, network/group
+  IDs and radio bands; `wlan_band` and `wlan_bands` are independent wire fields
+  and are changed only when supplied. At least one non-null field is required.
+  None omits a field; empty strings/lists and False remain explicit values.
+  Other controller keys and null-clearing are unsupported. Updates do not infer
+  site IDs or establish guest firewall isolation. No live validation was run.
+
 - **BREAKING:** removed raw `data` from `unifi_network_create_port_profile`
   and `unifi_network_update_port_profile` (#500). Pass `name`, `poe_mode`,
   `forward` and optional `native_networkconf_id` as named fields. Create requires

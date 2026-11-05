@@ -93,7 +93,7 @@ NETWORK_HAPPY_PATHS = [
     # wlan
     (register_wlan_tools, "unifi_network_list_wlans", "list_wlans", {}, None),
     (register_wlan_tools, "unifi_network_get_wlan", "get_wlan", {"wlan_id": "w-1"}, None),
-    (register_wlan_tools, "unifi_network_update_wlan", "update_wlan", {"wlan_id": "w-1", "data": {}}, None),
+    (register_wlan_tools, "unifi_network_update_wlan", "update_wlan", {"wlan_id": "w-1", "name": "fixture"}, None),
     # firewall reads
     (register_firewall_tools, "unifi_network_list_firewall_rules", "list_firewall_rules", {}, None),
     (register_firewall_tools, "unifi_network_get_firewall_rule", "get_firewall_rule", {"rule_id": "r-1"}, None),

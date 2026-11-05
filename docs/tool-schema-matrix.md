@@ -133,7 +133,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 | `unifi_network_update_port_profile` | W | `profile_id: string, name?: string \| null = null, poe_mode?: string \| null = null, forward?: string \| null = null, native_networkconf_id?: string \| null = null` |
 | `unifi_network_update_route` | W | `route_id: string, name?: string \| null = null, network?: string \| null = null, route_type?: string \| null = null, gateway_ip?: string \| null = null, interface?: string \| null = null, enabled?: boolean \| null = null` |
 | `unifi_network_update_settings` | W | `ntp_server_1?: string \| null = null, ntp_server_2?: string \| null = null, mgmt_led_enabled?: boolean \| null = null` |
-| `unifi_network_update_wlan` | W | `wlan_id: string, data: object` |
+| `unifi_network_update_wlan` | W | `wlan_id: string, name?: string \| null = null, security?: string \| null = null, wpa_mode?: string \| null = null, x_passphrase?: string \| null = null, enabled?: boolean \| null = null, networkconf_id?: string \| null = null, is_guest?: boolean \| null = null, l2_isolation?: boolean \| null = null, wpa_enc?: string \| null = null, wlan_band?: string \| null = null, wlan_bands?: array<string> \| null = null, ap_group_ids?: array<string> \| null = null, usergroup_id?: string \| null = null` |
 | `unifi_network_upgrade_device` | W | `mac: string, confirm?: boolean = false` |
 
 ---
