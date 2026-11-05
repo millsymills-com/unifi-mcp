@@ -204,7 +204,7 @@ def validate_id(value: str, *, field: str) -> None:
     Raises:
         UniFiBadRequestError: If ``value`` doesn't match the ID pattern.
     """
-    if not isinstance(value, str) or not _ID_RE.match(value):
+    if not isinstance(value, str) or not _ID_RE.fullmatch(value):
         raise UniFiBadRequestError(f"{field}: invalid id format")
 
 
@@ -235,7 +235,7 @@ def validate_mac(value: str, *, field: str) -> None:
     Raises:
         UniFiBadRequestError: If ``value`` doesn't match the MAC pattern.
     """
-    if not isinstance(value, str) or not _MAC_RE.match(value):
+    if not isinstance(value, str) or not _MAC_RE.fullmatch(value):
         raise UniFiBadRequestError(f"{field}: invalid mac format")
 
 
