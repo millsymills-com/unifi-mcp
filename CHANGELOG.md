@@ -14,6 +14,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- **BREAKING:** removed raw `data` from `unifi_network_create_dns_policy` and
+  `unifi_network_update_dns_policy` (#500). Pass the complete selected policy
+  through named fields; all seven variants remain available. Update is still a
+  full-object PUT, not a patch. Required variant fields cannot be omitted or
+  null-cleared, and unrelated fields refuse before HTTP. See
+  [migration guidance](docs/dns-policy-migration.md). No live writes were run.
+
+
 - **BREAKING:** removed raw `data` from `unifi_network_create_port_profile`
   and `unifi_network_update_port_profile` (#500). Pass `name`, `poe_mode`,
   `forward` and optional `native_networkconf_id` as named fields. Create requires

@@ -34,7 +34,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 | `unifi_network_block_client` | W | `mac: string, confirm?: boolean = false` |
 | `unifi_network_create_acl_rule` | W | `data: object` |
 | `unifi_network_create_backup` | W | — |
-| `unifi_network_create_dns_policy` | W | `data: object` |
+| `unifi_network_create_dns_policy` | W | `policy_type: "A_RECORD" \| "AAAA_RECORD" \| "CNAME_RECORD" \| "MX_RECORD" \| "TXT_RECORD" \| "SRV_RECORD" \| "FORWARD_DOMAIN", enabled: boolean, domain: string, ipv4_address?: string \| null = null, ipv6_address?: string \| null = null, target_domain?: string \| null = null, mail_server_domain?: string \| null = null, text?: string \| null = null, server_domain?: string \| null = null, ip_address?: string \| null = null, service?: string \| null = null, protocol?: string \| null = null, ttl_seconds?: integer \| null = null, priority?: integer \| null = null, port?: integer \| null = null, weight?: integer \| null = null` |
 | `unifi_network_create_firewall_group` | W | `name: string, group_type: string, group_members: array<string>` |
 | `unifi_network_create_firewall_rule` | W | `name: string, ruleset: string, action?: string = "drop", enabled?: boolean = true, protocol?: string = "all", src_address?: string \| null = null, dst_address?: string \| null = null, data?: object \| null = null` |
 | `unifi_network_create_firewall_zone` | W | `name: string, network_ids: array<string>` |
@@ -124,7 +124,7 @@ Backing surface: `/proxy/network/api/s/{site}/ (legacy controller)`. 107 tools.
 | `unifi_network_unblock_client` | W | `mac: string` |
 | `unifi_network_unlocate_device` | W | `mac: string` |
 | `unifi_network_update_acl_rule` | W | `acl_rule_id: string, data: object` |
-| `unifi_network_update_dns_policy` | W | `dns_policy_id: string, data: object` |
+| `unifi_network_update_dns_policy` | W | `dns_policy_id: string, policy_type: "A_RECORD" \| "AAAA_RECORD" \| "CNAME_RECORD" \| "MX_RECORD" \| "TXT_RECORD" \| "SRV_RECORD" \| "FORWARD_DOMAIN", enabled: boolean, domain: string, ipv4_address?: string \| null = null, ipv6_address?: string \| null = null, target_domain?: string \| null = null, mail_server_domain?: string \| null = null, text?: string \| null = null, server_domain?: string \| null = null, ip_address?: string \| null = null, service?: string \| null = null, protocol?: string \| null = null, ttl_seconds?: integer \| null = null, priority?: integer \| null = null, port?: integer \| null = null, weight?: integer \| null = null` |
 | `unifi_network_update_firewall_group` | W | `group_id: string, name?: string \| null = null, group_type?: string \| null = null, group_members?: array<string> \| null = null` |
 | `unifi_network_update_firewall_rule` | W | `rule_id: string, data: object` |
 | `unifi_network_update_firewall_zone` | W | `zone_id: string, name: string, network_ids: array<string>` |
