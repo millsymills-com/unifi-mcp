@@ -181,37 +181,72 @@ class TestAclWrites:
         client = AsyncMock()
         client.create_acl_rule.return_value = {"id": "new", "x_secret": "s"}
         ctx = _ctx(_config_rw(), client)
-        result = await _call(server, "unifi_network_create_acl_rule", ctx, data={"name": "iot", "type": "IPV4"})
-        client.create_acl_rule.assert_awaited_once_with({"name": "iot", "type": "IPV4"})
+        result = await _call(
+            server, "unifi_network_create_acl_rule", ctx, rule_type="IPV4", enabled=True, name="iot", action="ALLOW"
+        )
+        client.create_acl_rule.assert_awaited_once_with(
+            {"type": "IPV4", "enabled": True, "name": "iot", "action": "ALLOW"}
+        )
         assert result["x_secret"] == _REDACTED
 
     async def test_create_acl_rule_blocked_in_readonly(self, server):
         client = AsyncMock()
         ctx = _ctx(_config(), client)
         with pytest.raises(ToolError, match="read-only mode"):
-            await _call(server, "unifi_network_create_acl_rule", ctx, data={"name": "iot"})
+            await _call(
+                server, "unifi_network_create_acl_rule", ctx, rule_type="IPV4", enabled=True, name="iot", action="ALLOW"
+            )
         client.create_acl_rule.assert_not_called()
 
-    async def test_create_acl_rule_rejects_dangerous_key(self, server):
+    async def test_create_acl_rule_rejects_unnamed_field(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError):
-            await _call(server, "unifi_network_create_acl_rule", ctx, data={"roles": ["admin"]})
+            await _call(
+                server,
+                "unifi_network_create_acl_rule",
+                ctx,
+                rule_type="IPV4",
+                enabled=True,
+                name="iot",
+                action="ALLOW",
+                roles=["admin"],
+            )
         client.create_acl_rule.assert_not_called()
 
     async def test_update_acl_rule_validates_id(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError, match="acl_rule_id: invalid id format"):
-            await _call(server, "unifi_network_update_acl_rule", ctx, acl_rule_id="../x", data={"name": "y"})
+            await _call(
+                server,
+                "unifi_network_update_acl_rule",
+                ctx,
+                acl_rule_id="../x",
+                rule_type="IPV4",
+                enabled=False,
+                name="y",
+                action="BLOCK",
+            )
         client.update_acl_rule.assert_not_called()
 
     async def test_update_acl_rule_happy_path(self, server):
         client = AsyncMock()
         client.update_acl_rule.return_value = {"id": "r1"}
         ctx = _ctx(_config_rw(), client)
-        await _call(server, "unifi_network_update_acl_rule", ctx, acl_rule_id="r1", data={"name": "y"})
-        client.update_acl_rule.assert_awaited_once_with("r1", {"name": "y"})
+        await _call(
+            server,
+            "unifi_network_update_acl_rule",
+            ctx,
+            acl_rule_id="r1",
+            rule_type="IPV4",
+            enabled=False,
+            name="y",
+            action="BLOCK",
+        )
+        client.update_acl_rule.assert_awaited_once_with(
+            "r1", {"type": "IPV4", "enabled": False, "name": "y", "action": "BLOCK"}
+        )
 
     async def test_delete_acl_rule_requires_confirm(self, server):
         client = AsyncMock()
