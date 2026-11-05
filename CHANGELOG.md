@@ -12,6 +12,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   country-code reference catalog, with bounded pagination and response redaction
   (#494). Endpoint coverage is doc-derived and not yet live-validated.
 
+### Fixed
+
+- Resource-ID and MAC validators now reject a final newline rather than
+  accepting a prefix match (#605). Valid ID bounds and all four MAC formats
+  are preserved; client path-segment validation remains unchanged.
+
+- Temporary firewall-rule cleanup in the live CRUD test now supplies the
+  required delete confirmation (#600). Offline tests execute the real cleanup
+  and tool gate after successful, update-failed, read-failed and read-back-failed
+  roundtrips. No live hardware tests were run for this correction.
+
 ### Removed
 
 - **BREAKING:** removed raw `data` from `unifi_network_update_wlan` (#500).
@@ -22,6 +33,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   None omits a field; empty strings/lists and False remain explicit values.
   Other controller keys and null-clearing are unsupported. Updates do not infer
   site IDs or establish guest firewall isolation. No live validation was run.
+
+- **BREAKING:** removed raw `data` from `unifi_network_create_acl_rule` and
+  `unifi_network_update_acl_rule` (#500). Pass the complete IPv4/MAC rule through
+  named fields. Update remains a full-object PUT: resupply every desired filter.
+  The client does not fetch or copy old fields; controller endpoint-filter
+  omission effects are not live verified. The builder selects fixed filter
+  types from the named selectors and rejects incompatible or empty selectors.
+  Deprecated `index` remains unavailable; use the confirmed reorder tool.
+  See [migration guidance](docs/acl-rule-migration.md). No live writes were run.
+
+
+- **BREAKING:** removed raw `data` from `unifi_network_create_firewall_rule`
+  (#500). The same 17-field allowlist used by updates now exposes explicit
+  ordering, connection-state flags, selectors and group IDs. Original
+  `action="drop"`, `enabled=True` and `protocol="all"` defaults remain; no
+  ordering or state flags are inferred. Controller-required extra fields must
+  be supplied explicitly. See [creation guidance](docs/firewall-rule-create-migration.md).
+
+
+- **BREAKING:** removed raw `data` from `unifi_network_update_firewall_rule`
+  (#500). Pass named rule fields such as `enabled=False`, `rule_index=20000`
+  or `src_firewallgroup_ids=[]`. At least one non-null field is required;
+  None omits a field, and explicit null-clearing/arbitrary controller keys
+  are unsupported. Empty match lists are explicit and can broaden matching.
+  Create retains its existing interface pending separate migration. See
+  [migration guidance](docs/firewall-rule-update-migration.md).
+
+
+- **BREAKING:** removed raw `data` from `unifi_network_create_dns_policy` and
+  `unifi_network_update_dns_policy` (#500). Pass the complete selected policy
+  through named fields; all seven variants remain available. Update is still a
+  full-object PUT, not a patch. Required variant fields cannot be omitted or
+  null-cleared, and unrelated fields refuse before HTTP. See
+  [migration guidance](docs/dns-policy-migration.md). No live writes were run.
+
 
 - **BREAKING:** removed raw `data` from `unifi_network_create_port_profile`
   and `unifi_network_update_port_profile` (#500). Pass `name`, `poe_mode`,

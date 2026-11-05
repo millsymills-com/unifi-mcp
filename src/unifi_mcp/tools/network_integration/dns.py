@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastmcp import Context, FastMCP
+from pydantic import Field
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
-    JsonObject,
     get_server_context,
     redact_secrets,
-    reject_dangerous_keys,
     tool_handler,
     validate_id,
 )
 from unifi_mcp.tools.network_integration._common import bound_pagination
+from unifi_mcp.tools.network_integration._dns_policy import DnsPolicyType, build_dns_policy_body
 
 
 def register_dns_tools(mcp: FastMCP) -> None:
@@ -65,54 +65,138 @@ def register_dns_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_create_dns_policy(ctx: Context, data: JsonObject) -> dict[str, Any]:
-        """Create a DNS policy (Network Integration API).
+    async def unifi_network_create_dns_policy(
+        ctx: Context,
+        *,
+        policy_type: Annotated[
+            DnsPolicyType, Field(description="DNS policy variant; determines required named fields.")
+        ],
+        enabled: Annotated[bool, Field(description="Whether the policy is enabled; False explicitly disables it.")],
+        domain: Annotated[str, Field(min_length=1, max_length=127, description="Policy domain (1 to 127 characters).")],
+        ipv4_address: Annotated[str | None, Field(description="Required for A_RECORD.")] = None,
+        ipv6_address: Annotated[str | None, Field(description="Required for AAAA_RECORD.")] = None,
+        target_domain: Annotated[
+            str | None, Field(description="Required for CNAME_RECORD (1 to 127 characters).")
+        ] = None,
+        mail_server_domain: Annotated[
+            str | None, Field(description="Required for MX_RECORD (1 to 127 characters).")
+        ] = None,
+        text: Annotated[str | None, Field(description="Required for TXT_RECORD (1 to 1024 characters).")] = None,
+        server_domain: Annotated[
+            str | None, Field(description="Required for SRV_RECORD (1 to 127 characters).")
+        ] = None,
+        ip_address: Annotated[str | None, Field(description="DNS server address required for FORWARD_DOMAIN.")] = None,
+        service: Annotated[str | None, Field(description="Required for SRV_RECORD, for example _ldap.")] = None,
+        protocol: Annotated[str | None, Field(description="Required for SRV_RECORD, for example _tcp.")] = None,
+        ttl_seconds: Annotated[
+            int | None,
+            Field(description="Required for A/AAAA (0 to 86400) or CNAME (0 to 604800); forbidden for other variants."),
+        ] = None,
+        priority: Annotated[int | None, Field(description="Required for MX or SRV (0 to 65535).")] = None,
+        port: Annotated[int | None, Field(description="Required for SRV (0 to 65535).")] = None,
+        weight: Annotated[int | None, Field(description="Required for SRV (0 to 65535).")] = None,
+    ) -> dict[str, Any]:
+        """Create a DNS policy using named fields (Network Integration API).
 
-        The body is a discriminated union on ``type``
-        (``A_RECORD``/``AAAA_RECORD``/``CNAME_RECORD``/``MX_RECORD``/
-        ``TXT_RECORD``/``SRV_RECORD``/``FORWARD_DOMAIN``); ``type`` and
-        ``enabled`` are always required, and per-type required fields differ.
-        ``ttlSeconds`` applies only to A/AAAA/CNAME (CNAME max 604800; A/AAAA
-        max 86400); MX/TXT/SRV/FORWARD_DOMAIN take no ``ttlSeconds``.
-
-        Args:
-            ctx: FastMCP request context.
-            data: Full DNS-policy body for the chosen ``type``.
+        Send a complete policy for the selected variant; update is a full-object
+        PUT, not a patch. Raw data, arbitrary fields and null-clearing are not
+        supported. None omits a field, but cannot omit a required variant field.
+        IP address syntax and DNS semantics are checked by the controller.
 
         Returns:
-            The created policy (server-assigned ``id``), with sensitive fields redacted.
-
-        Raises:
-            ToolError: If write mode is disabled, ``data`` contains a denylisted
-                key, or the controller rejects the body.
+            The policy with sensitive fields redacted.
         """
-        reject_dangerous_keys(data, tool_name="unifi_network_create_dns_policy")
-        return redact_secrets(await get_server_context(ctx).clients["network_integration"].create_dns_policy(data))
+        body = build_dns_policy_body(
+            tool_name="unifi_network_create_dns_policy",
+            policy_type=policy_type,
+            enabled=enabled,
+            domain=domain,
+            fields={
+                "ipv4_address": ipv4_address,
+                "ipv6_address": ipv6_address,
+                "target_domain": target_domain,
+                "mail_server_domain": mail_server_domain,
+                "text": text,
+                "server_domain": server_domain,
+                "ip_address": ip_address,
+                "service": service,
+                "protocol": protocol,
+                "ttl_seconds": ttl_seconds,
+                "priority": priority,
+                "port": port,
+                "weight": weight,
+            },
+        )
+        return redact_secrets(await get_server_context(ctx).clients["network_integration"].create_dns_policy(body))
 
     @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_dns_policy(ctx: Context, dns_policy_id: str, data: JsonObject) -> dict[str, Any]:
-        """Update an existing DNS policy (Network Integration API).
+    async def unifi_network_update_dns_policy(
+        ctx: Context,
+        dns_policy_id: Annotated[str, Field(description="ID of the DNS policy to replace with this complete body.")],
+        *,
+        policy_type: Annotated[
+            DnsPolicyType, Field(description="DNS policy variant; determines required named fields.")
+        ],
+        enabled: Annotated[bool, Field(description="Whether the policy is enabled; False explicitly disables it.")],
+        domain: Annotated[str, Field(min_length=1, max_length=127, description="Policy domain (1 to 127 characters).")],
+        ipv4_address: Annotated[str | None, Field(description="Required for A_RECORD.")] = None,
+        ipv6_address: Annotated[str | None, Field(description="Required for AAAA_RECORD.")] = None,
+        target_domain: Annotated[
+            str | None, Field(description="Required for CNAME_RECORD (1 to 127 characters).")
+        ] = None,
+        mail_server_domain: Annotated[
+            str | None, Field(description="Required for MX_RECORD (1 to 127 characters).")
+        ] = None,
+        text: Annotated[str | None, Field(description="Required for TXT_RECORD (1 to 1024 characters).")] = None,
+        server_domain: Annotated[
+            str | None, Field(description="Required for SRV_RECORD (1 to 127 characters).")
+        ] = None,
+        ip_address: Annotated[str | None, Field(description="DNS server address required for FORWARD_DOMAIN.")] = None,
+        service: Annotated[str | None, Field(description="Required for SRV_RECORD, for example _ldap.")] = None,
+        protocol: Annotated[str | None, Field(description="Required for SRV_RECORD, for example _tcp.")] = None,
+        ttl_seconds: Annotated[
+            int | None,
+            Field(description="Required for A/AAAA (0 to 86400) or CNAME (0 to 604800); forbidden for other variants."),
+        ] = None,
+        priority: Annotated[int | None, Field(description="Required for MX or SRV (0 to 65535).")] = None,
+        port: Annotated[int | None, Field(description="Required for SRV (0 to 65535).")] = None,
+        weight: Annotated[int | None, Field(description="Required for SRV (0 to 65535).")] = None,
+    ) -> dict[str, Any]:
+        """Update a DNS policy using named fields (Network Integration API).
 
-        Full-object PUT: send every required field for the policy's ``type``,
-        not just the changed keys.
-
-        Args:
-            ctx: FastMCP request context.
-            dns_policy_id: The DNS policy id.
-            data: Full DNS-policy body (same schema as create).
+        Send a complete policy for the selected variant; update is a full-object
+        PUT, not a patch. Raw data, arbitrary fields and null-clearing are not
+        supported. None omits a field, but cannot omit a required variant field.
+        IP address syntax and DNS semantics are checked by the controller.
 
         Returns:
-            The updated policy with sensitive fields redacted.
-
-        Raises:
-            ToolError: If write mode is disabled, ``dns_policy_id`` is malformed,
-                ``data`` contains a denylisted key, or the controller rejects it.
+            The policy with sensitive fields redacted.
         """
         validate_id(dns_policy_id, field="dns_policy_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_dns_policy")
+        body = build_dns_policy_body(
+            tool_name="unifi_network_update_dns_policy",
+            policy_type=policy_type,
+            enabled=enabled,
+            domain=domain,
+            fields={
+                "ipv4_address": ipv4_address,
+                "ipv6_address": ipv6_address,
+                "target_domain": target_domain,
+                "mail_server_domain": mail_server_domain,
+                "text": text,
+                "server_domain": server_domain,
+                "ip_address": ip_address,
+                "service": service,
+                "protocol": protocol,
+                "ttl_seconds": ttl_seconds,
+                "priority": priority,
+                "port": port,
+                "weight": weight,
+            },
+        )
         return redact_secrets(
-            await get_server_context(ctx).clients["network_integration"].update_dns_policy(dns_policy_id, data)
+            await get_server_context(ctx).clients["network_integration"].update_dns_policy(dns_policy_id, body)
         )
 
     @mcp.tool(tags={"write", "network_integration"}, annotations={"readOnlyHint": False, "destructiveHint": True})

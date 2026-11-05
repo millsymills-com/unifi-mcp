@@ -181,37 +181,72 @@ class TestAclWrites:
         client = AsyncMock()
         client.create_acl_rule.return_value = {"id": "new", "x_secret": "s"}
         ctx = _ctx(_config_rw(), client)
-        result = await _call(server, "unifi_network_create_acl_rule", ctx, data={"name": "iot", "type": "IPV4"})
-        client.create_acl_rule.assert_awaited_once_with({"name": "iot", "type": "IPV4"})
+        result = await _call(
+            server, "unifi_network_create_acl_rule", ctx, rule_type="IPV4", enabled=True, name="iot", action="ALLOW"
+        )
+        client.create_acl_rule.assert_awaited_once_with(
+            {"type": "IPV4", "enabled": True, "name": "iot", "action": "ALLOW"}
+        )
         assert result["x_secret"] == _REDACTED
 
     async def test_create_acl_rule_blocked_in_readonly(self, server):
         client = AsyncMock()
         ctx = _ctx(_config(), client)
         with pytest.raises(ToolError, match="read-only mode"):
-            await _call(server, "unifi_network_create_acl_rule", ctx, data={"name": "iot"})
+            await _call(
+                server, "unifi_network_create_acl_rule", ctx, rule_type="IPV4", enabled=True, name="iot", action="ALLOW"
+            )
         client.create_acl_rule.assert_not_called()
 
-    async def test_create_acl_rule_rejects_dangerous_key(self, server):
+    async def test_create_acl_rule_rejects_unnamed_field(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError):
-            await _call(server, "unifi_network_create_acl_rule", ctx, data={"roles": ["admin"]})
+            await _call(
+                server,
+                "unifi_network_create_acl_rule",
+                ctx,
+                rule_type="IPV4",
+                enabled=True,
+                name="iot",
+                action="ALLOW",
+                roles=["admin"],
+            )
         client.create_acl_rule.assert_not_called()
 
     async def test_update_acl_rule_validates_id(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError, match="acl_rule_id: invalid id format"):
-            await _call(server, "unifi_network_update_acl_rule", ctx, acl_rule_id="../x", data={"name": "y"})
+            await _call(
+                server,
+                "unifi_network_update_acl_rule",
+                ctx,
+                acl_rule_id="../x",
+                rule_type="IPV4",
+                enabled=False,
+                name="y",
+                action="BLOCK",
+            )
         client.update_acl_rule.assert_not_called()
 
     async def test_update_acl_rule_happy_path(self, server):
         client = AsyncMock()
         client.update_acl_rule.return_value = {"id": "r1"}
         ctx = _ctx(_config_rw(), client)
-        await _call(server, "unifi_network_update_acl_rule", ctx, acl_rule_id="r1", data={"name": "y"})
-        client.update_acl_rule.assert_awaited_once_with("r1", {"name": "y"})
+        await _call(
+            server,
+            "unifi_network_update_acl_rule",
+            ctx,
+            acl_rule_id="r1",
+            rule_type="IPV4",
+            enabled=False,
+            name="y",
+            action="BLOCK",
+        )
+        client.update_acl_rule.assert_awaited_once_with(
+            "r1", {"type": "IPV4", "enabled": False, "name": "y", "action": "BLOCK"}
+        )
 
     async def test_delete_acl_rule_requires_confirm(self, server):
         client = AsyncMock()
@@ -273,28 +308,74 @@ class TestDnsWrites:
         client = AsyncMock()
         client.create_dns_policy.return_value = {"id": "new"}
         ctx = _ctx(_config_rw(), client)
-        await _call(server, "unifi_network_create_dns_policy", ctx, data={"type": "A_RECORD", "enabled": True})
-        client.create_dns_policy.assert_awaited_once_with({"type": "A_RECORD", "enabled": True})
+        await _call(
+            server,
+            "unifi_network_create_dns_policy",
+            ctx,
+            policy_type="A_RECORD",
+            enabled=True,
+            domain="example.test",
+            ipv4_address="192.0.2.10",
+            ttl_seconds=60,
+        )
+        client.create_dns_policy.assert_awaited_once_with(
+            {
+                "type": "A_RECORD",
+                "enabled": True,
+                "domain": "example.test",
+                "ipv4Address": "192.0.2.10",
+                "ttlSeconds": 60,
+            }
+        )
 
     async def test_create_dns_policy_blocked_in_readonly(self, server):
         client = AsyncMock()
         ctx = _ctx(_config(), client)
         with pytest.raises(ToolError, match="read-only mode"):
-            await _call(server, "unifi_network_create_dns_policy", ctx, data={"type": "A_RECORD"})
+            await _call(
+                server,
+                "unifi_network_create_dns_policy",
+                ctx,
+                policy_type="A_RECORD",
+                enabled=True,
+                domain="example.test",
+                ipv4_address="192.0.2.10",
+                ttl_seconds=60,
+            )
         client.create_dns_policy.assert_not_called()
 
-    async def test_create_dns_policy_rejects_dangerous_key(self, server):
+    async def test_create_dns_policy_rejects_unnamed_field(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError):
-            await _call(server, "unifi_network_create_dns_policy", ctx, data={"permissions": "x"})
+            await _call(
+                server,
+                "unifi_network_create_dns_policy",
+                ctx,
+                policy_type="A_RECORD",
+                enabled=True,
+                domain="example.test",
+                ipv4_address="192.0.2.10",
+                ttl_seconds=60,
+                permissions="x",
+            )
         client.create_dns_policy.assert_not_called()
 
     async def test_update_dns_policy_validates_id(self, server):
         client = AsyncMock()
         ctx = _ctx(_config_rw(), client)
         with pytest.raises(ToolError, match="dns_policy_id: invalid id format"):
-            await _call(server, "unifi_network_update_dns_policy", ctx, dns_policy_id="../x", data={"enabled": False})
+            await _call(
+                server,
+                "unifi_network_update_dns_policy",
+                ctx,
+                dns_policy_id="../x",
+                policy_type="A_RECORD",
+                enabled=False,
+                domain="example.test",
+                ipv4_address="192.0.2.10",
+                ttl_seconds=60,
+            )
         client.update_dns_policy.assert_not_called()
 
     async def test_delete_dns_policy_requires_confirm(self, server):

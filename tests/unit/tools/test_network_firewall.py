@@ -110,15 +110,11 @@ class TestFirewallClientEndpoints:
         assert route.call_count == 1
 
 
-class TestFirewallCreateDataEscapeHatch:
-    """#90: unifi_network_create_firewall_rule must accept a full-payload ``data``
-    kwarg for fields the scalar args don't expose.
-    """
+class TestFirewallCreateNamedFields:
+    """The fields recorded for #90 are available without a raw payload."""
 
-    async def test_data_kwarg_takes_precedence_over_scalars(self):
-        """When ``data`` is passed, the tool forwards it verbatim and ignores
-        the scalar args (name/ruleset/action/...).
-        """
+    async def test_named_fields_forward_complete_payload(self):
+        """A complete controller fixture maps exactly to its named tool fields."""
         from dataclasses import dataclass, field
         from typing import Any
         from unittest.mock import AsyncMock
@@ -166,20 +162,14 @@ class TestFirewallCreateDataEscapeHatch:
             "src_firewallgroup_ids": [],
             "dst_firewallgroup_ids": [],
         }
-        result = await tool.fn(
-            ctx,
-            name="scalar-ignored",
-            ruleset="WAN_IN",
-            data=full_payload,
-        )
+        result = await tool.fn(ctx, **full_payload)
         assert result == {"ok": True}
-        # The scalar "scalar-ignored" must not reach the client; data was used.
         (forwarded,), _ = client.create_firewall_rule.call_args
         assert forwarded == full_payload
 
-    async def test_scalar_args_still_work_when_data_is_none(self):
-        """Back-compat: the pre-#90 scalar-only signature still composes a
-        payload when ``data`` is omitted, so existing calls are unchanged.
+    async def test_original_scalar_defaults_are_preserved(self):
+        """Original scalar calls still compose their prior body and defaults.
+        Controller-required extra fields remain the caller's responsibility.
         """
         from dataclasses import dataclass, field
         from typing import Any

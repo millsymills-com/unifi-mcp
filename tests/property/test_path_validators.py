@@ -14,7 +14,7 @@ import string
 import urllib.parse
 
 import pytest
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
 
 from unifi_mcp.clients.base import BaseUniFiClient
@@ -39,6 +39,7 @@ def _is_valid_id(value: str) -> bool:
 
 
 @given(value=st.text(min_size=0, max_size=80).filter(lambda v: not _is_valid_id(v)))
+@example(value="0\n")
 def test_validate_id_rejects_outside_allowlist(value: str) -> None:
     """Any string that fails the allowlist regex must raise.
 
@@ -77,6 +78,14 @@ def _canonical_mac(draw: st.DrawFn) -> str:
 def test_validate_mac_accepts_canonical_forms(value: str) -> None:
     """All four canonical MAC forms (post-#212) must be accepted."""
     validate_mac(value, field="mac")
+
+
+@given(value=_canonical_mac())
+def test_validate_mac_rejects_final_newline(value: str) -> None:
+    """A valid MAC followed by a newline is not a complete accepted form."""
+    validate_mac(value, field="mac")
+    with pytest.raises(UniFiBadRequestError, match="mac: invalid mac format"):
+        validate_mac(value + "\n", field="mac")
 
 
 @st.composite

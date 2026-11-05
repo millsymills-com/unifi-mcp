@@ -96,7 +96,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_firewall_tools,
         "unifi_network_update_firewall_rule",
-        {"rule_id": TRAVERSAL, "data": {}},
+        {"rule_id": TRAVERSAL, "enabled": False},
         "update_firewall_rule",
         "network",
     ),
@@ -412,4 +412,36 @@ async def test_mac_taking_tool_rejects_traversal(register_fn, tool_name, kwargs,
     with pytest.raises(ToolError, match="invalid mac format"):
         await _call(server, tool_name, ctx, **kwargs)
 
+    getattr(client, client_method).assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("register_fn", "tool_name", "kwargs", "client_method", "client_key", "message"),
+    [
+        (
+            register_camera_tools,
+            "unifi_protect_get_camera",
+            {"camera_id": "synthetic-camera\n"},
+            "get_camera",
+            "protect",
+            "invalid id format",
+        ),
+        (
+            register_client_tools,
+            "unifi_network_get_client",
+            {"mac": "aa:bb:cc:dd:ee:ff\n"},
+            "list_active_clients",
+            "network",
+            "invalid mac format",
+        ),
+    ],
+)
+async def test_final_newline_refuses_before_client_access(
+    register_fn, tool_name, kwargs, client_method, client_key, message
+):
+    server = FastMCP(name="newline-regression")
+    register_fn(server)
+    client = _trip_client(client_key, client_method)
+    with pytest.raises(ToolError, match=message):
+        await _call(server, tool_name, _ctx(**{client_key: client}), **kwargs)
     getattr(client, client_method).assert_not_awaited()

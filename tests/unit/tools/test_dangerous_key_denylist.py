@@ -2,7 +2,7 @@
 
 Verifies ``unifi_mcp.tools._common.reject_dangerous_keys`` raises on every
 denylist key (exact / prefix / suffix), at every nesting depth, and that
-each of the 12 affected write tools wires the guard before the client call.
+the remaining raw-dict Protect updates wire the guard before the client call.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from fastmcp.exceptions import ToolError
 from unifi_mcp.config import UniFiConfig, UniFiMode
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import reject_dangerous_keys
-from unifi_mcp.tools.network.firewall import register_firewall_tools
 from unifi_mcp.tools.protect.cameras import register_camera_tools
 from unifi_mcp.tools.protect.devices import register_protect_device_tools
 
@@ -183,12 +182,6 @@ async def _call(server: FastMCP, tool_name: str, ctx: AsyncMock, **kwargs: Any) 
 # Payload uses a denied key so a successful call would mean the guard missed.
 DENIED_PAYLOAD = {"radius_secret": "boom"}
 GUARDED_WRITE_TOOLS = [
-    (
-        "unifi_network_create_firewall_rule",
-        register_firewall_tools,
-        {"name": "x", "ruleset": "LAN_IN", "data": DENIED_PAYLOAD},
-    ),
-    ("unifi_network_update_firewall_rule", register_firewall_tools, {"rule_id": "r-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_chime", register_protect_device_tools, {"chime_id": "ch-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_light", register_protect_device_tools, {"light_id": "l-1", "data": DENIED_PAYLOAD}),
     ("unifi_protect_update_sensor", register_protect_device_tools, {"sensor_id": "s-1", "data": DENIED_PAYLOAD}),

@@ -22,6 +22,60 @@ _FIREWALL_GROUP_FIELD_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 
+_FIREWALL_RULE_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    name: (name,)
+    for name in (
+        "name",
+        "ruleset",
+        "action",
+        "enabled",
+        "protocol",
+        "src_address",
+        "dst_address",
+        "rule_index",
+        "logging",
+        "state_new",
+        "state_established",
+        "state_invalid",
+        "state_related",
+        "icmp_typename",
+        "ipsec",
+        "src_firewallgroup_ids",
+        "dst_firewallgroup_ids",
+    )
+}
+
+
+def _validate_rule_fields(values: dict[str, Any]) -> None:
+    """Check named scalar/list types without guessing controller vocabularies."""
+    for field, value in values.items():
+        if value is None:
+            continue
+        if field in (
+            "name",
+            "ruleset",
+            "action",
+            "protocol",
+            "src_address",
+            "dst_address",
+            "icmp_typename",
+            "ipsec",
+        ) and not isinstance(value, str):
+            raise UniFiBadRequestError(f"{field} must be a string")
+        if (
+            field in ("enabled", "logging", "state_new", "state_established", "state_invalid", "state_related")
+            and type(value) is not bool
+        ):
+            raise UniFiBadRequestError(f"{field} must be a boolean")
+        if field == "rule_index" and type(value) is not int:
+            raise UniFiBadRequestError("rule_index must be an integer")
+        if field in {"src_firewallgroup_ids", "dst_firewallgroup_ids"}:
+            if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+                raise UniFiBadRequestError(f"{field} must be a list of IDs")
+            for index, item in enumerate(value):
+                validate_id(item, field=f"{field}[{index}]")
+
+
 def register_firewall_tools(mcp: FastMCP) -> None:
     """Register firewall tools."""
 
@@ -95,65 +149,166 @@ def register_firewall_tools(mcp: FastMCP) -> None:
         protocol: str = "all",
         src_address: str | None = None,
         dst_address: str | None = None,
-        data: JsonObject | None = None,
+        rule_index: int | None = None,
+        logging: bool | None = None,
+        state_new: bool | None = None,
+        state_established: bool | None = None,
+        state_invalid: bool | None = None,
+        state_related: bool | None = None,
+        icmp_typename: str | None = None,
+        ipsec: str | None = None,
+        src_firewallgroup_ids: list[str] | None = None,
+        dst_firewallgroup_ids: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Create a new firewall rule.
+        """Create a legacy firewall rule using named fields.
 
-        Returns:
-            The upstream API response.
+        Modern controllers require additional fields beyond name/ruleset.
+        Supply the explicit ordering, state flags and selectors needed by your
+        controller; no ordering or connection-state defaults are invented.
+        The existing action=drop, enabled=True and protocol=all defaults remain.
+        Raw data, arbitrary controller keys and null-clearing are unsupported.
 
         Args:
-            name: Rule name (ignored if ``data`` set).
-            ruleset: "WAN_IN" / "WAN_OUT" / "LAN_IN" / "LAN_OUT" / etc.
-            action: "accept" / "drop" / "reject".
-            enabled: Whether the rule is enabled.
-            protocol: "all" / "tcp" / "udp" / "tcp_udp" / "icmp".
-            src_address: Source IP/CIDR (optional).
-            dst_address: Destination IP/CIDR (optional).
-            data: Full firewall-rule payload — overrides the scalar args
-                when set. Use this to populate required fields like
-                ``rule_index`` that the scalars don't expose.
+            name: Rule name.
+            ruleset: Controller ruleset such as LAN_IN or WAN_IN.
+            action: Controller action; default drop.
+            enabled: Whether the new rule is enabled; default True.
+            protocol: Controller protocol; default all.
+            src_address: Optional source address/CIDR.
+            dst_address: Optional destination address/CIDR.
+            rule_index: Explicit rule ordering; not calculated or assigned by this tool.
+            logging: Explicit logging flag when required by the controller.
+            state_new: Explicit new-connection match flag.
+            state_established: Explicit established-connection match flag.
+            state_invalid: Explicit invalid-connection match flag.
+            state_related: Explicit related-connection match flag.
+            icmp_typename: Controller ICMP selector; an empty string is sent as supplied.
+            ipsec: Controller IPsec selector; an empty string is sent as supplied.
+            src_firewallgroup_ids: Source group IDs; [] explicitly sends an empty list.
+            dst_firewallgroup_ids: Destination group IDs; [] explicitly sends an empty list.
+
+        Returns:
+            The upstream response with sensitive fields redacted.
 
         Note:
-            Modern controllers reject scalar-only calls with HTTP 400
-            ``api.err.FirewallRuleFieldsRequired`` (#90). The legacy
-            ``rest/firewallrule`` endpoint also expects ``rule_index``,
-            ``logging``, the ``state_new`` / ``state_established`` /
-            ``state_invalid`` / ``state_related`` flags, ``icmp_typename``,
-            ``ipsec``, ``src_firewallgroup_ids``, and
-            ``dst_firewallgroup_ids``; pass them via ``data``.
+            The allowlist follows the existing full-payload fixtures for #90.
+            Legacy controller requirements vary; the minimum Python signature
+            is not a promise that those fields suffice on every controller.
         """
-        if data is None:
-            data = {
-                "name": name,
-                "ruleset": ruleset,
-                "action": action,
-                "enabled": enabled,
-                "protocol": protocol,
-            }
-            if src_address is not None:
-                data["src_address"] = src_address
-            if dst_address is not None:
-                data["dst_address"] = dst_address
-        else:
-            reject_dangerous_keys(data, tool_name="unifi_network_create_firewall_rule")
-        return redact_secrets(await get_server_context(ctx).clients["network"].create_firewall_rule(data))
+        if any(value is None for value in (name, ruleset, action, enabled, protocol)):
+            raise UniFiBadRequestError("name, ruleset, action, enabled and protocol cannot be null")
+        values = {
+            "name": name,
+            "ruleset": ruleset,
+            "action": action,
+            "enabled": enabled,
+            "protocol": protocol,
+            "src_address": src_address,
+            "dst_address": dst_address,
+            "rule_index": rule_index,
+            "logging": logging,
+            "state_new": state_new,
+            "state_established": state_established,
+            "state_invalid": state_invalid,
+            "state_related": state_related,
+            "icmp_typename": icmp_typename,
+            "ipsec": ipsec,
+            "src_firewallgroup_ids": src_firewallgroup_ids,
+            "dst_firewallgroup_ids": dst_firewallgroup_ids,
+        }
+        _validate_rule_fields(values)
+        body = build_named_arg_body(
+            tool_name="unifi_network_create_firewall_rule",
+            field_paths=_FIREWALL_RULE_FIELD_PATHS,
+            named_values=values,
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_create_firewall_rule")
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_firewall_rule(body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_firewall_rule(ctx: Context, rule_id: str, data: JsonObject) -> dict[str, Any]:
-        """Update an existing firewall rule. Pass only fields to change.
+    async def unifi_network_update_firewall_rule(
+        ctx: Context,
+        rule_id: str,
+        *,
+        name: str | None = None,
+        ruleset: str | None = None,
+        action: str | None = None,
+        enabled: bool | None = None,
+        protocol: str | None = None,
+        src_address: str | None = None,
+        dst_address: str | None = None,
+        rule_index: int | None = None,
+        logging: bool | None = None,
+        state_new: bool | None = None,
+        state_established: bool | None = None,
+        state_invalid: bool | None = None,
+        state_related: bool | None = None,
+        icmp_typename: str | None = None,
+        ipsec: str | None = None,
+        src_firewallgroup_ids: list[str] | None = None,
+        dst_firewallgroup_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Update named legacy firewall-rule fields; other fields are unchanged.
+
+        At least one non-null field is required. None omits a field; raw data
+        and explicit null-clearing are unsupported. Empty group-ID lists are
+        sent explicitly and may broaden matching. Ordering and state flags are
+        never inferred; the controller validates rule semantics and values.
 
         Args:
-            rule_id: The firewall rule ID.
-            data: Fields to update (e.g., {"enabled": false, "action": "accept"}).
+            rule_id: Existing rule ID.
+            name: Rule name.
+            ruleset: Controller ruleset such as LAN_IN or WAN_IN.
+            action: Controller action such as accept, drop or reject.
+            enabled: False explicitly disables the rule.
+            protocol: Controller protocol such as all, tcp or udp.
+            src_address: Source address/CIDR; omitted fields are unchanged.
+            dst_address: Destination address/CIDR.
+            rule_index: Explicit controller rule ordering value; never calculated.
+            logging: Whether matching traffic is logged.
+            state_new: Match new connections.
+            state_established: Match established connections.
+            state_invalid: Match invalid connections.
+            state_related: Match related connections.
+            icmp_typename: Controller ICMP selector; empty string is sent as supplied.
+            ipsec: Controller IPsec selector; empty string is sent as supplied.
+            src_firewallgroup_ids: Source group IDs; [] explicitly clears this match list.
+            dst_firewallgroup_ids: Destination group IDs; [] explicitly clears this match list.
 
         Returns:
-            The upstream API response.
+            The upstream API response with sensitive fields redacted.
         """
         validate_id(rule_id, field="rule_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_firewall_rule")
-        return redact_secrets(await get_server_context(ctx).clients["network"].update_firewall_rule(rule_id, data))
+        values = {
+            "name": name,
+            "ruleset": ruleset,
+            "action": action,
+            "enabled": enabled,
+            "protocol": protocol,
+            "src_address": src_address,
+            "dst_address": dst_address,
+            "rule_index": rule_index,
+            "logging": logging,
+            "state_new": state_new,
+            "state_established": state_established,
+            "state_invalid": state_invalid,
+            "state_related": state_related,
+            "icmp_typename": icmp_typename,
+            "ipsec": ipsec,
+            "src_firewallgroup_ids": src_firewallgroup_ids,
+            "dst_firewallgroup_ids": dst_firewallgroup_ids,
+        }
+        _validate_rule_fields(values)
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_firewall_rule",
+            field_paths=_FIREWALL_RULE_FIELD_PATHS,
+            named_values=values,
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_firewall_rule")
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_firewall_rule(rule_id, body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)

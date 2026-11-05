@@ -1,4 +1,4 @@
-"""Pin parameter guidance in tools/list for the three enum-bearing tools."""
+"""Pin explicit parameter guidance in tools/list for metrics and camera tools."""
 
 from __future__ import annotations
 
@@ -26,6 +26,27 @@ from unifi_mcp.tools.site_manager.metrics import register_site_manager_metrics_t
             {
                 "metric_type": "Metric aggregation window: 5m or 1h.",
                 "sites": "Site selectors with hostId, siteId and optional beginTimestamp/endTimestamp ranges.",
+            },
+        ),
+        ("unifi_protect_list_cameras", {}),
+        ("unifi_protect_get_camera", {"camera_id": "The camera ID."}),
+        (
+            "unifi_protect_update_camera",
+            {
+                "camera_id": "The camera ID.",
+                "name": "Camera display name.",
+                "led_settings_is_enabled": "Toggle the status LED (ledSettings.isEnabled).",
+                "osd_settings_is_name_enabled": "Show camera name in the OSD (osdSettings.isNameEnabled).",
+                "osd_settings_is_date_enabled": "Show date in the OSD (osdSettings.isDateEnabled).",
+                "osd_settings_is_logo_enabled": "Show logo in the OSD (osdSettings.isLogoEnabled).",
+                "osd_settings_is_debug_enabled": "Show debug overlay in the OSD (osdSettings.isDebugEnabled).",
+            },
+        ),
+        (
+            "unifi_protect_set_smart_detection",
+            {
+                "camera_id": "The camera ID.",
+                "object_types": 'Object types to detect, e.g. ["person", "vehicle", "animal"].',
             },
         ),
         (
