@@ -8,7 +8,7 @@ from fastmcp import Context, FastMCP
 
 from unifi_mcp.errors import UniFiBadRequestError
 from unifi_mcp.tools._common import (
-    JsonObject,
+    build_named_arg_body,
     get_server_context,
     redact_secrets,
     reject_dangerous_keys,
@@ -21,6 +21,10 @@ from unifi_mcp.tools._common import (
 # imported so the two tool modules stay independently auditable. See #151.
 _PORT_IDX_MIN = 1
 _PORT_IDX_MAX = 52
+
+_PORT_PROFILE_FIELD_PATHS: dict[str, tuple[str, ...]] = {
+    name: (name,) for name in ("name", "poe_mode", "forward", "native_networkconf_id")
+}
 
 
 def register_port_profile_tools(mcp: FastMCP) -> None:
@@ -59,37 +63,91 @@ def register_port_profile_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_create_port_profile(ctx: Context, data: JsonObject) -> dict[str, Any]:
-        """Create a switch port profile.
-
-        The controller requires at least ``name``, ``poe_mode`` (e.g. ``auto``),
-        and ``forward`` (e.g. ``all`` / ``native`` / ``customize``). Pass a
-        full payload via ``data`` — it's forwarded verbatim.
+    async def unifi_network_create_port_profile(
+        ctx: Context,
+        *,
+        name: str,
+        poe_mode: str,
+        forward: str,
+        native_networkconf_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a switch port profile using named fields.
 
         Args:
-            data: Full port-profile payload.
+            name: Profile name.
+            poe_mode: Controller PoE mode, e.g. auto or off.
+            forward: Controller forwarding mode, e.g. all, native or customize.
+            native_networkconf_id: Legacy network configuration ID; required when forward is native.
+
+        Only these four fields are exposed. Raw ``data`` and explicit
+        null-clearing are unsupported; None omits the optional network ID.
+        Field support follows the repository's existing port-profile fixture;
+        this migration adds no live hardware validation.
 
         Returns:
-            The upstream API response.
+            The upstream API response with sensitive fields redacted.
         """
-        reject_dangerous_keys(data, tool_name="unifi_network_create_port_profile")
-        return redact_secrets(await get_server_context(ctx).clients["network"].create_port_profile(data))
+        if native_networkconf_id is not None:
+            validate_id(native_networkconf_id, field="native_networkconf_id")
+        if forward == "native" and native_networkconf_id is None:
+            raise UniFiBadRequestError("native_networkconf_id is required when forward is native")
+        body = build_named_arg_body(
+            tool_name="unifi_network_create_port_profile",
+            field_paths=_PORT_PROFILE_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "poe_mode": poe_mode,
+                "forward": forward,
+                "native_networkconf_id": native_networkconf_id,
+            },
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_create_port_profile")
+        return redact_secrets(await get_server_context(ctx).clients["network"].create_port_profile(body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": False})
     @tool_handler(write=True)
-    async def unifi_network_update_port_profile(ctx: Context, profile_id: str, data: JsonObject) -> dict[str, Any]:
-        """Update a switch port profile. Pass only fields to change.
+    async def unifi_network_update_port_profile(
+        ctx: Context,
+        profile_id: str,
+        *,
+        name: str | None = None,
+        poe_mode: str | None = None,
+        forward: str | None = None,
+        native_networkconf_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Update named switch port-profile fields. Other fields are unchanged.
 
         Args:
             profile_id: The port-profile ID to update.
-            data: Fields to update (e.g. ``{"poe_mode": "off"}``).
+            name: Profile name.
+            poe_mode: Controller PoE mode, e.g. auto or off.
+            forward: Controller forwarding mode, e.g. all, native or customize.
+            native_networkconf_id: Legacy network configuration ID.
+
+        At least one non-null named field is required. None omits a field;
+        raw ``data``, arbitrary controller keys and explicit null-clearing are
+        unsupported. A partial update does not read or resolve existing IDs.
 
         Returns:
-            The upstream API response.
+            The upstream API response with sensitive fields redacted.
         """
         validate_id(profile_id, field="profile_id")
-        reject_dangerous_keys(data, tool_name="unifi_network_update_port_profile")
-        return redact_secrets(await get_server_context(ctx).clients["network"].update_port_profile(profile_id, data))
+        if native_networkconf_id is not None:
+            validate_id(native_networkconf_id, field="native_networkconf_id")
+        body = build_named_arg_body(
+            tool_name="unifi_network_update_port_profile",
+            field_paths=_PORT_PROFILE_FIELD_PATHS,
+            named_values={
+                "name": name,
+                "poe_mode": poe_mode,
+                "forward": forward,
+                "native_networkconf_id": native_networkconf_id,
+            },
+            data=None,
+        )
+        reject_dangerous_keys(body, tool_name="unifi_network_update_port_profile")
+        return redact_secrets(await get_server_context(ctx).clients["network"].update_port_profile(profile_id, body))
 
     @mcp.tool(tags={"write", "network"}, annotations={"readOnlyHint": False, "destructiveHint": True})
     @tool_handler(write=True)

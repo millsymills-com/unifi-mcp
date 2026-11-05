@@ -183,7 +183,7 @@ ID_TAKING_TOOLS: list[tuple[Any, str, dict[str, Any], str, str]] = [
     (
         register_port_profile_tools,
         "unifi_network_update_port_profile",
-        {"profile_id": TRAVERSAL, "data": {}},
+        {"profile_id": TRAVERSAL, "poe_mode": "off"},
         "update_port_profile",
         "network",
     ),

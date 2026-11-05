@@ -1130,7 +1130,7 @@ class TestWriteRoundtrips:
         created = await _invoke(
             live_client,
             "unifi_network_create_port_profile",
-            {"data": create_payload},
+            create_payload,
         )
         artifacts.dump(f"create_port_profile-{suffix}", {"ok": True, "payload": created})
         items = _unwrap_list(created)
@@ -1141,7 +1141,7 @@ class TestWriteRoundtrips:
             updated = await _invoke(
                 live_client,
                 "unifi_network_update_port_profile",
-                {"profile_id": profile_id, "data": {"poe_mode": "auto"}},
+                {"profile_id": profile_id, "poe_mode": "auto"},
             )
             artifacts.dump(f"update_port_profile-{suffix}", {"ok": True, "payload": updated})
 
