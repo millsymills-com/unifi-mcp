@@ -67,3 +67,6 @@ Thumbs.db
 
 # Internal-agent planning run-books — keep local, do not track (#367)
 docs/superpowers/
+
+# Claude Code local settings can contain machine-specific permissions and secrets.
+**/.claude/settings.local.json
