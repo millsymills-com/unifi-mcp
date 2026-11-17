@@ -14,6 +14,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- DNS startup timeouts now return without waiting for a blocked system resolver;
+  one daemon worker bounds retained work and does not delay interpreter exit (#608).
+
 - Resource-ID and MAC validators now reject a final newline rather than
   accepting a prefix match (#605). Valid ID bounds and all four MAC formats
   are preserved; client path-segment validation remains unchanged.

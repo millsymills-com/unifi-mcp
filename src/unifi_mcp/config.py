@@ -9,6 +9,8 @@ import ipaddress
 import logging
 import re
 import socket
+import threading
+import time
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 # Cap DNS resolution so a bad host can't hang startup. Two seconds is enough
 # for LAN lookups and short enough that a misconfigured host fails fast.
 _DNS_LOOKUP_TIMEOUT_S = 2.0
+# A stuck system resolver may outlive its caller, but must not accumulate workers.
+_DNS_WORKER_SLOT = threading.BoundedSemaphore(1)
 
 # Canonical fingerprint form: 64 lowercase hex chars, no separators. The
 # accepted input form additionally allows colon separators and any case.
@@ -379,24 +383,43 @@ def _resolve_host(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Addre
     records are only returned when the host has IPv6 support, so on an
     IPv4-only box an IPv6-only-public name could resolve to nothing and trip the
     fail-closed path in ``_audit_service_tls`` rather than being classified.
-    Bounding via thread
-    (rather than ``socket.setdefaulttimeout``) avoids mutating process-global
-    socket state. Raises ``OSError`` (incl. ``socket.gaierror``) on lookup
-    failure or timeout, or ``ValueError`` if a result isn't a valid IP literal.
+    A single daemon worker avoids the executor's blocking shutdown/exit join.
+    A timed-out system lookup cannot be cancelled; it retains the sole worker
+    slot until it finishes. Later name lookups share the same bounded wait and
+    fail closed while that slot is occupied. No process-global socket state is
+    changed. Raises ``OSError`` on lookup failure or timeout, or ``ValueError``
+    if a result isn't a valid IP literal.
     """
     try:
         return [ipaddress.ip_address(host)]
     except ValueError:
         pass
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="unifi-dns") as pool:
-        future = pool.submit(socket.getaddrinfo, host, None, type=socket.SOCK_STREAM)
+    deadline = time.monotonic() + _DNS_LOOKUP_TIMEOUT_S
+    timeout_message = f"DNS lookup for {host!r} exceeded {_DNS_LOOKUP_TIMEOUT_S}s timeout"
+    if not _DNS_WORKER_SLOT.acquire(timeout=_DNS_LOOKUP_TIMEOUT_S):
+        raise OSError(timeout_message)
+    future: concurrent.futures.Future[list[ipaddress.IPv4Address | ipaddress.IPv6Address]] = concurrent.futures.Future()
+
+    def resolve() -> None:
         try:
-            infos = future.result(timeout=_DNS_LOOKUP_TIMEOUT_S)
-        except concurrent.futures.TimeoutError as exc:
-            raise OSError(f"DNS lookup for {host!r} exceeded {_DNS_LOOKUP_TIMEOUT_S}s timeout") from exc
-    resolved: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
-    for info in infos:
-        address = ipaddress.ip_address(info[4][0])
-        if address not in resolved:
-            resolved.append(address)
-    return resolved
+            infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+            resolved: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+            for info in infos:
+                address = ipaddress.ip_address(info[4][0])
+                if address not in resolved:
+                    resolved.append(address)
+            future.set_result(resolved)
+        except BaseException as exc:
+            future.set_exception(exc)
+        finally:
+            _DNS_WORKER_SLOT.release()
+
+    try:
+        threading.Thread(target=resolve, name="unifi-dns", daemon=True).start()
+    except BaseException:
+        _DNS_WORKER_SLOT.release()
+        raise
+    try:
+        return future.result(timeout=max(0.0, deadline - time.monotonic()))
+    except concurrent.futures.TimeoutError as exc:
+        raise OSError(timeout_message) from exc
