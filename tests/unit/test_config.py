@@ -3,12 +3,15 @@
 import logging
 import re
 import socket
+import subprocess
+import sys
+import threading
 import time
 
 import pytest
 from pydantic import ValidationError
 
-from unifi_mcp.config import _DNS_LOOKUP_TIMEOUT_S, ToolProfile, UniFiConfig, UniFiMode, _resolve_host, get_config
+from unifi_mcp.config import ToolProfile, UniFiConfig, UniFiMode, _resolve_host, get_config
 from unifi_mcp.errors import (
     UniFiAuthError,
     UniFiConnectionError,
@@ -462,15 +465,52 @@ class TestVerifySSLAudit:
         ``socket.getdefaulttimeout()`` (process-global state).
         """
 
+        release = threading.Event()
+        finished = threading.Event()
+        calls = []
+
         def slow(*_args, **_kwargs):
-            time.sleep(_DNS_LOOKUP_TIMEOUT_S + 1.0)
+            calls.append(1)
+            release.wait(timeout=2)
+            finished.set()
             return _addrinfo("1.2.3.4")("slow.example.invalid")
 
         monkeypatch.setattr(socket, "getaddrinfo", slow)
+        monkeypatch.setattr("unifi_mcp.config._DNS_LOOKUP_TIMEOUT_S", 0.05)
         before = socket.getdefaulttimeout()
-        with pytest.raises(OSError, match="exceeded"):
-            _resolve_host("slow.example.invalid")
-        assert socket.getdefaulttimeout() == before
+        try:
+            started = time.monotonic()
+            with pytest.raises(OSError, match="exceeded"):
+                _resolve_host("slow.example.invalid")
+            assert time.monotonic() - started < 0.5
+            assert not finished.is_set()
+            # A stuck lookup cannot create unbounded background workers.
+            with pytest.raises(OSError, match="exceeded"):
+                _resolve_host("another.example.invalid")
+            assert len(calls) == 1
+            assert socket.getdefaulttimeout() == before
+        finally:
+            release.set()
+            assert finished.wait(1)
+        # A completed timed-out worker releases its slot; late data is discarded.
+        monkeypatch.setattr(socket, "getaddrinfo", _addrinfo("10.0.0.1", "::1"))
+        assert [str(a) for a in _resolve_host("recovered.example.invalid")] == ["10.0.0.1", "::1"]
+
+    def test_stuck_dns_does_not_block_interpreter_exit(self):
+        code = """
+import socket
+import threading
+import unifi_mcp.config as config
+config._DNS_LOOKUP_TIMEOUT_S = 0.02
+socket.getaddrinfo = lambda *a, **k: threading.Event().wait()
+try:
+    config._resolve_host("blocked.example.invalid")
+except OSError:
+    pass
+else:
+    raise AssertionError("lookup must fail closed")
+"""
+        subprocess.run([sys.executable, "-c", code], check=True, timeout=5)  # noqa: S603 - fixed local code
 
     def test_get_config_caches_singleton_and_audits_once(self, caplog, monkeypatch):
         """#190: ``get_config`` returns the same instance and the TLS audit
