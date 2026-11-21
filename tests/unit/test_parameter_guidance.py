@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 from fastmcp import Client, FastMCP
 
+from unifi_mcp.config import UniFiConfig, UniFiMode
+from unifi_mcp.server import create_server
 from unifi_mcp.tools.protect.cameras import register_camera_tools
 from unifi_mcp.tools.site_manager.metrics import register_site_manager_metrics_tools
 
@@ -77,3 +79,26 @@ async def test_tools_list_parameter_guidance(name, expected):
         assert properties["confirm"]["default"] is False
         assert tool.annotations is not None
         assert tool.annotations.destructive_hint is True
+
+
+async def test_every_tool_parameter_carries_schema_guidance():
+    """Server-wide #479 guard: parameter semantics live in inputSchema, and ``ctx`` never ships."""
+    config = UniFiConfig(
+        _env_file=None,
+        unifi_mode=UniFiMode.READWRITE,
+        unifi_network_api="net",
+        unifi_protect_api="prot",
+        unifi_site_manager_api="sm",
+    )
+    # list_tools() on the server skips the lifespan, so no upstream validation runs.
+    tools = await create_server(config).list_tools()
+    assert tools
+    undescribed = {
+        tool.name: sorted(
+            key for key, value in tool.parameters.get("properties", {}).items() if not value.get("description")
+        )
+        for tool in tools
+    }
+    assert {name: keys for name, keys in undescribed.items() if keys} == {}
+    assert [tool.name for tool in tools if "ctx" in tool.parameters.get("properties", {})] == []
+    assert [tool.name for tool in tools if "ctx:" in (tool.description or "")] == []
