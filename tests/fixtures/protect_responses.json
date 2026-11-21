@@ -5,5 +5,6 @@
   "chimes": [],
   "lights": [],
   "sensors": [],
-  "viewers": []
+  "viewers": [],
+  "camera_integration_v1_rtsps_enabled": {"id": "cam-v1-rtsps", "modelKey": "camera", "state": "CONNECTED", "name": "G3 Flex", "type": "UVC G3 Flex", "guid": null, "mac": "AABBCCDDEE20", "isMicEnabled": true, "osdSettings": {"isNameEnabled": false, "isDateEnabled": false, "isLogoEnabled": true, "isDebugEnabled": false, "overlayLocation": "topLeft"}, "ledSettings": {"isEnabled": true, "welcomeLed": true, "floodLed": true}, "micVolume": 100, "activePatrolSlot": null, "videoMode": "default", "hdrType": "off", "featureFlags": {"supportFullHdSnapshot": true, "hasHdr": true, "smartDetectTypes": [], "smartDetectAudioTypes": [], "videoModes": ["default", "sport", "slowShutter"], "hasMic": true, "hasLedStatus": true, "hasSpeaker": false}, "smartDetectSettings": {"objectTypes": [], "audioTypes": []}, "hasPackageCamera": false}
 }
