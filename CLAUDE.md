@@ -1,4 +1,6 @@
-# CLAUDE.md — Project Intelligence for unifi-mcp
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -25,6 +27,10 @@ uv run pytest tests/unit/ tests/property/ -v
 
 # Offline transport + allowlist (separate CI job)
 uv run pytest tests/integration/test_stdio_transport.py tests/integration/test_device_allowlist.py -v
+
+# Single file / single test (pytest addopts include -x and --strict-markers; asyncio_mode=auto)
+uv run pytest tests/unit/tools/test_confirm_gate.py -v
+uv run pytest "tests/unit/test_server.py::TestCreateServer::test_explicit_config_controls_startup_and_runtime_policy" -v
 
 # Test with coverage
 uv run pytest tests/unit/ tests/property/ --cov=unifi_mcp --cov-report=term-missing -m "not integration"
@@ -71,6 +77,17 @@ Network-origin counts. The inventory is checked against live registration and
 `src/unifi_mcp/_inventory.py` by `tests/unit/test_tool_inventory.py`.
 Network Integration tools share `unifi_network_*` names with legacy Network
 tools; their `{"network_integration"}` tag also drives graceful degradation.
+When only the legacy backend fails, `_hide_unavailable_backend`
+(`src/unifi_mcp/server.py`) hides its tools by name, not by tag, so the shared
+names stay served.
+
+- Registration is two-phase: `register_all_tools` (`src/unifi_mcp/tools/__init__.py`) registers by configured key and
+  `UNIFI_TOOLS` profile, then hides `{"write"}` unless `UNIFI_MODE=readwrite`; `_configured_lifespan` (`server.py`) then
+  hides the tag of any API whose `validate_connection()` fails (#87).
+- Every tool stacks `@mcp.tool(...)` over `@tool_handler()` (`src/unifi_mcp/tools/_common.py`), which funnels errors to
+  `ToolError` and, with `write=True`, re-checks `writes_enabled` at call time.
+- `destructiveHint: True` iff the tool takes a `confirm` bool that must be `True` (ADR-0001), enforced by
+  `tests/unit/tools/test_confirm_gate.py`.
 
 ## Conventions
 
@@ -83,28 +100,6 @@ tools; their `{"network_integration"}` tag also drives graceful degradation.
 - **Error mapping**: API errors -> typed exceptions -> `ToolError` with agent-readable messages
 - **Tests**: Use `respx` for HTTP mocking, `pytest-asyncio` for async tests
 - **No print statements**: Use `logging` module (enforced by ruff T20 rule)
-
-## Key Patterns
-
-### Mode Gating
-```python
-# Tools tagged with {"write"} are disabled in readonly mode
-@mcp.tool(tags={"write"}, annotations={"readOnlyHint": False})
-async def unifi_network_create_wlan(...): ...
-
-# In server lifespan:
-if not config.writes_enabled:
-    mcp.disable(tags={"write"})
-```
-
-### Graceful Degradation
-```python
-# Only register tools for APIs with configured keys
-if config.network_enabled:
-    register_network_tools(mcp)
-if config.protect_enabled:
-    register_protect_tools(mcp)
-```
 
 ## Gotchas
 
