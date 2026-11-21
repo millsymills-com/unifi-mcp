@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import re
 import time
+from pathlib import Path
 
 import pytest
 
@@ -663,3 +666,37 @@ class TestRedactSecretsFinalReviewShapes:
     )
     def test_benign_text_passes_through(self, text):
         assert redact_secrets({"note": text})["note"] == text
+
+
+class TestIntegrationV1CameraAliasShape:
+    """#499: a live integration-v1 camera with an active RTSPS stream carries no bare alias field.
+
+    Captured 2026-11-20 from ``GET /proxy/protect/integration/v1/cameras`` (G3 Flex,
+    ``rtsps-stream`` ``high`` enabled), sanitized. The bearer alias only reaches clients
+    inside ``rtsps://`` URLs from ``cameras/{id}/rtsps-stream``, which ``_RTSP_STREAM_RE``
+    covers, so plan phase 8's alias key-name rules are hardening, not a live-leak fix.
+    If a later capture adds an alias-shaped key, this test fails and phase 8 becomes urgent.
+    """
+
+    @staticmethod
+    def _camera() -> dict[str, object]:
+        path = Path(__file__).resolve().parent.parent / "fixtures" / "protect_responses.json"
+        return json.loads(path.read_text())["camera_integration_v1_rtsps_enabled"]
+
+    @staticmethod
+    def _keys(node: object) -> set[str]:
+        if isinstance(node, dict):
+            return set(node) | {k for v in node.values() for k in TestIntegrationV1CameraAliasShape._keys(v)}
+        if isinstance(node, list):
+            return {k for v in node for k in TestIntegrationV1CameraAliasShape._keys(v)}
+        return set()
+
+    def test_no_alias_shaped_keys(self):
+        alias_shaped = {
+            k for k in self._keys(self._camera()) if re.search(r"alias|stream|channel|rtsp", k, re.IGNORECASE)
+        }
+        assert alias_shaped == set()
+
+    def test_redaction_is_a_no_op(self):
+        camera = self._camera()
+        assert redact_secrets(camera) == camera
