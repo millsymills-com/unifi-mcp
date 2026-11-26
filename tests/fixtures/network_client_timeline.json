@@ -1,0 +1,45 @@
+{
+  "active_snapshots": {
+    "associated": {
+      "data": [
+        {"mac": "02:00:00:00:00:02", "hostname": "fixture-speaker"},
+        {
+          "mac": "02:00:00:00:00:01",
+          "hostname": "fixture-tablet",
+          "essid": "fixture-roam",
+          "ap_mac": "02:00:00:00:01:01",
+          "last_seen": 1795683600,
+          "token": "fixture-placeholder"
+        }
+      ]
+    },
+    "roamed": {
+      "data": [
+        {"mac": "02:00:00:00:00:02", "hostname": "fixture-speaker"},
+        {
+          "mac": "02:00:00:00:00:01",
+          "hostname": "fixture-tablet",
+          "essid": "fixture-roam",
+          "ap_mac": "02:00:00:00:01:02",
+          "last_seen": 1795683660,
+          "token": "fixture-placeholder"
+        }
+      ]
+    },
+    "disconnected": {
+      "data": [{"mac": "02:00:00:00:00:02", "hostname": "fixture-speaker"}]
+    }
+  },
+  "all_clients_after_disconnect": {
+    "data": [
+      {"mac": "02:00:00:00:00:02", "hostname": "fixture-speaker"},
+      {"mac": "02:00:00:00:00:01", "hostname": "fixture-tablet", "last_seen": 1795683660}
+    ]
+  },
+  "legacy_alarms": {
+    "data": [
+      {"_id": "fixture-alarm-2", "time": 1795683780000, "key": "fixture-ap-warning", "token": "fixture-placeholder"},
+      {"_id": "fixture-alarm-1", "time": 1795683600000, "key": "fixture-ap-warning"}
+    ]
+  }
+}
